@@ -5531,20 +5531,27 @@ function showLoginError(msg) {
 let appReady = false;
 let pendingUser = null;
 
+let _loginRoutingInProgress = false;
 function onLoginSuccess(user) {
+  // Prevent double-fire from signInWithEmailAndPassword + onAuthStateChanged both calling this
+  if (_loginRoutingInProgress) return;
+  _loginRoutingInProgress = true;
+  setTimeout(() => { _loginRoutingInProgress = false; }, 3000); // reset after 3s
+
   currentUser = user;
   const u = USERS[user.email] || { role: 'tech', name: user.email, uid: user.uid };
   currentRole = u.role;
   const ls = document.getElementById('loginScreen');
   const lb = document.getElementById('loginBtn');
-  if (ls) ls.style.display = 'none';
   if (lb) { lb.textContent = 'SIGN IN'; lb.disabled = false; }
+
   if (!appReady) {
-    // Page not ready yet - queue for when DOMContentLoaded fires
+    // DOMContentLoaded hasn't fired yet — queue routing
     pendingUser = user;
     return;
   }
-  // Page already loaded - route immediately
+  // Hide login and route
+  if (ls) ls.style.display = 'none';
   routeUser();
 }
 
@@ -5667,16 +5674,23 @@ function initFirebaseAuth() {
       const ls = document.getElementById('loginScreen');
       if (user) {
         try {
+          // onLoginSuccess has a double-fire guard — safe to always call
           onLoginSuccess(user);
         } catch(e) {
           console.warn('Auth routing error:', e);
           if (ls) ls.style.display = 'flex';
         }
       } else {
-        if (ls) ls.style.display = 'flex';
-        document.getElementById('techApp').style.display = 'none';
-        document.getElementById('closerApp').style.display = 'none';
-        document.getElementById('callCenterApp').style.display = 'none';
+        // Only show login if we're not mid-login (doLogin handles its own UI)
+        if (!_loginRoutingInProgress) {
+          if (ls) ls.style.display = 'flex';
+          const ta = document.getElementById('techApp');
+          const ca = document.getElementById('closerApp');
+          const cc = document.getElementById('callCenterApp');
+          if (ta) ta.style.display = 'none';
+          if (ca) ca.style.display = 'none';
+          if (cc) cc.style.display = 'none';
+        }
       }
     });
   } catch(e) { console.warn('Auth init failed', e); }
