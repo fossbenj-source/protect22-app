@@ -530,18 +530,18 @@
       <div style="font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;">OPERATIONS PLATFORM</div>
     </div>
     <!-- Form -->
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;">
+    <form id="loginForm" onsubmit="doLogin();return false;" style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;">
       <div id="loginError" style="display:none;background:rgba(255,68,68,0.1);border:1px solid var(--red);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--red);margin-bottom:16px;"></div>
       <div style="margin-bottom:14px;">
         <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:6px;">EMAIL</label>
-        <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')document.getElementById('loginPassword').focus()">
+        <input type="email" id="loginEmail" name="username" placeholder="your@email.com" autocomplete="username" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;">
       </div>
       <div style="margin-bottom:20px;">
         <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:6px;">PASSWORD</label>
-        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')doLogin()">
+        <input type="password" id="loginPassword" name="password" placeholder="••••••••" autocomplete="current-password" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;">
       </div>
-      <button onclick="doLogin()" id="loginBtn" style="width:100%;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;">SIGN IN</button>
-    </div>
+      <button type="submit" id="loginBtn" style="width:100%;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;">SIGN IN</button>
+    </form>
     <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);">Protect22 · Bridgepoint Service</div>
   </div>
 </div>
@@ -672,6 +672,15 @@
 </div>
 
 <div class="form-wrap">
+
+  <!-- Scheduled banner -->
+  <div id="scheduledBanner" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;margin-bottom:8px;align-items:center;gap:8px;">
+    <span style="font-size:14px;">📅</span>
+    <div>
+      <div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;">Scheduled</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--accent);" id="scheduledTimeLabel">—</div>
+    </div>
+  </div>
 
   <!-- Status + Time -->
   <div class="card">
@@ -1028,12 +1037,21 @@ function switchJob(id) {
 }
 
 function deleteJob(id, e) {
-  e.stopPropagation();
-  if (jobs.length === 1) { showToast('Need at least one job', 'error'); return; }
+  if (e) e.stopPropagation();
   jobs = jobs.filter(j => j.id !== id);
-  if (activeJobId === id) { activeJobId = jobs[jobs.length-1].id; loadJob(activeJobId); }
+  // If no jobs left, create a blank one
+  if (jobs.length === 0) {
+    const j = blankJob();
+    jobs.push(j);
+    activeJobId = j.id;
+  } else if (activeJobId === id) {
+    activeJobId = jobs[jobs.length-1].id;
+  }
+  loadJob(activeJobId);
   renderTabs();
   saveToStorage();
+  renderMonthCal();
+  showToast('Job removed', 'info');
 }
 
 function renderTabs() {
@@ -2028,7 +2046,7 @@ async function submitForm() {
       customer_phone:data.phone, confirmation:data.confirmation,
       zones:data.zones, address:data.address, notes:data.notes,
       status:data.status, arrive_time:data.arriveTime, finish_time:data.finishTime,
-      fees:data.fees
+      fees:data.fees, verbal_code:data.verbalCode||'—', master_code:data.masterCode||'—'
     });
     await logToSheets(data);
     showToast('✓ Sent & logged: ' + data.customer, 'success');
@@ -3161,6 +3179,58 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
   });
 }
 
+function showJobContextMenu(jobId, el) {
+  const j = jobs.find(x => x.id === jobId);
+  if (!j) return;
+
+  // Remove existing
+  document.getElementById('jobContextMenu')?.remove();
+
+  const menu = document.createElement('div');
+  menu.id = 'jobContextMenu';
+  menu.style.cssText = 'position:fixed;inset:0;z-index:50000;display:flex;align-items:flex-end;background:rgba(0,0,0,0.6);';
+  menu.onclick = e => { if(e.target===menu) menu.remove(); };
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:16px;';
+
+  // Job name header
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;';
+  hdr.textContent = (j.data.customerName||'Job') + (j.scheduledTime?' · '+j.scheduledTime:'');
+  sheet.appendChild(hdr);
+
+  // Action buttons
+  const actions = [
+    { icon:'📋', label:'Open Job', color:'var(--accent)', fn:() => { switchJob(jobId); showScreen('job'); menu.remove(); }},
+    { icon:'📅', label:'Reschedule', color:'var(--muted)', fn:() => { menu.remove(); openScheduleModal(); }},
+    { icon:'🗑️', label:'Delete from Schedule', color:'var(--red)', fn:() => {
+      menu.remove();
+      // Confirm delete
+      if (!confirm('Remove ' + (j.data.customerName||'this job') + ' from schedule?')) return;
+      deleteJob(jobId, {stopPropagation:()=>{}});
+      renderDayTimeline(calSelectedDate);
+    }},
+  ];
+
+  actions.forEach(a => {
+    const btn = document.createElement('button');
+    btn.style.cssText = 'width:100%;background:none;border:none;border-bottom:1px solid var(--border);color:'+a.color+';text-align:left;padding:14px 4px;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;';
+    btn.innerHTML = '<span style="font-size:18px;">'+a.icon+'</span><span>'+a.label+'</span>';
+    btn.onclick = a.fn;
+    sheet.appendChild(btn);
+  });
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.style.cssText = 'width:100%;background:none;border:none;color:var(--muted);padding:14px 4px;font-size:14px;cursor:pointer;margin-top:4px;';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = () => menu.remove();
+  sheet.appendChild(cancelBtn);
+
+  menu.appendChild(sheet);
+  document.body.appendChild(menu);
+}
+
 function addSwipeToComplete(el, jobId) {
   let startX = 0, currentX = 0, swiping = false;
   el.addEventListener('touchstart', e => { startX = e.touches[0].clientX; swiping = true; }, {passive:true});
@@ -3468,20 +3538,14 @@ function confirmScheduleJob() {
     }
   }
 
-  // Load equipment
-  const installing = getSchedEquipment('installing');
-  const existing = getSchedEquipment('existing');
-  if (installing.length) j.data.installing = installing;
-  if (existing.length) j.data.existing = existing.map(e => ({ name: e.name, qty: e.qty, yes: false, no: false, cell: false }));
-
   // Save duration
   j.scheduledDuration = schedDuration;
   j.scheduledEndTime = addMinutesToTime(time, schedDuration);
-  // Load equipment into job data
+  // Load equipment from schedule modal rows
   const installItems = getSchedEquipItems('install');
   const existItems = getSchedEquipItems('exist');
   if (installItems.length) j.data.installing = installItems;
-  if (existItems.length) j.data.existing = existItems.map(i => ({name:i.name, qty:i.qty, yes:false, no:false, cell:false}));
+  if (existItems.length) j.data.existing = existItems.map(i => ({name:i.name||i, qty:i.qty||'1', yes:i.yes||false, no:i.no||false, cell:i.cell||false}));
 
   jobs.push(j);
   activeJobId = j.id;
@@ -3537,7 +3601,7 @@ function renderHistory() {
   list.innerHTML = '';
 
   // Build history from all jobs that have been sent
-  const history = jobs.filter(j => j.sent || j.data.customerName);
+  const history = jobs.filter(j => j.data && j.data.customerName && j.data.customerName.trim());
   const sorted = [...history].reverse();
   const now = new Date();
   const weekAgo = new Date(now - 7*24*60*60*1000);
@@ -3554,13 +3618,15 @@ function renderHistory() {
   );
 
   if (filtered.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>No jobs found</div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>' + (q ? 'No matching jobs' : 'No jobs yet') + '</div>';
     return;
   }
 
   filtered.forEach(j => {
     const card = document.createElement('div');
     card.className = 'history-card';
+    const sc = j.status==='complete'?'var(--green)':j.status==='inprogress'?'var(--accent)':j.status==='cantfinish'?'var(--red)':j.status==='reschedule'?'var(--orange)':'var(--yellow)';
+    card.style.borderLeft = '3px solid ' + sc;
     const installing = j.data.installing ? j.data.installing.filter(Boolean).length : 0;
     const existing = j.data.existing ? j.data.existing.filter(e=>e&&(e.name||e)).length : 0;
     card.innerHTML = `
@@ -4145,14 +4211,15 @@ document.addEventListener('keydown', e => {
 function initFirebaseAuth() {
   if (typeof firebase === 'undefined' || !firebase.auth) {
     console.log('Firebase not available - using offline mode');
-    // Show login screen - user will log in with email/password validation only
     const ls = document.getElementById('loginScreen');
     if (ls) ls.style.display = 'flex';
     return;
   }
   try {
     const auth = firebase.auth();
-    auth.onAuthStateChanged(user => {
+    // Sign out any cached session first, THEN listen for auth state
+    auth.signOut().catch(()=>{}).finally(() => {
+      auth.onAuthStateChanged(user => {
       const ls = document.getElementById('loginScreen');
       if (user) {
         // Keep login screen until routing is confirmed
@@ -4170,6 +4237,7 @@ function initFirebaseAuth() {
         document.getElementById('callCenterApp').style.display = 'none';
       }
     });
+    });// end finally
   } catch(e) { console.warn('Auth init failed', e); }
 }
 // end initFirebaseAuth
@@ -4203,8 +4271,6 @@ try {
     window.fbRemove = (path) => db.ref(path).remove().catch(()=>{});
     window.fbListen = (path, cb) => db.ref(path).on('value', snap => cb(snap.val()));
     window.firebaseReady = true;
-    // Always sign out on fresh page load - require manual login every time
-    firebase.auth().signOut().catch(()=>{});
     db.ref('.info/connected').on('value', snap => {
       const el = document.getElementById('syncStatus');
       if (!el) return;
@@ -4268,6 +4334,7 @@ function initAppData() {
   updateTruckBadge();
   const lbl = document.getElementById('todayDateLabel');
   if (lbl) lbl.textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
+  updateTruckBadge();
   scheduleDailySummary();
   showScreen('today');
   // Sync Firebase jobs if available
@@ -4636,234 +4703,6 @@ function bookCCAppt() {
 
 <!-- TODAY SCREEN -->
 
-<!-- JOB SCREEN -->
-<div class="screen" id="screenJob">
-<div class="header" style="margin-top:0;">
-  <div class="logo">🛡️</div>
-  <div>
-    <h1>Alarm Install</h1>
-    <p>Protect22</p>
-  </div>
-  <div class="date-badge" id="dateBadge"></div>
-</div>
-
-<div class="jobs-bar" id="jobsBar">
-  <div class="current-job-bar" onclick="toggleJobsDropdown()">
-    <div style="flex:1;min-width:0;">
-      <div class="current-job-label">Current Job</div>
-      <div class="current-job-name" id="currentJobName">—</div>
-    </div>
-    <span class="current-job-status pending" id="currentJobStatus">…</span>
-    <span class="current-job-chevron" id="jobChevron">▾</span>
-  </div>
-  <div class="jobs-dropdown" id="jobsDropdown">
-    <div class="jobs-dropdown-header">
-      <span class="jobs-dropdown-title">All Jobs</span>
-    </div>
-    <div id="jobsList"></div>
-    <button class="btn-new-job" onclick="addJob();toggleJobsDropdown()">+ New Job</button>
-  </div>
-</div>
-
-<div class="form-wrap">
-
-  <!-- Status + Time -->
-  <div class="card">
-    <div class="card-head"><span>📍</span><h2>Job Status & Time</h2></div>
-    <div class="card-body">
-      <div class="field">
-        <label>Status</label>
-        <div class="status-row" style="gap:8px;">
-          <button class="status-btn" id="btnInProgress" onclick="setStatus('inprogress')" style="flex:1;">🔧 In Progress</button>
-          <button class="status-btn" id="btnComplete" onclick="setStatus('complete')" style="flex:1;">✓ Complete</button>
-          <button class="status-btn" id="btnCantFinish" onclick="triggerCantFinish()" style="flex:1;">⚠️ Couldn't Finish</button>
-        </div>
-      </div>
-      <div class="field">
-        <label>Time on Site</label>
-        <div class="time-row">
-          <button class="time-btn" id="btnArrive" onclick="stampTime('arrive')">🕐 Arrived</button>
-          <button class="time-btn" id="btnFinish" onclick="stampTime('finish')">🏁 Finished</button>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <div style="flex:1;">
-            <label style="font-size:9px;margin-bottom:3px;">ARRIVE TIME</label>
-            <input type="text" id="arriveInput" placeholder="e.g. 9:30 AM" oninput="editTime('arrive')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
-          </div>
-          <div style="flex:1;">
-            <label style="font-size:9px;margin-bottom:3px;">FINISH TIME</label>
-            <input type="text" id="finishInput" placeholder="e.g. 11:45 AM" oninput="editTime('finish')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-  <!-- Fee -->
-  <div class="fee-card">
-    <div>
-      <div class="fee-label">Install Fee</div>
-      <div class="fee-note">Standard Protect22 install</div>
-    </div>
-    <div style="text-align:right;">
-      <div class="fee-amount">$150</div>
-      <div class="fee-note">flat rate</div>
-    </div>
-  </div>
-
-  <!-- FillQuick -->
-  <a href="https://protect22.fillquick.com/Account/Login?ReturnUrl=%2F" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a2a1a,#0d1a0d);border:1px solid rgba(0,230,118,0.3);"
-    <span>📋</span><span>Protect22 FillQuick</span><span class="ql-arrow">→</span>
-  </a>
-
-  <!-- Customer & Contact -->
-  <div class="card">
-    <div class="card-head"><span>👤</span><h2>Customer Info & Contact</h2></div>
-    <div class="card-body">
-      <div class="field">
-        <label>Customer Name</label>
-        <div class="copy-row">
-          <input type="text" id="customerName" onblur="lockIfFilled('customerName')" placeholder="Full name or search..." oninput="autoSave();filterJobCustomers()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('address').focus();}">
-          <button class="btn-copy" onclick="copyField('customerName',this)" title="Copy name">⎘</button>
-          <button class="btn-paste" onclick="pasteField('customerName',this)" title="Paste name">⏎</button>
-        </div>
-        <div id="jobCustomerDropdown" style="display:none;background:var(--input-bg);border:1px solid var(--accent);border-radius:6px;margin-top:4px;max-height:160px;overflow-y:auto;z-index:500;position:relative;"></div>
-        <div id="jobCustomerSearch" style="display:none;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:160px;overflow-y:auto;position:relative;"></div>
-      </div>
-      <div class="field">
-        <label>Address</label>
-        <div class="addr-row">
-          <input type="text" id="address" onblur="lockIfFilled('address')" placeholder="123 Main St, City, State" oninput="autoSave();updateCrossStreet()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('email').focus();}">
-          <a id="mapsBtn" class="btn-maps" href="#" onclick="openMaps(event)" title="Open in Maps">📌</a>
-          <button class="btn-maps" onclick="getMyLocation(event)" title="Use my current location">📍</button><button class="btn-copy" onclick="copyField('address',this)" title="Copy address" style="height:34px;">⎘</button><button class="btn-paste" onclick="pasteField('address',this)" title="Paste address" style="height:34px;">⏎</button>
-        </div>
-        <div class="cross-street" id="crossStreet"></div>
-      </div>
-      <div class="field">
-        <label>Email</label>
-        <div class="copy-row"><input type="email" id="email" onblur="lockIfFilled('email')" placeholder="customer@email.com" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('phone').focus();}"><button class="btn-copy" onclick="copyField('email',this)" title="Copy email">⎘</button><button class="btn-paste" onclick="pasteField('email',this)" title="Paste email">⏎</button></div>
-      </div>
-      <div class="field">
-        <label>Phone</label>
-        <div class="copy-row"><input type="tel" id="phone" onblur="lockIfFilled('phone')" placeholder="(555) 000-0000" oninput="formatPhone(this);autoSave()" onpaste="setTimeout(()=>{formatPhone(this);autoSave();},0)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('cs').focus();}"><button class="btn-copy" onclick="copyField('phone',this)" title="Copy phone">⎘</button><button class="btn-paste" onclick="pasteField('phone',this)" title="Paste phone">⏎</button><button class="btn-call" onclick="callPhone()" title="Call">📞</button></div>
-      </div>
-      <div class="field">
-        <label>CS #</label>
-        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
-      </div>
-      <div class="field">
-        <label>ADT Bot Status #</label>
-        <div class="copy-row">
-          <input type="text" id="adtStatus" onblur="lockIfFilled('adtStatus')" placeholder="ADT bot status number" oninput="autoSave()">
-          <button class="btn-copy" onclick="copyField('adtStatus',this)" title="Copy ADT status">⎘</button>
-          <button class="btn-paste" onclick="pasteField('adtStatus',this)" title="Paste ADT status">⏎</button>
-        </div>
-      </div>
-      <div class="field">
-        <label>Confirmation #</label>
-        <div class="copy-row"><input type="text" id="confirmation" onblur="lockIfFilled('confirmation')" placeholder="Confirmation number" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('notes').focus();}"><button class="btn-copy" onclick="copyField('confirmation',this)" title="Copy confirmation #">⎘</button><button class="btn-paste" onclick="pasteField('confirmation',this)" title="Paste confirmation #">⏎</button></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3PS -->
-  <a href="https://3ps.dealer.adt.com/LoginPage.htm?originalUrl=https%3A%2F%2F3ps.dealer.adt.com%2F#!/search/customer" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a1a0a,#120f00);border:1px solid rgba(255,165,0,0.3);"
-    <span>🔍</span><span>3PS — ADT Customer Search</span><span class="ql-arrow">→</span>
-  </a>
-
-  <!-- ADT DCC -->
-  <a href="https://adtdcc-live-gme5sigejq-ue.a.run.app/" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#0a0d1a,#0d1020);border:1px solid rgba(0,212,255,0.3);"
-    <span>🖥️</span><span>ADT DCC Portal</span><span class="ql-arrow">→</span>
-  </a>
-
-
-  <!-- Existing -->
-  <div class="card">
-    <div class="card-head"><span>📦</span><h2>Existing Equipment</h2></div>
-    <div class="card-body">
-      <div id="existingRows"></div>
-      <button class="btn-add" onclick="addExistingRow()">+ Add Existing Equipment</button>
-    </div>
-  </div>
-
-
-
-
-  <!-- Installing -->
-  <div class="card">
-    <div class="card-head"><span>🔧</span><h2>Installing</h2></div>
-    <div class="card-body">
-      <div class="list-rows" id="installingRows"></div>
-      <button class="btn-add" onclick="addInstallingRow()">+ Add Equipment</button>
-    </div>
-  </div>
-
-  <!-- Master Code -->
-  <div class="card">
-    <div class="card-head"><span>🔑</span><h2>Codes</h2></div>
-    <div class="card-body">
-      <div class="field">
-        <label>Master Code</label>
-        <div class="copy-row">
-          <input type="text" id="masterCode" placeholder="Enter master code" oninput="autoSave()" onblur="lockIfFilled('masterCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
-          <button class="btn-copy" onclick="copyField('masterCode',this)" title="Copy master code">⎘</button>
-          <button class="btn-paste" onclick="pasteField('masterCode',this)" title="Paste master code">⏎</button>
-        </div>
-      </div>
-      <div class="field">
-        <label>Verbal Code</label>
-        <div class="copy-row">
-          <input type="text" id="verbalCode" placeholder="Enter verbal code" oninput="autoSave()" onblur="lockIfFilled('verbalCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
-          <button class="btn-copy" onclick="copyField('verbalCode',this)" title="Copy verbal code">⎘</button>
-          <button class="btn-paste" onclick="pasteField('verbalCode',this)" title="Paste verbal code">⏎</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Zones -->
-  <div class="card">
-    <div class="card-head"><span>📡</span><h2>Zones</h2></div>
-    <div class="card-body">
-      <div id="zoneRows"></div>
-      <button class="btn-add" onclick="addZoneRow()">+ Add Zone</button>
-    </div>
-  </div>
-
-  <!-- Notes -->
-  <div class="card">
-    <div class="card-head"><span>📝</span><h2>Notes</h2></div>
-    <div class="card-body">
-      <textarea id="notes" placeholder="Gate code, parking, special instructions, anything to remember..." oninput="autoSave()"></textarea>
-    </div>
-  </div>
-
-  <!-- MyADT -->
-  <div class="adt-banner">
-    <p><strong>For Signs</strong> — Register at MyADT.com</p>
-    <a class="adt-link" href="https://MyADT.com" target="_blank">MyADT.com →</a>
-  </div>
-
-  <!-- LeadConnector -->
-  <a href="https://api.leadconnectorhq.com/widget/form/F5f31hA1mM1CFsmkuiSQ" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a0a1a,#150d20);border:1px solid rgba(180,0,255,0.3);"
-    <span>📝</span><span>LeadConnector Form</span><span class="ql-arrow">→</span>
-  </a>
-
-  <div class="sent-banner" id="sentBanner">✓ Install record already sent for this job</div>
-
-  <button class="btn-submit" id="submitBtn" onclick="submitForm()">✉ Send Install Record</button>
-  <button class="btn-summary" onclick="sendDailySummary()">📊 Send Daily Summary</button>
-  <button class="btn-clear" onclick="clearJobData()">↺ Clear This Job's Customer Data</button>
-
-</div>
-
-<div class="toast" id="toast"></div>
-
-
-
-  
-</div>
 
 
 </div>
