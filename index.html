@@ -5495,24 +5495,24 @@ function doLogin() {
 
   // Firebase loads async — if not ready yet, retry up to 3s before failing
   function attemptLogin(retriesLeft) {
-    const ready = typeof firebase !== 'undefined'
-      && typeof firebase.auth === 'function'
-      && firebase.apps && firebase.apps.length > 0;
-
-    if (!ready) {
+    // window.firebaseReady is set immediately after firebase.initializeApp() runs
+    if (!window.firebaseReady) {
       if (retriesLeft > 0) {
         setTimeout(() => attemptLogin(retriesLeft - 1), 400);
         return;
       }
-      showLoginError('Connection required — check your internet and try again');
-      btn.textContent = 'SIGN IN'; btn.disabled = false;
-      return;
+      // Last resort — try anyway even if firebaseReady flag isn't set
+      if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
+        showLoginError('Connection required — check your internet and try again');
+        btn.textContent = 'SIGN IN'; btn.disabled = false;
+        return;
+      }
+      // Firebase SDK is loaded, just initializeApp may not have run — try anyway
     }
 
     firebase.auth().signInWithEmailAndPassword(email, pass)
-      .then(cred => {
-        // onAuthStateChanged will also fire — onLoginSuccess handles routing
-        // No need to call onLoginSuccess here, the auth listener does it
+      .then(() => {
+        // onAuthStateChanged fires automatically after sign-in and handles routing
       })
       .catch(e => {
         const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials')
