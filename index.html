@@ -3986,9 +3986,11 @@ function onLoginSuccess(user) {
 
 function routeUser() {
   if (!currentUser) return;
-  if (currentRole === 'closer') {
+  const role = (USERS[currentUser.email] || {}).role || 'tech';
+  currentRole = role;
+  if (role === 'closer') {
     initCloserView();
-  } else if (currentRole === 'callcenter') {
+  } else if (role === 'callcenter') {
     initCallCenterView();
   } else {
     initTechApp();
@@ -4022,16 +4024,25 @@ function initTechApp() {
 }
 
 function initCloserView() {
-  document.getElementById('techApp').style.display = 'none';
-  document.getElementById('closerApp').style.display = 'block';
-  document.getElementById('callCenterApp').style.display = 'none';
+  const ta=document.getElementById('techApp');
+  const ca=document.getElementById('closerApp');
+  const cc=document.getElementById('callCenterApp');
+  if (!ca) { setTimeout(initCloserView, 100); return; }
+  if (ta) ta.style.display = 'none';
+  ca.style.display = 'block';
+  if (cc) cc.style.display = 'none';
+  document.getElementById('closerDateLabel').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
   renderCloserCalendar();
 }
 
 function initCallCenterView() {
-  document.getElementById('techApp').style.display = 'none';
-  document.getElementById('closerApp').style.display = 'none';
-  document.getElementById('callCenterApp').style.display = 'block';
+  const ta=document.getElementById('techApp');
+  const ca=document.getElementById('closerApp');
+  const cc=document.getElementById('callCenterApp');
+  if (!cc) { setTimeout(initCallCenterView, 100); return; }
+  if (ta) ta.style.display = 'none';
+  if (ca) ca.style.display = 'none';
+  cc.style.display = 'block';
   renderCallCenterView();
 }
 
