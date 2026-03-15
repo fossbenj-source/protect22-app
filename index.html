@@ -20,7 +20,8 @@
     --shadow:0 4px 24px rgba(0,0,0,0.4);
   }
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'DM Sans',sans-serif;background:var(--bg);background-image:radial-gradient(ellipse at 20% 0%,rgba(0,212,255,0.04) 0%,transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(255,107,43,0.04) 0%,transparent 60%);color:var(--text);min-height:100vh;padding:0;}
+  html{overflow-x:hidden;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);background-image:radial-gradient(ellipse at 20% 0%,rgba(0,212,255,0.04) 0%,transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(255,107,43,0.04) 0%,transparent 60%);color:var(--text);min-height:100vh;padding:0;overflow-x:hidden;}
 
   /* HEADER */
   .header{max-width:780px;margin:0 auto 16px;display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--border);position:relative;}
@@ -62,7 +63,7 @@
   .btn-new-job:hover{background:var(--accent-dim);color:var(--accent);}
 
   /* FORM */
-  .form-wrap{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
+  .form-wrap{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:12px;overflow-x:hidden;}
 
   /* CARD */
   .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);transition:border-color 0.2s;overflow:visible;}
@@ -263,7 +264,7 @@
   .nav-btn.active .nav-icon{filter:drop-shadow(0 0 6px var(--accent));}
 
   /* SCREENS */
-  .screen{display:none;max-width:780px;margin:0 auto;padding:20px 16px 110px;}
+  .screen{display:none;max-width:780px;margin:0 auto;padding:20px 16px 110px;overflow-x:hidden;}
   .screen.active{display:block;}
 
   /* TODAY SCREEN */
@@ -705,6 +706,14 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* ── Floating send button on mobile ── */
+  #floatingSendBtn { bottom: 68px; }
+  #floatingSendBtn .btn-submit { font-size: 13px; padding: 14px; }
+
+  /* ── Address bar compact on mobile ── */
+  #jobAddressBar { padding: 10px 12px; }
+  #jobAddressPreview { font-size: 13px; }
 }
 </style>
 </head>
@@ -789,6 +798,9 @@
     <!-- Day Brief — smart morning summary, only shows on today with jobs -->
     <div id="dayBriefCard" style="display:none;margin-bottom:12px;"></div>
 
+    <!-- ★ TODAY'S JOBS — front and center -->
+    <div id="todayJobCards" style="margin-bottom:14px;"></div>
+
     <!-- Stats -->
     <div class="stats-row">
       <div class="stat-card" onclick="showAllJobsList()" style="cursor:pointer;"><div class="stat-num" id="statTotal" style="color:var(--accent)">0</div><div class="stat-label">Jobs</div></div>
@@ -799,7 +811,7 @@
     <!-- Schedule Job button -->
     <button class="btn-today-add" onclick="openScheduleModal()" style="margin-bottom:14px;">+ Schedule Job</button>
 
-    <!-- Month calendar always visible -->
+    <!-- Month calendar -->
     <div id="monthCalSection">
       <div class="cal-header">
         <button class="cal-nav" onclick="calNavMonth(-1)">&#8249;</button>
@@ -892,6 +904,16 @@
     </button>
   </div>
 
+  <!-- ★ ADDRESS BAR — always visible at top for quick navigation -->
+  <div id="jobAddressBar" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+    <div style="flex:1;min-width:0;">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1.5px;margin-bottom:2px;">NAVIGATE TO</div>
+      <div id="jobAddressPreview" style="font-size:14px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">No address yet</div>
+    </div>
+    <button onclick="openMaps(event)" style="background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:8px;padding:10px 16px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:1px;cursor:pointer;white-space:nowrap;flex-shrink:0;">📍 GO</button>
+    <button onclick="callPhone()" style="background:rgba(0,230,118,0.15);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:10px 12px;font-size:14px;cursor:pointer;flex-shrink:0;" title="Call customer">📞</button>
+  </div>
+
   <!-- Status + Time -->
   <div class="card">
     <div class="card-head"><span>📍</span><h2>Job Status & Time</h2></div>
@@ -924,32 +946,25 @@
     </div>
   </div>
 
-
-  <!-- Fee -->
-  <div class="fee-card">
-    <div>
-      <div class="fee-label">Install Fee</div>
-      <div class="fee-note">Standard Protect22 install</div>
+  <!-- ★ CUSTOMER INFO — collapsible when locked -->
+  <div class="card" id="customerInfoCard">
+    <div class="card-head" onclick="toggleCustomerCollapse()" style="cursor:pointer;">
+      <span>👤</span><h2>Customer Info & Contact</h2>
+      <span id="customerCollapseChevron" style="margin-left:auto;color:var(--muted);font-size:12px;">▾</span>
     </div>
-    <div style="text-align:right;">
-      <div class="fee-amount" id="feeAmountDisplay">$150</div>
-      <div class="fee-note">flat rate</div>
+    <!-- Collapsed summary — shown when all fields locked -->
+    <div id="customerCollapsedSummary" style="display:none;padding:10px 14px;font-size:13px;color:var(--text);cursor:pointer;" onclick="toggleCustomerCollapse()">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span id="collapsedName" style="font-weight:700;"></span>
+        <span id="collapsedPhone" style="color:var(--muted);font-size:12px;"></span>
+        <span id="collapsedCS" style="color:var(--muted);font-size:12px;"></span>
+      </div>
     </div>
-  </div>
-
-  <!-- FillQuick -->
-  <a href="https://protect22.fillquick.com/Account/Login?ReturnUrl=%2F" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a2a1a,#0d1a0d);border:1px solid rgba(0,230,118,0.3);"
-    <span>📋</span><span>Protect22 FillQuick</span><span class="ql-arrow">→</span>
-  </a>
-
-  <!-- Customer & Contact -->
-  <div class="card">
-    <div class="card-head"><span>👤</span><h2>Customer Info & Contact</h2></div>
-    <div class="card-body">
+    <div class="card-body" id="customerInfoBody">
       <div class="field">
         <label>Customer Name</label>
         <div class="copy-row">
-          <input type="text" id="customerName" onblur="lockIfFilled('customerName')" placeholder="Full name or search..." oninput="autoSave();filterJobCustomers()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('address').focus();}">
+          <input type="text" id="customerName" onblur="lockIfFilled('customerName');autoSave()" placeholder="Full name or search..." oninput="debouncedFilterJobCustomers();debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('address').focus();}">
           <button class="btn-copy" onclick="copyField('customerName',this)" title="Copy name">⎘</button>
           <button class="btn-paste" onclick="pasteField('customerName',this)" title="Paste name">⏎</button>
         </div>
@@ -959,7 +974,7 @@
       <div class="field">
         <label>Address</label>
         <div class="addr-row">
-          <input type="text" id="address" onblur="lockIfFilled('address')" placeholder="123 Main St, City, State" oninput="autoSave();updateCrossStreet()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('email').focus();}">
+          <input type="text" id="address" onblur="lockIfFilled('address')" placeholder="123 Main St, City, State" oninput="autoSave();updateCrossStreet();updateAddressBar()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('email').focus();}">
           <a id="mapsBtn" class="btn-maps" href="#" onclick="openMaps(event)" title="Open in Maps">📌</a>
           <button class="btn-maps" onclick="getMyLocation(event)" title="Use my current location">📍</button><button class="btn-copy" onclick="copyField('address',this)" title="Copy address" style="height:34px;">⎘</button><button class="btn-paste" onclick="pasteField('address',this)" title="Paste address" style="height:34px;">⏎</button>
         </div>
@@ -992,16 +1007,17 @@
     </div>
   </div>
 
-  <!-- 3PS -->
-  <a href="https://3ps.dealer.adt.com/LoginPage.htm?originalUrl=https%3A%2F%2F3ps.dealer.adt.com%2F#!/search/customer" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a1a0a,#120f00);border:1px solid rgba(255,165,0,0.3);"
-    <span>🔍</span><span>3PS — ADT Customer Search</span><span class="ql-arrow">→</span>
-  </a>
-
-  <!-- ADT DCC -->
-  <a href="https://adtdcc-live-gme5sigejq-ue.a.run.app/" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#0a0d1a,#0d1020);border:1px solid rgba(0,212,255,0.3);"
-    <span>🖥️</span><span>ADT DCC Portal</span><span class="ql-arrow">→</span>
-  </a>
-
+  <!-- Fee -->
+  <div class="fee-card">
+    <div>
+      <div class="fee-label">Install Fee</div>
+      <div class="fee-note">Standard Protect22 install</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="fee-amount" id="feeAmountDisplay">$150</div>
+      <div class="fee-note">flat rate</div>
+    </div>
+  </div>
 
   <!-- Existing -->
   <div class="card">
@@ -1012,15 +1028,15 @@
     </div>
   </div>
 
-
-
-
   <!-- Installing -->
   <div class="card">
     <div class="card-head"><span>🔧</span><h2>Installing</h2></div>
     <div class="card-body">
       <div class="list-rows" id="installingRows"></div>
-      <button class="btn-add" onclick="addInstallingRow()">+ Add Equipment</button>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn-add" onclick="addInstallingRow()" style="flex:1;">+ Add Equipment</button>
+        <button class="btn-add" onclick="loadEquipTemplate()" style="flex:0 0 auto;border-color:var(--accent);color:var(--accent);" title="Load standard install template">⚡ Template</button>
+      </div>
     </div>
   </div>
 
@@ -1064,23 +1080,47 @@
     </div>
   </div>
 
+  <!-- ★ QUICK LINKS — grouped together, collapsible -->
+  <div class="card">
+    <div class="card-head" onclick="const b=document.getElementById('quickLinksBody');b.style.display=b.style.display==='none'?'flex':'none'" style="cursor:pointer;">
+      <span>🔗</span><h2>Quick Links & Portals</h2>
+      <span style="margin-left:auto;color:var(--muted);font-size:12px;">▾</span>
+    </div>
+    <div id="quickLinksBody" style="display:none;padding:10px 14px;flex-direction:column;gap:8px;">
+      <a href="https://protect22.fillquick.com/Account/Login?ReturnUrl=%2F" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a2a1a,#0d1a0d);border:1px solid rgba(0,230,118,0.3);">
+        <span>📋</span><span>Protect22 FillQuick</span><span class="ql-arrow">→</span>
+      </a>
+      <a href="https://3ps.dealer.adt.com/LoginPage.htm?originalUrl=https%3A%2F%2F3ps.dealer.adt.com%2F#!/search/customer" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a1a0a,#120f00);border:1px solid rgba(255,165,0,0.3);">
+        <span>🔍</span><span>3PS — ADT Customer Search</span><span class="ql-arrow">→</span>
+      </a>
+      <a href="https://adtdcc-live-gme5sigejq-ue.a.run.app/" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#0a0d1a,#0d1020);border:1px solid rgba(0,212,255,0.3);">
+        <span>🖥️</span><span>ADT DCC Portal</span><span class="ql-arrow">→</span>
+      </a>
+      <a href="https://api.leadconnectorhq.com/widget/form/F5f31hA1mM1CFsmkuiSQ" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a0a1a,#150d20);border:1px solid rgba(180,0,255,0.3);">
+        <span>📝</span><span>LeadConnector Form</span><span class="ql-arrow">→</span>
+      </a>
+    </div>
+  </div>
+
   <!-- MyADT -->
   <div class="adt-banner">
     <p><strong>For Signs</strong> — Register at MyADT.com</p>
     <a class="adt-link" href="https://MyADT.com" target="_blank">MyADT.com →</a>
   </div>
 
-  <!-- LeadConnector -->
-  <a href="https://api.leadconnectorhq.com/widget/form/F5f31hA1mM1CFsmkuiSQ" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a0a1a,#150d20);border:1px solid rgba(180,0,255,0.3);"
-    <span>📝</span><span>LeadConnector Form</span><span class="ql-arrow">→</span>
-  </a>
-
   <div class="sent-banner" id="sentBanner">✓ Install record already sent for this job</div>
 
-  <button class="btn-submit" id="submitBtn" onclick="submitForm()">✉ Send Install Record</button>
   <button class="btn-summary" onclick="sendDailySummary()">📊 Send Daily Summary</button>
   <button class="btn-clear" onclick="clearJobData()">↺ Clear This Job's Customer Data</button>
 
+  <!-- spacer for floating button -->
+  <div style="height:70px;"></div>
+
+</div>
+
+<!-- ★ FLOATING SEND BUTTON — always visible -->
+<div id="floatingSendBtn" style="position:fixed;bottom:68px;left:50%;transform:translateX(-50%);z-index:8990;width:calc(100% - 32px);max-width:748px;">
+  <button class="btn-submit" id="submitBtn" onclick="submitForm()" style="box-shadow:0 -4px 20px rgba(0,0,0,0.5);">✉ Send Install Record</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1093,6 +1133,15 @@ const DEFAULT_EMAIL_RECIPIENT = 'bfoss@bridgepointservice.com';
 function getEmailRecipient() {
   return localStorage.getItem('p22_emailRecipient') || DEFAULT_EMAIL_RECIPIENT;
 }
+
+// ── Global error handler — surfaces silent failures ──
+window.onerror = function(msg, url, line, col, err) {
+  console.error('P22 Error:', msg, 'at line', line, err);
+  return false;
+};
+window.addEventListener('unhandledrejection', e => {
+  console.error('P22 Unhandled promise:', e.reason);
+});
 
 // ── Equipment ──────────────────────────────────────────────
 const EQUIPMENT = [
@@ -1289,9 +1338,15 @@ function deleteJob(id, e) {
 }
 
 function renderTabs() {
+  // Skip DOM updates while user is actively typing in customerName — iOS Safari
+  // loses cursor position / drops characters when DOM is modified during input
+  const focused = document.activeElement;
+  if (focused && focused.id === 'customerName') return;
+
   const activeJob = jobs.find(j => j.id === activeJobId);
   const nameEl = document.getElementById('currentJobName');
   const stEl = document.getElementById('currentJobStatus');
+  if (!nameEl || !stEl) return; // Not on job screen yet
   if (activeJob) {
     nameEl.textContent = activeJob.data.customerName || (activeJob.scheduledTime ? activeJob.scheduledTime + (activeJob.scheduledDate ? ' · ' + new Date(activeJob.scheduledDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '') : 'Job ' + activeJob.id);
     if (activeJob.sent) { stEl.textContent = '✉ Sent'; stEl.className = 'current-job-status complete'; }
@@ -1551,6 +1606,128 @@ function loadJob(id) {
   const btn = document.getElementById('submitBtn');
   if (j.sent) { sb.classList.add('show'); btn.innerHTML = '✉ Resend Install Record'; }
   else { sb.classList.remove('show'); btn.innerHTML = '✉ Send Install Record'; }
+  // Update address bar and customer collapse state
+  updateAddressBar();
+  updateCustomerCollapseState();
+  updatePasteVisibility();
+}
+
+// ── Address Bar (top of job screen) ─────────────────────
+function updateAddressBar() {
+  const preview = document.getElementById('jobAddressPreview');
+  if (!preview) return;
+  const addr = document.getElementById('address')?.value?.trim();
+  const name = document.getElementById('customerName')?.value?.trim();
+  if (addr) {
+    preview.textContent = addr.split(',')[0]; // Show just street
+    preview.style.color = 'var(--text)';
+  } else if (name) {
+    preview.textContent = name + ' — no address';
+    preview.style.color = 'var(--muted)';
+  } else {
+    preview.textContent = 'No address yet';
+    preview.style.color = 'var(--muted)';
+  }
+}
+
+// ── Customer Info Collapse ──────────────────────────────
+let _customerCollapsed = false;
+function toggleCustomerCollapse() {
+  _customerCollapsed = !_customerCollapsed;
+  applyCustomerCollapse();
+}
+
+function applyCustomerCollapse() {
+  const body = document.getElementById('customerInfoBody');
+  const summary = document.getElementById('customerCollapsedSummary');
+  const chevron = document.getElementById('customerCollapseChevron');
+  if (!body || !summary) return;
+  if (_customerCollapsed) {
+    body.style.display = 'none';
+    summary.style.display = 'block';
+    if (chevron) chevron.textContent = '▸';
+    // Populate collapsed summary
+    const name = document.getElementById('customerName')?.value?.trim() || '';
+    const phone = document.getElementById('phone')?.value?.trim() || '';
+    const cs = document.getElementById('cs')?.value?.trim() || '';
+    document.getElementById('collapsedName').textContent = name || 'No customer';
+    document.getElementById('collapsedPhone').textContent = phone ? '📞 ' + phone : '';
+    document.getElementById('collapsedCS').textContent = cs ? 'CS: ' + cs : '';
+  } else {
+    body.style.display = 'block';
+    summary.style.display = 'none';
+    if (chevron) chevron.textContent = '▾';
+  }
+}
+
+function updateCustomerCollapseState() {
+  // Auto-collapse if all key fields are locked
+  const keyFields = ['customerName', 'address', 'phone'];
+  const allLocked = keyFields.every(fid => {
+    const el = document.getElementById(fid);
+    return el && el.value.trim() && el.readOnly;
+  });
+  if (allLocked && !_customerCollapsed) {
+    _customerCollapsed = true;
+    applyCustomerCollapse();
+  } else if (!allLocked && _customerCollapsed) {
+    _customerCollapsed = false;
+    applyCustomerCollapse();
+  }
+}
+
+// ── Equipment Template (one-tap standard install) ───────
+const DEFAULT_TEMPLATE = [
+  { name: '2GIG eSERIES THIN D/W CONTACT (DW10e-345)', qty: '4' },
+  { name: '2GIG eSERIES MOTION DETECTOR PIR (PIR1e-345)', qty: '1' },
+  { name: '2GIG eSERIES SMOKE/HEAT/FREEZE SENSOR (SMKT8e-345)', qty: '1' },
+  { name: '2GIG eSERIES 4-BUTTON KEYFOB (KEY2e-345)', qty: '1' },
+];
+
+function loadEquipTemplate() {
+  const saved = JSON.parse(localStorage.getItem('p22_defaultTemplate') || 'null');
+  const template = saved || DEFAULT_TEMPLATE;
+  // Check if installing rows already have items
+  const existing = document.getElementById('installingRows');
+  const hasItems = existing && existing.querySelectorAll('.list-row').length > 0 &&
+    [...existing.querySelectorAll('.combo-wrap')].some(c => c.getValue && c.getValue());
+  if (hasItems) {
+    // Ask whether to replace or append
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
+    overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+    sheet.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">⚡ LOAD TEMPLATE</div>';
+    const replBtn = document.createElement('button');
+    replBtn.style.cssText = 'width:100%;background:rgba(0,212,255,0.1);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;cursor:pointer;margin-bottom:10px;';
+    replBtn.textContent = '↺ REPLACE CURRENT';
+    replBtn.onclick = () => { overlay.remove(); applyEquipTemplate(template, true); };
+    const addBtn = document.createElement('button');
+    addBtn.style.cssText = 'width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:13px;cursor:pointer;margin-bottom:10px;';
+    addBtn.textContent = '+ ADD TO EXISTING';
+    addBtn.onclick = () => { overlay.remove(); applyEquipTemplate(template, false); };
+    const canBtn = document.createElement('button');
+    canBtn.style.cssText = 'width:100%;background:none;border:none;color:var(--muted);padding:10px;font-size:12px;cursor:pointer;';
+    canBtn.textContent = 'Cancel';
+    canBtn.onclick = () => overlay.remove();
+    sheet.appendChild(replBtn); sheet.appendChild(addBtn); sheet.appendChild(canBtn);
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+  } else {
+    applyEquipTemplate(template, true);
+  }
+}
+
+function applyEquipTemplate(template, replace) {
+  if (replace) {
+    document.getElementById('installingRows').innerHTML = '';
+  }
+  template.forEach(item => {
+    addInstallingRow(item.name, item.qty);
+  });
+  autoSave();
+  showToast('⚡ Template loaded — ' + template.length + ' items', 'success');
 }
 
 function updateCrossStreet() {
@@ -1574,6 +1751,57 @@ function updateCrossStreet() {
   } else {
     el.classList.remove('show');
   }
+}
+
+// ── Smart button visibility: hide copy+paste when empty, show copy when has value ──
+function updatePasteVisibility() {
+  const fields = ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'];
+  fields.forEach(fid => {
+    const el = document.getElementById(fid);
+    if (!el) return;
+    const row = el.closest('.copy-row') || el.closest('.addr-row');
+    if (!row) return;
+    const pasteBtn = row.querySelector('.btn-paste');
+    const copyBtn = row.querySelector('.btn-copy');
+    // If field is locked, lockField already handles visibility
+    if (el.readOnly) {
+      if (copyBtn) copyBtn.style.display = 'flex';
+      if (pasteBtn) pasteBtn.style.display = 'none';
+      return;
+    }
+    const hasValue = el.value.trim();
+    if (hasValue) {
+      if (copyBtn) copyBtn.style.display = 'flex';
+      if (pasteBtn) pasteBtn.style.display = 'none';
+    } else {
+      if (copyBtn) copyBtn.style.display = 'none';
+      if (pasteBtn) pasteBtn.style.display = 'flex';
+    }
+  });
+}
+// Run on every input so buttons update as you type
+document.addEventListener('input', e => {
+  if (e.target.matches('#customerName,#address,#email,#phone,#cs,#adtStatus,#confirmation,#masterCode,#verbalCode')) {
+    const row = e.target.closest('.copy-row') || e.target.closest('.addr-row');
+    if (!row) return;
+    const pasteBtn = row.querySelector('.btn-paste');
+    const copyBtn = row.querySelector('.btn-copy');
+    if (e.target.readOnly) return;
+    const hasValue = e.target.value.trim();
+    if (hasValue) {
+      if (copyBtn) copyBtn.style.display = 'flex';
+      if (pasteBtn) pasteBtn.style.display = 'none';
+    } else {
+      if (copyBtn) copyBtn.style.display = 'none';
+      if (pasteBtn) pasteBtn.style.display = 'flex';
+    }
+  }
+});
+
+let _filterTimer = null;
+function debouncedFilterJobCustomers() {
+  if (_filterTimer) clearTimeout(_filterTimer);
+  _filterTimer = setTimeout(filterJobCustomers, 300);
 }
 
 function filterJobCustomers() {
@@ -1655,6 +1883,11 @@ function loadJobCustomer(jobId) {
   });
   autoSave(); updateCrossStreet();
   document.getElementById('jobCustomerDropdown').style.display = 'none';
+  // Lock all filled customer fields
+  Object.keys(fields).forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el && el.value.trim()) lockField(fid);
+  });
   showToast('✓ Loaded from todays job', 'success');
 }
 
@@ -1669,6 +1902,11 @@ function loadCustomerIntoJob(id) {
   if (c.notes) { const n = document.getElementById('notes'); if(n && !n.value) n.value = c.notes; }
   autoSave(); updateCrossStreet();
   document.getElementById('jobCustomerSearch').style.display = 'none';
+  // Lock all filled customer fields
+  Object.keys(fields).forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el && el.value.trim()) lockField(fid);
+  });
   showToast('✓ ' + c.name + ' loaded', 'success');
 }
 
@@ -1684,7 +1922,7 @@ document.addEventListener('click', e => {
 
 function copyField(id, btn) {
   const val = document.getElementById(id).value.trim();
-  if (!val) { showToast('Nothing to copy', 'error'); return; }
+  if (!val) return; // Silently ignore — button should be hidden anyway
   navigator.clipboard.writeText(val).then(() => {
     btn.textContent = '✓';
     btn.classList.add('copied');
@@ -1694,9 +1932,14 @@ function copyField(id, btn) {
   });
 }
 
+let _recentlyUnlocked = new Set(); // Track fields unlocked by edit button to prevent re-lock race
+
 function lockIfFilled(id) {
+  // Skip if this field was just unlocked by the edit button (race condition prevention)
+  if (_recentlyUnlocked.has(id)) return;
   // Small delay so edit button click registers before lock fires
   setTimeout(() => {
+    if (_recentlyUnlocked.has(id)) return; // Check again after delay
     const input = document.getElementById(id);
     if (input && input.value.trim() && !input.readOnly) {
       lockField(id);
@@ -1719,28 +1962,35 @@ function lockField(id) {
     editBtn.className = 'btn-edit';
     editBtn.title = 'Edit field';
     editBtn.textContent = '✏️';
-    editBtn.onclick = () => unlockField(id);
+    editBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); unlockField(id); };
     // Insert before copy button so it sits in the right spot
     const copyBtn = row.querySelector('.btn-copy');
     if (copyBtn) row.insertBefore(editBtn, copyBtn);
     else row.appendChild(editBtn);
   } else {
-    row.querySelector('.btn-edit').style.display = 'flex';
+    const existing = row.querySelector('.btn-edit');
+    existing.style.display = 'flex';
+    // Re-bind onclick in case it was stale
+    existing.onclick = (e) => { e.preventDefault(); e.stopPropagation(); unlockField(id); };
   }
 }
 
 function unlockField(id) {
   const input = document.getElementById(id);
   if (!input) return;
+  // Mark as recently unlocked to prevent lockIfFilled race condition
+  _recentlyUnlocked.add(id);
+  setTimeout(() => _recentlyUnlocked.delete(id), 500);
   input.readOnly = false;
   input.classList.remove('locked');
-  input.focus();
   const row = input.closest('.copy-row') || input.closest('.addr-row');
   if (!row) return;
   const pasteBtn = row.querySelector('.btn-paste');
   if (pasteBtn) pasteBtn.style.display = 'flex';
   const editBtn = row.querySelector('.btn-edit');
   if (editBtn) editBtn.style.display = 'none';
+  // Focus after a tick so the DOM settles
+  setTimeout(() => input.focus(), 50);
 }
 
 function callPhone() {
@@ -1773,6 +2023,29 @@ async function pasteField(id, btn) {
   }
 }
 
+// Simple paste for forms without lock behavior (new customer, etc.)
+async function pasteToField(id, btn) {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) { showToast('Clipboard is empty', 'error'); return; }
+    const input = document.getElementById(id);
+    if (!input) return;
+    if (id.toLowerCase().includes('phone')) {
+      input.value = text;
+      formatPhone(input);
+    } else {
+      input.value = text.trim();
+    }
+    if (btn) {
+      btn.textContent = '✓';
+      btn.classList.add('pasted');
+      setTimeout(() => { btn.textContent = '⏎'; btn.classList.remove('pasted'); }, 1200);
+    }
+  } catch(e) {
+    showToast('Allow clipboard access when prompted', 'info');
+  }
+}
+
 function formatPhone(input) {
   let digits = input.value.replace(/\D/g, '').slice(0, 10);
   if (digits.length === 0) { input.value = ''; return; }
@@ -1785,11 +2058,33 @@ function formatPhone(input) {
   }
 }
 
+let _autoSaveTimer = null;
 function autoSave() {
   saveCurrentJob();
   renderTabs();
-  saveToStorage();
-  if (typeof currentScreen !== 'undefined' && currentScreen === 'today' && typeof renderCal === 'function') renderCal();
+  // Debounce the expensive storage/Firebase write - 500ms after last keystroke
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => {
+    saveToStorage();
+    if (typeof currentScreen !== 'undefined' && currentScreen === 'today' && typeof renderCal === 'function') renderCal();
+  }, 500);
+}
+
+// Fully debounced version — delays ALL work including renderTabs
+// Use this on inputs where iOS keyboard interference is a problem (customerName)
+let _debouncedAutoSaveTimer = null;
+function debouncedAutoSave() {
+  if (_debouncedAutoSaveTimer) clearTimeout(_debouncedAutoSaveTimer);
+  _debouncedAutoSaveTimer = setTimeout(() => {
+    saveCurrentJob();
+    // Only update tabs/DOM if user is no longer typing in customerName
+    const focused = document.activeElement;
+    if (!focused || focused.id !== 'customerName') {
+      renderTabs();
+      updateAddressBar();
+    }
+    saveToStorage();
+  }, 600);
 }
 
 function saveToStorage() {
@@ -3012,16 +3307,21 @@ function clearJobData() {
   j.data.customerName=''; j.data.address=''; j.data.cs='';
   j.data.email=''; j.data.phone=''; j.data.confirmation='';
   j.data.notes=''; j.data.zones=[]; j.data.arriveTime=''; j.data.finishTime='';
+  j.data.masterCode=''; j.data.verbalCode=''; j.data.adtStatus='';
+  j.data.lockedFields = [];
   j.status='pending'; j.sent=false;
-  document.getElementById('customerName').value='';
-  if(document.getElementById('masterCode')) document.getElementById('masterCode').value='';
-  if(document.getElementById('adtStatus')) document.getElementById('adtStatus').value='';
-  document.getElementById('address').value='';
-  document.getElementById('cs').value='';
-  document.getElementById('email').value='';
-  document.getElementById('phone').value='';
-  document.getElementById('confirmation').value='';
-  document.getElementById('notes').value='';
+  // Unlock and clear all fields
+  const clearFields = ['customerName','address','cs','email','phone','confirmation','notes','masterCode','verbalCode','adtStatus'];
+  clearFields.forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el) { el.value = ''; el.readOnly = false; el.classList.remove('locked'); }
+    // Hide edit buttons, show paste buttons
+    const row = el ? (el.closest('.copy-row') || el.closest('.addr-row')) : null;
+    if (row) {
+      const editBtn = row.querySelector('.btn-edit'); if(editBtn) editBtn.style.display = 'none';
+      const pasteBtn = row.querySelector('.btn-paste'); if(pasteBtn) pasteBtn.style.display = 'flex';
+    }
+  });
   document.getElementById('zoneRows').innerHTML=''; addZoneRow();
   document.getElementById('sentBanner').classList.remove('show');
   document.getElementById('submitBtn').innerHTML='✉ Send Install Record';
@@ -3029,7 +3329,8 @@ function clearJobData() {
   document.getElementById('btnArrive').textContent='🕐 Arrived';
   document.getElementById('btnFinish').className='time-btn';
   document.getElementById('btnFinish').textContent='🏁 Finished';
-  document.getElementById('timeDisplay').textContent='—';
+  const arrIn = document.getElementById('arriveInput'); if(arrIn) arrIn.value = '';
+  const finIn = document.getElementById('finishInput'); if(finIn) finIn.value = '';
   setStatus('pending', false);
   renderTabs();
   saveToStorage();
@@ -3319,6 +3620,11 @@ function useCustomer(id) {
   j.data.email        = c.email || '';
   j.data.cs           = c.cs || '';
   j.data.notes        = c.notes || '';
+  // Pre-set locked fields so they lock on load
+  j.data.lockedFields = ['customerName','address','phone','email','cs'].filter(fid => {
+    const val = fid === 'customerName' ? c.name : fid === 'address' ? c.address : fid === 'phone' ? c.phone : fid === 'email' ? c.email : c.cs;
+    return val && val.trim();
+  });
   jobs.push(j);
   activeJobId = j.id;
   saveToStorage();
@@ -3717,11 +4023,59 @@ function updateTodayStats() {
   document.getElementById('statFees').textContent = '$' + allJobs.filter(j=>j.status==='complete').length * INSTALL_FEE;
   // Refresh the day brief card
   if (typeof renderDayBrief === 'function') renderDayBrief();
+  // Refresh today's job cards
+  renderTodayJobCards();
   const sync = document.getElementById('syncStatus');
   if (sync) {
     if (window.firebaseReady) { sync.textContent = '⬤ Synced'; sync.style.color = 'var(--green)'; }
     else { sync.textContent = '⬤ Local'; sync.style.color = 'var(--muted)'; }
   }
+}
+
+// ── Today's Job Cards (top of today screen) ─────────────
+function renderTodayJobCards() {
+  const container = document.getElementById('todayJobCards');
+  if (!container) return;
+  const todayJobs = sortJobsByTime(getJobsForDate(new Date()));
+  if (todayJobs.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No jobs scheduled for today</div>';
+    return;
+  }
+  let html = '';
+  todayJobs.forEach((j, idx) => {
+    const sc = j.status==='complete'?'var(--green)':j.status==='inprogress'?'var(--accent)':j.status==='cantfinish'?'var(--red)':'var(--yellow)';
+    const statusIcon = getStatusIcon(j.status);
+    const addr = j.data.address ? j.data.address.split(',')[0] : '';
+    const isDone = j.status === 'complete';
+    html += '<div data-jobid="'+j.id+'" class="today-job-quick-card" style="background:var(--panel);border:1px solid var(--border);border-left:3px solid '+sc+';border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;'+(isDone?'opacity:0.6;':'')+'display:flex;align-items:center;gap:12px;">';
+    html += '<div style="flex:1;min-width:0;">';
+    html += '<div style="display:flex;align-items:center;gap:6px;">';
+    html += '<span style="font-family:Share Tech Mono,monospace;font-size:12px;color:'+sc+';font-weight:bold;">'+esc(j.scheduledTime||'--:--')+'</span>';
+    html += '<span style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(j.data.customerName||'Unnamed')+'</span>';
+    html += '</div>';
+    if (addr) html += '<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 '+esc(addr)+'</div>';
+    html += '</div>';
+    html += '<span style="font-size:14px;">'+statusIcon+'</span>';
+    if (addr && !isDone) {
+      html += '<button onclick="event.stopPropagation();navToAddress(\''+esc(addr.replace(/'/g,"\\'"))+'\')" style="background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:6px;padding:8px 10px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;flex-shrink:0;">GO</button>';
+    }
+    html += '</div>';
+  });
+  container.innerHTML = html;
+  // Wire clicks
+  container.querySelectorAll('.today-job-quick-card').forEach(card => {
+    card.onclick = () => { switchJob(parseInt(card.dataset.jobid)); showScreen('job'); };
+    card.onmouseover = () => { card.style.borderColor = 'var(--accent)'; };
+    card.onmouseout = () => { card.style.borderColor = 'var(--border)'; };
+  });
+}
+
+function navToAddress(addr) {
+  if (!addr) return;
+  const encoded = encodeURIComponent(addr);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) { window.location.href = 'maps://?q=' + encoded; }
+  else { window.open('https://www.google.com/maps/search/?api=1&query=' + encoded, '_blank'); }
 }
 
 // ── SCHEDULE MODAL ────────────────────────────────────────
@@ -4093,7 +4447,7 @@ function updateTimeBlockPreview() {
 }
 
 function addMinutesToTime(timeStr, mins) {
-  if (!timeStr || timeStr === '9:00 AM') return null;
+  if (!timeStr) return null;
   try {
     const parts = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
     if (!parts) return null;
@@ -4574,18 +4928,21 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     // Ghost only moves vertically — X stays locked to column
     if (ghostEl) {
       ghostEl.style.top = (clientY - grabOffsetY) + 'px';
-      // ghostEl.style.left unchanged — stays at ghostOrigLeft
     }
-    // Track el.style.top for day-view drop position
-    const parentRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0};
-    const elTop = (clientY - grabOffsetY) - parentRect.top;
+    // Calculate el.style.top accounting for scroll offset of the timeline container
+    const container = containerEl || el.parentElement;
+    const scrollWrap = container.closest('.timeline-wrap');
+    const scrollTop = scrollWrap ? scrollWrap.scrollTop : 0;
+    const parentRect = container.getBoundingClientRect();
+    const elTop = (clientY - grabOffsetY) - parentRect.top + scrollTop;
     el.style.top = Math.max(0, elTop) + 'px';
     // Update ghost label with snapped time (week view)
     const colInfo = getWeekColAtX(clientX);
     if (colInfo) {
       const colRect = colInfo.col.getBoundingClientRect();
-      // Time is based on element top edge, not cursor
-      const elTopInCol = (clientY - grabOffsetY) - colRect.top;
+      const colScrollWrap = colInfo.col.closest('.timeline-wrap');
+      const colScrollTop = colScrollWrap ? colScrollWrap.scrollTop : 0;
+      const elTopInCol = (clientY - grabOffsetY) - colRect.top + colScrollTop;
       const { time } = getTimeFromTop(Math.max(0, elTopInCol));
       if (ghostEl) {
         const nameEl = ghostEl.querySelector('.timeline-event-name');
@@ -4613,10 +4970,11 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     const colInfo = getWeekColAtX(clientX);
 
     if (colInfo && colInfo.col.getAttribute('data-date')) {
-      // WEEK VIEW DROP — use element TOP edge (not cursor) so time matches
-      // where the block lands visually, not where the user grabbed it.
+      // WEEK VIEW DROP — account for scroll offset within timeline container
       const colRect = colInfo.col.getBoundingClientRect();
-      const elTopInCol = (clientY - grabOffsetY) - colRect.top;
+      const colScrollWrap = colInfo.col.closest('.timeline-wrap');
+      const colScrollTop = colScrollWrap ? colScrollWrap.scrollTop : 0;
+      const elTopInCol = (clientY - grabOffsetY) - colRect.top + colScrollTop;
       const { time } = getTimeFromTop(Math.max(0, elTopInCol));
       const dateStr = colInfo.col.getAttribute('data-date');
       const newDate = new Date(dateStr + 'T12:00:00');
@@ -4629,10 +4987,7 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       renderWeekTimeline();
       showToast('📅 Moved to ' + colInfo.col.getAttribute('data-date-label') + ' at ' + time, 'success');
     } else {
-      // DAY VIEW DROP - get time from Y position relative to timeline container
-      const container = containerEl || el.parentElement;
-      const containerRect = container ? container.getBoundingClientRect() : {top:0};
-      // Use the element's current top position (set during drag)
+      // DAY VIEW DROP — use el.style.top which was set during drag with scroll offset
       const currentTop = parseInt(el.style.top) || 0;
       const { time, snappedMins } = getTimeFromTop(currentTop);
       const snappedTop = (snappedMins / 60) * HOUR_HEIGHT;
@@ -4969,19 +5324,29 @@ function addResizeToEvent(el, jobId, HOUR_HEIGHT, HOUR_START) {
 
 function timeToMinutes(timeStr) {
   if (!timeStr) return null;
+  // Try standard "H:MM AM/PM"
   const parts = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!parts) {
-    // Try bare hour
-    const h = parseInt(timeStr);
-    if (!isNaN(h)) return h * 60;
-    return null;
+  if (parts) {
+    let h = parseInt(parts[1]);
+    const m = parseInt(parts[2]);
+    const ampm = parts[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
   }
-  let h = parseInt(parts[1]);
-  const m = parseInt(parts[2]);
-  const ampm = parts[3].toUpperCase();
-  if (ampm === 'PM' && h !== 12) h += 12;
-  if (ampm === 'AM' && h === 12) h = 0;
-  return h * 60 + m;
+  // Try "H AM/PM" or "Ha" / "Hp" formats
+  const shortParts = timeStr.match(/(\d+)\s*(AM|PM|a|p)/i);
+  if (shortParts) {
+    let h = parseInt(shortParts[1]);
+    const ampm = shortParts[2].toUpperCase();
+    if ((ampm === 'PM' || ampm === 'P') && h !== 12) h += 12;
+    if ((ampm === 'AM' || ampm === 'A') && h === 12) h = 0;
+    return h * 60;
+  }
+  // Try bare number (assume hour in 24h)
+  const h = parseInt(timeStr);
+  if (!isNaN(h) && h >= 0 && h <= 23) return h * 60;
+  return null;
 }
 
 function getStatusClass(status) {
@@ -5131,7 +5496,7 @@ function getSchedTime() {
 
 
 function getSchedEquipment(type) {
-  const containerId = type === 'installing' ? 'schedInstallingRows' : 'schedExistingRows';
+  const containerId = type === 'installing' ? 'schedInstallRows' : 'schedExistRows';
   const c = document.getElementById(containerId);
   if (!c) return [];
   return [...c.querySelectorAll('.sched-equip-row')].map(row => {
@@ -5236,6 +5601,11 @@ let truck = (() => {
 let selectedDay = new Date().toDateString();
 
 function showScreen(name) {
+  // Save current job data before leaving the job screen
+  if (currentScreen === 'job' && name !== 'job') {
+    saveCurrentJob();
+    saveToStorage();
+  }
   currentScreen = name;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -5917,7 +6287,6 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Init ─────────────────────────────────────────────────
-// ── Init ─────────────────────────────────────────────────
 // ── Firebase Auth Init ───────────────────────────────────
 function initFirebaseAuth() {
   if (typeof firebase === 'undefined' || !firebase.auth) {
@@ -6024,14 +6393,13 @@ if (pendingUser) { currentUser = pendingUser; pendingUser = null; routeUser(); }
 
 }); // end DOMContentLoaded
 
-// ── initAppData (replaces old DOMContentLoaded init) ─────
-// ── Closer Calendar ───────────────────────────────────────
+// ── Closer Calendar State ────────────────────────────────
 let closerAppts = [];
 let closerCalDate = new Date();
 let closerSelectedDate = new Date();
 let closerView = 'week';
-// ── Call Center ────────────────────────────────────────────
-// ── initAppData (replaces old DOMContentLoaded init) ─────
+
+// ── initAppData ──────────────────────────────────────────
 function initAppData() {
   // Load data or demo data
   if (!loadFromStorage()) {
@@ -6730,11 +7098,11 @@ document.addEventListener('DOMContentLoaded', function() {
     <!-- New customer form — collapsed by default -->
     <div class="customer-form-card" id="newCustomerForm" style="display:none;margin-bottom:14px;">
       <h3>NEW CUSTOMER</h3>
-      <div class="field"><label>Name *</label><input type="text" id="ncName" placeholder="Full name" style="font-size:16px;"></div>
-      <div class="field"><label>Address</label><input type="text" id="ncAddress" placeholder="123 Main St, City, State" style="font-size:16px;"></div>
-      <div class="field"><label>Phone</label><input type="tel" id="ncPhone" placeholder="(555) 000-0000" oninput="formatPhone(this)" style="font-size:16px;"></div>
-      <div class="field"><label>Email</label><input type="email" id="ncEmail" placeholder="customer@email.com" style="font-size:16px;"></div>
-      <div class="field"><label>CS #</label><input type="text" id="ncCs" placeholder="CS number" style="font-size:16px;"></div>
+      <div class="field"><label>Name *</label><div class="copy-row"><input type="text" id="ncName" placeholder="Full name" style="font-size:16px;"><button class="btn-paste" onclick="pasteToField('ncName',this)" title="Paste">⏎</button></div></div>
+      <div class="field"><label>Address</label><div class="copy-row"><input type="text" id="ncAddress" placeholder="123 Main St, City, State" style="font-size:16px;"><button class="btn-paste" onclick="pasteToField('ncAddress',this)" title="Paste">⏎</button></div></div>
+      <div class="field"><label>Phone</label><div class="copy-row"><input type="tel" id="ncPhone" placeholder="(555) 000-0000" oninput="formatPhone(this)" style="font-size:16px;"><button class="btn-paste" onclick="pasteToField('ncPhone',this)" title="Paste">⏎</button></div></div>
+      <div class="field"><label>Email</label><div class="copy-row"><input type="email" id="ncEmail" placeholder="customer@email.com" style="font-size:16px;"><button class="btn-paste" onclick="pasteToField('ncEmail',this)" title="Paste">⏎</button></div></div>
+      <div class="field"><label>CS #</label><div class="copy-row"><input type="text" id="ncCs" placeholder="CS number" style="font-size:16px;"><button class="btn-paste" onclick="pasteToField('ncCs',this)" title="Paste">⏎</button></div></div>
       <div class="field"><label>Notes</label><textarea id="ncNotes" placeholder="Any notes about this customer..." style="min-height:60px;"></textarea></div>
       <div style="display:flex;gap:8px;margin-top:4px;">
         <button onclick="saveNewCustomer()" style="flex:1;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:2px;cursor:pointer;">💾 SAVE CUSTOMER</button>
