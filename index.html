@@ -935,11 +935,11 @@
         <div style="display:flex;gap:8px;margin-top:8px;">
           <div style="flex:1;">
             <label style="font-size:9px;margin-bottom:3px;">ARRIVE TIME</label>
-            <input type="text" id="arriveInput" placeholder="e.g. 9:30 AM" oninput="editTime('arrive')" onblur="editTime('arrive')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
+            <input type="text" id="arriveInput" placeholder="e.g. 9:30 AM" oninput="editTimeRaw('arrive')" onblur="editTimeNormalize('arrive')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
           </div>
           <div style="flex:1;">
             <label style="font-size:9px;margin-bottom:3px;">FINISH TIME</label>
-            <input type="text" id="finishInput" placeholder="e.g. 11:45 AM" oninput="editTime('finish')" onblur="editTime('finish')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
+            <input type="text" id="finishInput" placeholder="e.g. 11:45 AM" oninput="editTimeRaw('finish')" onblur="editTimeNormalize('finish')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
           </div>
         </div>
       </div>
@@ -974,7 +974,7 @@
       <div class="field">
         <label>Address</label>
         <div class="addr-row">
-          <input type="text" id="address" onblur="lockIfFilled('address')" placeholder="123 Main St, City, State" oninput="autoSave();updateCrossStreet();updateAddressBar()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('email').focus();}">
+          <input type="text" id="address" onblur="lockIfFilled('address')" placeholder="123 Main St, City, State" oninput="debouncedAutoSave();updateCrossStreet();updateAddressBar()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('email').focus();}">
           <a id="mapsBtn" class="btn-maps" href="#" onclick="openMaps(event)" title="Open in Maps">📌</a>
           <button class="btn-maps" onclick="getMyLocation(event)" title="Use my current location">📍</button><button class="btn-copy" onclick="copyField('address',this)" title="Copy address" style="height:34px;">⎘</button><button class="btn-paste" onclick="pasteField('address',this)" title="Paste address" style="height:34px;">⏎</button>
         </div>
@@ -982,27 +982,27 @@
       </div>
       <div class="field">
         <label>Email</label>
-        <div class="copy-row"><input type="email" id="email" onblur="lockIfFilled('email')" placeholder="customer@email.com" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('phone').focus();}"><button class="btn-copy" onclick="copyField('email',this)" title="Copy email">⎘</button><button class="btn-paste" onclick="pasteField('email',this)" title="Paste email">⏎</button></div>
+        <div class="copy-row"><input type="email" id="email" onblur="lockIfFilled('email')" placeholder="customer@email.com" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('phone').focus();}"><button class="btn-copy" onclick="copyField('email',this)" title="Copy email">⎘</button><button class="btn-paste" onclick="pasteField('email',this)" title="Paste email">⏎</button></div>
       </div>
       <div class="field">
         <label>Phone</label>
-        <div class="copy-row"><input type="tel" id="phone" onblur="lockIfFilled('phone')" placeholder="(555) 000-0000" oninput="formatPhone(this);autoSave()" onpaste="setTimeout(()=>{formatPhone(this);autoSave();},0)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('cs').focus();}"><button class="btn-copy" onclick="copyField('phone',this)" title="Copy phone">⎘</button><button class="btn-paste" onclick="pasteField('phone',this)" title="Paste phone">⏎</button><button class="btn-call" onclick="callPhone()" title="Call">📞</button></div>
+        <div class="copy-row"><input type="tel" id="phone" onblur="lockIfFilled('phone')" placeholder="(555) 000-0000" oninput="formatPhone(this);debouncedAutoSave()" onpaste="setTimeout(()=>{formatPhone(this);debouncedAutoSave();},0)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('cs').focus();}"><button class="btn-copy" onclick="copyField('phone',this)" title="Copy phone">⎘</button><button class="btn-paste" onclick="pasteField('phone',this)" title="Paste phone">⏎</button><button class="btn-call" onclick="callPhone()" title="Call">📞</button></div>
       </div>
       <div class="field">
         <label>CS #</label>
-        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
+        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
       </div>
       <div class="field">
         <label>ADT Bot Status #</label>
         <div class="copy-row">
-          <input type="text" id="adtStatus" onblur="lockIfFilled('adtStatus')" placeholder="ADT bot status number" oninput="autoSave()">
+          <input type="text" id="adtStatus" onblur="lockIfFilled('adtStatus')" placeholder="ADT bot status number" oninput="debouncedAutoSave()">
           <button class="btn-copy" onclick="copyField('adtStatus',this)" title="Copy ADT status">⎘</button>
           <button class="btn-paste" onclick="pasteField('adtStatus',this)" title="Paste ADT status">⏎</button>
         </div>
       </div>
       <div class="field">
         <label>Confirmation #</label>
-        <div class="copy-row"><input type="text" id="confirmation" onblur="lockIfFilled('confirmation')" placeholder="Confirmation number" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('notes').focus();}"><button class="btn-copy" onclick="copyField('confirmation',this)" title="Copy confirmation #">⎘</button><button class="btn-paste" onclick="pasteField('confirmation',this)" title="Paste confirmation #">⏎</button></div>
+        <div class="copy-row"><input type="text" id="confirmation" onblur="lockIfFilled('confirmation')" placeholder="Confirmation number" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('notes').focus();}"><button class="btn-copy" onclick="copyField('confirmation',this)" title="Copy confirmation #">⎘</button><button class="btn-paste" onclick="pasteField('confirmation',this)" title="Paste confirmation #">⏎</button></div>
       </div>
     </div>
   </div>
@@ -1035,19 +1035,19 @@
       <div class="list-rows" id="installingRows"></div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn-add" onclick="addInstallingRow()" style="flex:1;">+ Add Equipment</button>
-        <button class="btn-add" onclick="loadEquipTemplate()" style="flex:0 0 auto;border-color:var(--accent);color:var(--accent);" title="Load standard install template">⚡ Template</button>
+        <button onclick="loadEquipTemplate()" style="flex:0 0 auto;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:7px 14px;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;transition:all 0.15s;white-space:nowrap;" title="Load standard install template">⚡ Template</button>
       </div>
     </div>
   </div>
 
-  <!-- Master Code -->
+  <!-- Codes -->
   <div class="card">
     <div class="card-head"><span>🔑</span><h2>Codes</h2></div>
     <div class="card-body">
       <div class="field">
         <label>Master Code</label>
         <div class="copy-row">
-          <input type="text" id="masterCode" placeholder="Enter master code" oninput="autoSave()" onblur="lockIfFilled('masterCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
+          <input type="text" id="masterCode" placeholder="Enter master code" oninput="debouncedAutoSave()" onblur="lockIfFilled('masterCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
           <button class="btn-copy" onclick="copyField('masterCode',this)" title="Copy master code">⎘</button>
           <button class="btn-paste" onclick="pasteField('masterCode',this)" title="Paste master code">⏎</button>
         </div>
@@ -1055,10 +1055,15 @@
       <div class="field">
         <label>Verbal Code</label>
         <div class="copy-row">
-          <input type="text" id="verbalCode" placeholder="Enter verbal code" oninput="autoSave()" onblur="lockIfFilled('verbalCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
+          <input type="text" id="verbalCode" placeholder="Enter verbal code" oninput="debouncedAutoSave()" onblur="lockIfFilled('verbalCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
           <button class="btn-copy" onclick="copyField('verbalCode',this)" title="Copy verbal code">⎘</button>
           <button class="btn-paste" onclick="pasteField('verbalCode',this)" title="Paste verbal code">⏎</button>
         </div>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+        <label>User Codes</label>
+        <div id="userCodeRows"></div>
+        <button class="btn-add" onclick="addUserCodeRow()" style="margin-top:8px;">+ Add User Code</button>
       </div>
     </div>
   </div>
@@ -1076,7 +1081,7 @@
   <div class="card">
     <div class="card-head"><span>📝</span><h2>Notes</h2></div>
     <div class="card-body">
-      <textarea id="notes" placeholder="Gate code, parking, special instructions, anything to remember..." oninput="autoSave()"></textarea>
+      <textarea id="notes" placeholder="Gate code, parking, special instructions, anything to remember..." oninput="debouncedAutoSave()"></textarea>
     </div>
   </div>
 
@@ -1128,7 +1133,7 @@
 <script>
 emailjs.init("A1vvWPOF9gjT480_A");
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyMxJeWLlp5GWa8rpCqbUWc-fLXd4xXdfGHZQ0oUeCfFH5Fb7lQjvt1iadUZALPWlQL/exec";
-const INSTALL_FEE = 150; // ── Central fee constant ── change once, updates everywhere
+let INSTALL_FEE = (() => { try { const s = JSON.parse(localStorage.getItem('p22_settings')||'{}'); return s.installFee || 150; } catch(e) { return 150; } })();
 const DEFAULT_EMAIL_RECIPIENT = 'bfoss@bridgepointservice.com';
 function getEmailRecipient() {
   return localStorage.getItem('p22_emailRecipient') || DEFAULT_EMAIL_RECIPIENT;
@@ -1282,7 +1287,7 @@ function blankJob() {
     status: 'pending',
     data: {
       customerName:'', address:'', cs:'', email:'', phone:'', masterCode:'', verbalCode:'', adtStatus:'',
-      confirmation:'', notes:'', installing:[], existing:[], zones:[],
+      confirmation:'', notes:'', installing:[], existing:[], zones:[], userCodes:[],
       arriveTime:'', finishTime:''
     }
   };
@@ -1338,10 +1343,10 @@ function deleteJob(id, e) {
 }
 
 function renderTabs() {
-  // Skip DOM updates while user is actively typing in customerName — iOS Safari
+  // Skip DOM updates while user is actively typing in ANY input — iOS Safari
   // loses cursor position / drops characters when DOM is modified during input
   const focused = document.activeElement;
-  if (focused && focused.id === 'customerName') return;
+  if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA') && focused.closest('#screenJob')) return;
 
   const activeJob = jobs.find(j => j.id === activeJobId);
   const nameEl = document.getElementById('currentJobName');
@@ -1481,11 +1486,12 @@ function saveCurrentJob() {
     .map(item => ({
       name: item.querySelector('.combo-wrap').getValue(),
       qty: item.querySelector('.qty-input').value||'1',
-      yes: item.querySelector('[data-cls="on-yes"]').classList.contains('on-yes'),
-      no: item.querySelector('[data-cls="on-no"]').classList.contains('on-no'),
+      yes: false,
+      no: false,
       cell: item.querySelector('[data-cls="on-cell"]').classList.contains('on-cell')
     }));
   d.zones = [...document.getElementById('zoneRows').querySelectorAll('input')].map(i => i.value);
+  d.userCodes = getUserCodes();
   // Persist locked state so it survives navigation
   const lockableFields = ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'];
   d.lockedFields = lockableFields.filter(fid => {
@@ -1592,6 +1598,9 @@ function loadJob(id) {
 
   document.getElementById('zoneRows').innerHTML = '';
   (d.zones && d.zones.length ? d.zones : ['']).forEach(z => addZoneRow(z));
+
+  // User codes
+  loadUserCodes(d.userCodes || []);
 
   // Status
   setStatus(j.status || 'pending', false);
@@ -1728,6 +1737,63 @@ function applyEquipTemplate(template, replace) {
   });
   autoSave();
   showToast('⚡ Template loaded — ' + template.length + ' items', 'success');
+}
+
+// ── Template Editor (Settings screen) ───────────────────
+function loadTemplateEditor() {
+  const container = document.getElementById('templateEditorRows');
+  if (!container) return;
+  container.innerHTML = '';
+  const saved = JSON.parse(localStorage.getItem('p22_defaultTemplate') || 'null');
+  const template = saved || DEFAULT_TEMPLATE;
+  template.forEach((item, idx) => addTemplateRow(item.name, item.qty));
+  if (template.length === 0) addTemplateRow();
+}
+
+function addTemplateRow(name, qty) {
+  const container = document.getElementById('templateEditorRows');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'list-row';
+  row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:8px;';
+  const combo = createCombo(name || '');
+  combo.style.flex = '1';
+  combo.style.minWidth = '0';
+  const qtyWrap = document.createElement('div');
+  qtyWrap.className = 'qty-wrap';
+  const qtyMinus = document.createElement('button');
+  qtyMinus.className = 'qty-btn'; qtyMinus.textContent = '−'; qtyMinus.type = 'button';
+  const qtyInput = document.createElement('input');
+  qtyInput.type = 'text'; qtyInput.className = 'qty-input'; qtyInput.value = qty || '1'; qtyInput.maxLength = 3;
+  const qtyPlus = document.createElement('button');
+  qtyPlus.className = 'qty-btn'; qtyPlus.textContent = '+'; qtyPlus.type = 'button';
+  qtyMinus.onclick = () => { const v = parseInt(qtyInput.value)||1; if(v>1) qtyInput.value = v-1; };
+  qtyPlus.onclick = () => { const v = parseInt(qtyInput.value)||1; qtyInput.value = v+1; };
+  qtyWrap.appendChild(qtyMinus); qtyWrap.appendChild(qtyInput); qtyWrap.appendChild(qtyPlus);
+  const rm = document.createElement('button');
+  rm.className = 'btn-remove'; rm.innerHTML = '&times;';
+  rm.onclick = () => row.remove();
+  row.appendChild(combo); row.appendChild(qtyWrap); row.appendChild(rm);
+  container.appendChild(row);
+}
+
+function saveTemplate() {
+  const container = document.getElementById('templateEditorRows');
+  if (!container) return;
+  const items = [...container.querySelectorAll('.list-row')].map(row => {
+    const name = row.querySelector('.combo-wrap')?.getValue?.() || '';
+    const qty = row.querySelector('.qty-input')?.value || '1';
+    return name ? { name, qty } : null;
+  }).filter(Boolean);
+  if (items.length === 0) { showToast('Add at least one item', 'error'); return; }
+  localStorage.setItem('p22_defaultTemplate', JSON.stringify(items));
+  showToast('⚡ Template saved — ' + items.length + ' items', 'success');
+}
+
+function resetTemplate() {
+  localStorage.removeItem('p22_defaultTemplate');
+  loadTemplateEditor();
+  showToast('Template reset to default', 'info');
 }
 
 function updateCrossStreet() {
@@ -2077,13 +2143,16 @@ function debouncedAutoSave() {
   if (_debouncedAutoSaveTimer) clearTimeout(_debouncedAutoSaveTimer);
   _debouncedAutoSaveTimer = setTimeout(() => {
     saveCurrentJob();
-    // Only update tabs/DOM if user is no longer typing in customerName
+    // Only update tabs/DOM if user is no longer typing in any input
     const focused = document.activeElement;
-    if (!focused || focused.id !== 'customerName') {
+    if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA') && focused.closest('#screenJob')) {
+      // Still typing — just save to storage, skip DOM updates
+      saveToStorage();
+    } else {
       renderTabs();
       updateAddressBar();
+      saveToStorage();
     }
-    saveToStorage();
   }, 600);
 }
 
@@ -2842,24 +2911,40 @@ function normalizeTimeInput(raw) {
   return h + ':' + String(m).padStart(2,'0') + ' ' + ampm;
 }
 
-function editTime(type) {
+// Save raw value while typing — no normalization, no snapping
+function editTimeRaw(type) {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  if (type === 'arrive') {
+    j.data.arriveTime = document.getElementById('arriveInput').value;
+  } else {
+    j.data.finishTime = document.getElementById('finishInput').value;
+  }
+}
+
+// Normalize on blur — format the time and update display
+function editTimeNormalize(type) {
   const j = jobs.find(x => x.id === activeJobId);
   if (!j) return;
   if (type === 'arrive') {
     const input = document.getElementById('arriveInput');
     const val = normalizeTimeInput(input.value);
-    if (val && val !== input.value) input.value = val;
-    j.data.arriveTime = val;
-    document.getElementById('btnArrive').className = 'time-btn' + (val ? ' stamped' : '');
+    if (val) input.value = val;
+    j.data.arriveTime = val || input.value;
+    document.getElementById('btnArrive').className = 'time-btn' + (j.data.arriveTime ? ' stamped' : '');
   } else {
     const input = document.getElementById('finishInput');
     const val = normalizeTimeInput(input.value);
-    if (val && val !== input.value) input.value = val;
-    j.data.finishTime = val;
-    document.getElementById('btnFinish').className = 'time-btn' + (val ? ' stamped' : '');
+    if (val) input.value = val;
+    j.data.finishTime = val || input.value;
+    document.getElementById('btnFinish').className = 'time-btn' + (j.data.finishTime ? ' stamped' : '');
   }
   updateTimeDisplay(j.data.arriveTime, j.data.finishTime);
+  saveToStorage();
 }
+
+// Keep editTime as alias for backward compat (stamp buttons call it)
+function editTime(type) { editTimeNormalize(type); }
 
 function updateTimeDisplay(arrive, finish) {
   const btnA = document.getElementById('btnArrive');
@@ -3021,9 +3106,18 @@ document.addEventListener('click', e => { if(openDropdown&&!e.target.closest('.c
 function addInstallingRow(val, qty) {
   const c=document.getElementById('installingRows');
   const row=document.createElement('div'); row.className='list-row';
-  const num=document.createElement('span'); num.className='row-num';
+  row.style.cssText='display:flex;flex-direction:column;gap:6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;';
+  // Line 1: full-width equipment name
   const combo=createCombo(val);
+  combo.style.width='100%';
+  combo.querySelector('input').style.fontSize='14px';
   combo.querySelector('input').addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addInstallingRow();setTimeout(()=>{const ins=c.querySelectorAll('.combo-wrap input');ins[ins.length-1].focus();},50);} });
+  // Line 2: qty controls + remove, right-aligned
+  const controlRow=document.createElement('div');
+  controlRow.style.cssText='display:flex;align-items:center;justify-content:flex-end;gap:6px;';
+  const qtyLabel=document.createElement('span');
+  qtyLabel.style.cssText='font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-right:auto;';
+  qtyLabel.textContent='QTY';
   const qtyWrap=document.createElement('div'); qtyWrap.className='qty-wrap';
   const qtyMinus=document.createElement('button'); qtyMinus.className='qty-btn'; qtyMinus.textContent='−'; qtyMinus.type='button';
   const qtyInput=document.createElement('input'); qtyInput.type='text'; qtyInput.className='qty-input'; qtyInput.value=qty||'1'; qtyInput.maxLength=3;
@@ -3031,23 +3125,24 @@ function addInstallingRow(val, qty) {
   qtyMinus.onclick=()=>{ const v=parseInt(qtyInput.value)||1; if(v>1){qtyInput.value=v-1; autoSave();} };
   qtyPlus.onclick=()=>{ const v=parseInt(qtyInput.value)||1; qtyInput.value=v+1; autoSave(); };
   qtyInput.addEventListener('input', autoSave);
-  qtyInput.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addInstallingRow();setTimeout(()=>{const ins=c.querySelectorAll('.combo-wrap input');ins[ins.length-1].focus();},50);} });
   qtyWrap.appendChild(qtyMinus); qtyWrap.appendChild(qtyInput); qtyWrap.appendChild(qtyPlus);
   const rm=document.createElement('button'); rm.className='btn-remove'; rm.innerHTML='&times;';
-  rm.onclick=()=>{row.remove();renum(c,'.row-num');autoSave();};
-  row.appendChild(num); row.appendChild(combo); row.appendChild(qtyWrap); row.appendChild(rm);
-  c.appendChild(row); renum(c,'.row-num');
+  rm.onclick=()=>{row.remove();autoSave();};
+  controlRow.appendChild(qtyLabel); controlRow.appendChild(qtyWrap); controlRow.appendChild(rm);
+  row.appendChild(combo); row.appendChild(controlRow);
+  c.appendChild(row);
 }
 
 function addExistingRow(val, flags) {
   flags=flags||{};
   const c=document.getElementById('existingRows');
   const item=document.createElement('div'); item.className='equip-item';
-  const top=document.createElement('div'); top.className='equip-top';
-  const num=document.createElement('span'); num.className='row-num';
+  item.style.cssText='background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;';
+  // Line 1: full-width equipment name
   const combo=createCombo(val);
-  const input=combo.querySelector('input');
-  input.addEventListener('keydown', e => {
+  combo.style.width='100%';
+  combo.querySelector('input').style.fontSize='14px';
+  combo.querySelector('input').addEventListener('keydown', e => {
     if(e.key==='Enter'){
       e.preventDefault();
       addExistingRow();
@@ -3057,6 +3152,12 @@ function addExistingRow(val, flags) {
       },50);
     }
   });
+  // Line 2: qty controls + remove
+  const controlRow=document.createElement('div');
+  controlRow.style.cssText='display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:6px;';
+  const qtyLabel=document.createElement('span');
+  qtyLabel.style.cssText='font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-right:auto;';
+  qtyLabel.textContent='QTY';
   const qtyWrap=document.createElement('div'); qtyWrap.className='qty-wrap';
   const qtyMinus=document.createElement('button'); qtyMinus.className='qty-btn'; qtyMinus.textContent='−'; qtyMinus.type='button';
   const qtyInput=document.createElement('input'); qtyInput.type='text'; qtyInput.className='qty-input'; qtyInput.value=flags.qty||'1'; qtyInput.maxLength=3;
@@ -3064,17 +3165,17 @@ function addExistingRow(val, flags) {
   qtyMinus.onclick=()=>{ const v=parseInt(qtyInput.value)||1; if(v>1){qtyInput.value=v-1; autoSave();} };
   qtyPlus.onclick=()=>{ const v=parseInt(qtyInput.value)||1; qtyInput.value=v+1; autoSave(); };
   qtyInput.addEventListener('input', autoSave);
-  qtyInput.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addExistingRow();setTimeout(()=>{const ins=c.querySelectorAll('.combo-wrap input');ins[ins.length-1].focus();},50);} });
   qtyWrap.appendChild(qtyMinus); qtyWrap.appendChild(qtyInput); qtyWrap.appendChild(qtyPlus);
   const rm=document.createElement('button'); rm.className='btn-remove'; rm.innerHTML='&times;';
   rm.onclick=()=>{item.remove();renumExisting();autoSave();};
-  top.appendChild(num); top.appendChild(combo); top.appendChild(qtyWrap); top.appendChild(rm);
+  controlRow.appendChild(qtyLabel); controlRow.appendChild(qtyWrap); controlRow.appendChild(rm);
+  // Line 3: flags
   const fd=document.createElement('div'); fd.className='equip-flags';
+  fd.style.marginTop='8px';
   fd.innerHTML=`
-    <button class="flag-btn ${flags.yes?'on-yes':''}" data-cls="on-yes" onclick="toggleFlag(this,'on-yes');autoSave()"><span class="dot"></span> Update Needed: Yes</button>
-    <button class="flag-btn ${flags.no?'on-no':''}" data-cls="on-no" onclick="toggleFlag(this,'on-no');autoSave()"><span class="dot"></span> Update Needed: No</button>
     <button class="flag-btn ${flags.cell?'on-cell':''}" data-cls="on-cell" onclick="toggleFlag(this,'on-cell');autoSave()"><span class="dot"></span> Swapped for New</button>`;
-  item.appendChild(top); item.appendChild(fd); c.appendChild(item); renumExisting();
+  item.appendChild(combo); item.appendChild(controlRow); item.appendChild(fd);
+  c.appendChild(item); renumExisting();
 }
 
 function addZoneRow(val) {
@@ -3095,6 +3196,75 @@ function toggleFlag(btn,cls){btn.classList.toggle(cls);}
 function renum(c,sel){c.querySelectorAll(sel).forEach((el,i)=>el.textContent=(i+1)+'.');}
 function renumExisting(){document.getElementById('existingRows').querySelectorAll('.row-num').forEach((el,i)=>el.textContent=(i+1)+'.');}
 
+// ── User Codes ──────────────────────────────────────────
+function addUserCodeRow(data) {
+  data = data || {};
+  const c = document.getElementById('userCodeRows');
+  if (!c) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:8px;';
+  const num = document.createElement('span');
+  num.className = 'user-code-num';
+  num.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);width:28px;flex-shrink:0;text-align:right;';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'User name';
+  nameInput.value = data.name || '';
+  nameInput.style.cssText = 'flex:1;min-width:0;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:14px;padding:8px 10px;outline:none;';
+  nameInput.oninput = () => autoSave();
+  const codeInput = document.createElement('input');
+  codeInput.type = 'text';
+  codeInput.placeholder = 'Code';
+  codeInput.value = data.code || '';
+  codeInput.style.cssText = 'width:90px;flex-shrink:0;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--accent);font-family:Share Tech Mono,monospace;font-size:16px;letter-spacing:3px;padding:8px 10px;outline:none;text-align:center;';
+  codeInput.oninput = () => autoSave();
+  codeInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addUserCodeRow(); setTimeout(() => { const inputs = c.querySelectorAll('input[placeholder="User name"]'); inputs[inputs.length-1].focus(); }, 50); }
+  });
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn-copy';
+  copyBtn.textContent = '⎘';
+  copyBtn.title = 'Copy code';
+  copyBtn.style.cssText = 'flex-shrink:0;';
+  copyBtn.onclick = function() {
+    const val = codeInput.value.trim();
+    if (!val) return;
+    navigator.clipboard.writeText(val).then(() => {
+      copyBtn.textContent = '✓'; copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = '⎘'; copyBtn.classList.remove('copied'); }, 1500);
+    });
+  };
+  const rm = document.createElement('button');
+  rm.className = 'btn-remove'; rm.innerHTML = '&times;';
+  rm.onclick = () => { row.remove(); renumUserCodes(); autoSave(); };
+  row.appendChild(num); row.appendChild(nameInput); row.appendChild(codeInput); row.appendChild(copyBtn); row.appendChild(rm);
+  c.appendChild(row);
+  renumUserCodes();
+}
+
+function renumUserCodes() {
+  const c = document.getElementById('userCodeRows');
+  if (!c) return;
+  c.querySelectorAll('.user-code-num').forEach((el, i) => { el.textContent = 'U' + (i+1); });
+}
+
+function getUserCodes() {
+  const c = document.getElementById('userCodeRows');
+  if (!c) return [];
+  return [...c.children].map(row => {
+    const inputs = row.querySelectorAll('input');
+    return { name: inputs[0]?.value?.trim() || '', code: inputs[1]?.value?.trim() || '' };
+  }).filter(u => u.name || u.code);
+}
+
+function loadUserCodes(codes) {
+  const c = document.getElementById('userCodeRows');
+  if (!c) return;
+  c.innerHTML = '';
+  if (codes && codes.length) {
+    codes.forEach(u => addUserCodeRow(u));
+  }
+}
 // ── Collect ────────────────────────────────────────────────
 function collectData() {
   const j = jobs.find(x => x.id === activeJobId) || {};
@@ -3105,10 +3275,9 @@ function collectData() {
     .map(item=>{
       const name=item.querySelector('.combo-wrap').getValue(); if(!name) return null;
       const qty=item.querySelector('.qty-input').value||'1';
-      const yes=item.querySelector('[data-cls="on-yes"]').classList.contains('on-yes');
-      const no=item.querySelector('[data-cls="on-no"]').classList.contains('on-no');
-      const cell=item.querySelector('[data-cls="on-cell"]').classList.contains('on-cell');
-      const f=[yes&&'Update: Yes',no&&'Update: No',cell&&'Swapped for New'].filter(Boolean).join(', ');
+      const cellEl=item.querySelector('[data-cls="on-cell"]');
+      const cell=cellEl?cellEl.classList.contains('on-cell'):false;
+      const f=cell?'Swapped for New':'';
       const qtyStr=qty>1?` (x${qty})`:'';
       return `${name}${qtyStr}${f?' ['+f+']':''}`;
     }).filter(Boolean);
@@ -3130,6 +3299,7 @@ function collectData() {
     installing: installing.length?installing.map((e,i)=>`${i+1}. ${e}`).join('\n'):'—',
     existing: existing.length?existing.map((e,i)=>`${i+1}. ${e}`).join('\n'):'—',
     zones: zones.length?zones.map((z,i)=>`${i+1}. ${z}`).join('\n'):'—',
+    userCodes: (d.userCodes||[]).filter(u=>u.name||u.code).map((u,i)=>`User ${i+1}: ${u.name||'—'} = ${u.code||'—'}`).join('\n') || '—',
     fees: '$' + INSTALL_FEE + ' Install Fee',
     date: new Date().toLocaleString()
   };
@@ -3153,6 +3323,7 @@ async function logToSheets(data) {
       installing: data.installing,
       existing: data.existing,
       zones: data.zones,
+      userCodes: data.userCodes,
       notes: data.notes
     };
     await fetch(SHEETS_URL, {
@@ -3179,7 +3350,8 @@ async function submitForm() {
       customer_phone:data.phone, confirmation:data.confirmation,
       zones:data.zones, address:data.address, notes:data.notes,
       status:data.status, arrive_time:data.arriveTime, finish_time:data.finishTime,
-      fees:data.fees, verbal_code:data.verbalCode||'—', master_code:data.masterCode||'—'
+      fees:data.fees, verbal_code:data.verbalCode||'—', master_code:data.masterCode||'—',
+      user_codes:data.userCodes||'—'
     });
     await logToSheets(data);
     showToast('✓ Sent & logged: ' + data.customer, 'success');
@@ -3213,7 +3385,7 @@ async function sendDailySummary() {
       : '—';
     const existing=d.existing&&d.existing.filter(e=>e&&e.name).length
       ? d.existing.filter(e=>e&&e.name).map((e,idx)=>{
-          const flags=[e.yes&&'Update: Yes',e.no&&'Update: No',e.cell&&'Swapped for New'].filter(Boolean).join(', ');
+          const flags=e.cell?'Swapped for New':'';
           return `${idx+1}. ${e.name}${e.qty>1?` (x${e.qty})`:''}${flags?' ['+flags+']':''}`;
         }).join(', ')
       : '—';
@@ -3337,15 +3509,23 @@ function clearJobData() {
   showToast('Job cleared — equipment kept','info');
 }
 
-// ── Auto daily summary at 6pm ──────────────────────────────
+// ── Auto daily summary ──────────────────────────────
+let _summaryTimeout = null;
+let _summaryInterval = null;
 function scheduleDailySummary() {
-  const now=new Date();
-  const sixPM=new Date(now); sixPM.setHours(18,0,0,0);
-  let ms=sixPM-now;
-  if(ms<0) ms+=86400000;
+  // Clear any existing timer
+  if (_summaryTimeout) clearTimeout(_summaryTimeout);
+  if (_summaryInterval) clearInterval(_summaryInterval);
+  const now = new Date();
+  // Use saved hour or default to 18 (6 PM)
+  const savedHour = appSettings.summaryHour || 18;
+  const targetTime = new Date(now);
+  targetTime.setHours(savedHour, 0, 0, 0);
+  let ms = targetTime - now;
+  if (ms < 0) ms += 86400000;
   // Show countdown in sync status
   const updateCountdown = () => {
-    const remaining = sixPM - new Date();
+    const remaining = targetTime - new Date();
     if (remaining <= 0) return;
     const h = Math.floor(remaining/3600000);
     const m = Math.floor((remaining%3600000)/60000);
@@ -3356,10 +3536,10 @@ function scheduleDailySummary() {
   };
   setInterval(updateCountdown, 60000);
   updateCountdown();
-  setTimeout(()=>{
+  _summaryTimeout = setTimeout(()=>{
     sendDailySummary();
     showToast('📊 Daily summary auto-sent!', 'success');
-    setInterval(()=>{ sendDailySummary(); showToast('📊 Daily summary auto-sent!', 'success'); }, 86400000);
+    _summaryInterval = setInterval(()=>{ sendDailySummary(); showToast('📊 Daily summary auto-sent!', 'success'); }, 86400000);
   }, ms);
 }
 
@@ -3401,6 +3581,99 @@ let customers = JSON.parse(localStorage.getItem('p22_customers') || '[]');
 function saveCustomers() {
   localStorage.setItem('p22_customers', JSON.stringify(customers));
   if (window.fbSet) window.fbSet('customers', customers).catch(()=>{});
+}
+
+// ── CSV Customer Import ─────────────────────────────────
+// Accepts CSV with headers: Name, Address, Phone, Email, CS, Notes
+// Flexible — matches columns by header name, order doesn't matter
+function importCustomerCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const text = e.target.result.trim();
+      const lines = text.split(/\r?\n/);
+      if (lines.length < 2) { showToast('CSV needs a header row + at least 1 data row', 'error'); return; }
+
+      // Parse header — match flexibly
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z]/g, ''));
+      const colMap = {};
+      headers.forEach((h, i) => {
+        if (h.includes('name') || h === 'customer' || h === 'fullname') colMap.name = i;
+        else if (h.includes('addr') || h.includes('street') || h === 'location') colMap.address = i;
+        else if (h.includes('phone') || h.includes('mobile') || h.includes('cell') || h === 'tel') colMap.phone = i;
+        else if (h.includes('email') || h.includes('mail')) colMap.email = i;
+        else if (h.includes('cs') || h.includes('account') || h.includes('ref') || h.includes('number')) colMap.cs = i;
+        else if (h.includes('note') || h.includes('comment')) colMap.notes = i;
+      });
+
+      if (colMap.name === undefined) {
+        // Fallback: assume order is Name, Address, Phone, Email, CS, Notes
+        colMap.name = 0;
+        if (headers.length > 1) colMap.address = 1;
+        if (headers.length > 2) colMap.phone = 2;
+        if (headers.length > 3) colMap.email = 3;
+        if (headers.length > 4) colMap.cs = 4;
+        if (headers.length > 5) colMap.notes = 5;
+      }
+
+      // Parse rows
+      let imported = 0, skipped = 0;
+      const existingNames = new Set(customers.map(c => c.name.toLowerCase()));
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        // Simple CSV parse (handles quoted fields with commas)
+        const cols = parseCSVLine(line);
+        const name = (cols[colMap.name] || '').trim();
+        if (!name) { skipped++; continue; }
+        // Skip duplicates by name
+        if (existingNames.has(name.toLowerCase())) { skipped++; continue; }
+        const c = {
+          id: Date.now() + i,
+          name: name,
+          address: (cols[colMap.address] || '').trim(),
+          phone: (cols[colMap.phone] || '').trim(),
+          email: (cols[colMap.email] || '').trim(),
+          cs: (cols[colMap.cs] || '').trim(),
+          notes: (cols[colMap.notes] || '').trim(),
+        };
+        customers.push(c);
+        existingNames.add(name.toLowerCase());
+        imported++;
+      }
+
+      saveCustomers();
+      renderCustomers();
+      showToast('✓ Imported ' + imported + ' customers' + (skipped ? ' (' + skipped + ' skipped)' : ''), 'success');
+    } catch(err) {
+      console.error('CSV import error:', err);
+      showToast('Could not parse CSV — check format', 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// Parse a single CSV line, handling quoted fields
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current); current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result;
 }
 
 
@@ -4322,10 +4595,8 @@ function addSchedEquipRow(type, val, qty, flags) {
     const rm=document.createElement('button');rm.className='btn-remove';rm.innerHTML='&times;';rm.onclick=()=>{item.remove();};
     top.appendChild(combo);top.appendChild(qtyWrap);top.appendChild(rm);
     const fd=document.createElement('div');fd.className='equip-flags';
-    const fbYes=document.createElement('button');fbYes.className='flag-btn'+(flags.yes?' on-yes':'');fbYes.setAttribute('data-cls','on-yes');fbYes.innerHTML='<span class="dot"></span> Update: Yes';fbYes.onclick=()=>toggleFlag(fbYes,'on-yes');
-    const fbNo=document.createElement('button');fbNo.className='flag-btn'+(flags.no?' on-no':'');fbNo.setAttribute('data-cls','on-no');fbNo.innerHTML='<span class="dot"></span> Update: No';fbNo.onclick=()=>toggleFlag(fbNo,'on-no');
     const fbCell=document.createElement('button');fbCell.className='flag-btn'+(flags.cell?' on-cell':'');fbCell.setAttribute('data-cls','on-cell');fbCell.innerHTML='<span class="dot"></span> Swapped for New';fbCell.onclick=()=>toggleFlag(fbCell,'on-cell');
-    fd.appendChild(fbYes);fd.appendChild(fbNo);fd.appendChild(fbCell);
+    fd.appendChild(fbCell);
     item.appendChild(top);item.appendChild(fd);c.appendChild(item);
   } else {
     // Installing — same as before
@@ -5092,9 +5363,9 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       return;
     }
 
-    // Was in drag mode — commit the drop
-    cleanupDrag();
+    // Was in drag mode — commit the drop, THEN clean up
     onEnd(endX, endY);
+    cleanupDrag();
   }, {passive:true});
 
   el.addEventListener('touchcancel', () => { cleanupDrag(); }, {passive:true});
@@ -5898,8 +6169,22 @@ function saveEmailSetting() {
   const email = document.getElementById('settingsEmail').value.trim();
   if (!email || !email.includes('@')) { showToast('Enter a valid email', 'error'); return; }
   appSettings.reportEmail = email;
+  localStorage.setItem('p22_emailRecipient', email); // Wire to getEmailRecipient()
   saveSettings();
-  showToast('✓ Email saved: ' + email, 'success');
+  showToast('✓ Reports will send to ' + email, 'success');
+}
+
+function saveFeeSetting() {
+  const val = parseInt(document.getElementById('settingsInstallFee').value);
+  if (isNaN(val) || val < 0) { showToast('Enter a valid amount', 'error'); return; }
+  appSettings.installFee = val;
+  saveSettings();
+  // Update the live constant
+  window.INSTALL_FEE = val;
+  // Update the fee display on job screen
+  const feeEl = document.getElementById('feeAmountDisplay');
+  if (feeEl) feeEl.textContent = '$' + val;
+  showToast('✓ Install fee set to $' + val, 'success');
 }
 
 function saveSummaryTime() {
@@ -5908,6 +6193,8 @@ function saveSummaryTime() {
   appSettings.summaryHour = h;
   appSettings.summaryAmPm = ampm;
   saveSettings();
+  // Re-schedule with new time
+  scheduleDailySummary();
   showToast('✓ Summary will send at ' + (h>12?h-12:h) + ' ' + ampm.toUpperCase(), 'success');
 }
 
@@ -5922,6 +6209,47 @@ function exportData() {
   showToast('✓ Data exported', 'success');
 }
 
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!confirm('Import ' + (data.jobs?.length||0) + ' jobs, ' + (data.customers?.length||0) + ' customers, ' + (data.truck?.length||0) + ' truck items? This will merge with existing data.')) return;
+      if (data.jobs && Array.isArray(data.jobs)) {
+        // Merge — add jobs with IDs that don't already exist
+        const existingIds = new Set(jobs.map(j => j.id));
+        const newJobs = data.jobs.filter(j => !existingIds.has(j.id));
+        jobs.push(...newJobs);
+        jobCounter = Math.max(jobCounter, ...jobs.map(j => j.id));
+      }
+      if (data.customers && Array.isArray(data.customers)) {
+        const existingIds = new Set(customers.map(c => c.id));
+        const newCusts = data.customers.filter(c => !existingIds.has(c.id));
+        customers.push(...newCusts);
+      }
+      if (data.truck && Array.isArray(data.truck)) {
+        truck = data.truck;
+      }
+      if (data.settings) {
+        Object.assign(appSettings, data.settings);
+        saveSettings();
+      }
+      saveToStorage();
+      saveCustomers();
+      saveTruck();
+      showToast('✓ Imported — reloading...', 'success');
+      setTimeout(() => location.reload(), 1500);
+    } catch(err) {
+      showToast('Invalid file format', 'error');
+      console.error('Import error:', err);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // Reset so same file can be re-selected
+}
+
 function clearAllData() {
   if (!confirm('Clear ALL jobs, customers, and truck data? This cannot be undone.')) return;
   localStorage.clear();
@@ -5930,16 +6258,24 @@ function clearAllData() {
 }
 
 function loadSettingsScreen() {
+  // Email
   const emailEl = document.getElementById('settingsEmail');
-  if (emailEl && appSettings.reportEmail) emailEl.value = appSettings.reportEmail;
+  if (emailEl) emailEl.value = appSettings.reportEmail || localStorage.getItem('p22_emailRecipient') || DEFAULT_EMAIL_RECIPIENT;
+  // Install fee
+  const feeEl = document.getElementById('settingsInstallFee');
+  if (feeEl) feeEl.value = appSettings.installFee || INSTALL_FEE;
+  // Data info
   const infoEl = document.getElementById('settingsDataInfo');
   if (infoEl) infoEl.textContent = jobs.length + ' jobs · ' + customers.length + ' customers · ' + truck.length + ' truck items';
+  // Summary time
   if (appSettings.summaryHour) {
     const sh = document.getElementById('summaryHour');
     const sa = document.getElementById('summaryAmPm');
     if(sh) sh.value = appSettings.summaryHour;
     if(sa) sa.value = appSettings.summaryAmPm || 'pm';
   }
+  // Load template editor
+  loadTemplateEditor();
 }
 
 // Override PIN check to use settings PIN if set
@@ -6693,39 +7029,71 @@ function updateApptStatus(fbKey, status) {
   document.getElementById('apptDetailPanel')?.remove();
   renderCloserDayTimeline(closerSelectedDate);
   updateCloserStats();
-  showToast(status==='closed'?'&#10003; Marked as closed!':'Appointment cancelled', status==='closed'?'success':'info');
+  // AUTO-CREATE: When closer marks "closed", create install job + customer for tech
+  if (status === 'closed' && a) {
+    createInstallFromAppt(fbKey);
+  } else {
+    showToast(status==='cancelled'?'Appointment cancelled':'Status updated', 'info');
+  }
 }
 
 function createInstallFromAppt(fbKey) {
   const a = closerAppts.find(x => x.fbKey === fbKey);
   if (!a) return;
-  // Create a new job in the tech system
-  const newJob = {
-    id: Date.now(),
-    status: 'pending',
-    sent: false,
-    scheduledDate: new Date(a.date).toISOString(),
-    scheduledTime: a.time,
-    scheduledDuration: 120,
-    data: {
-      customerName: a.customerName,
-      address: a.address||'',
-      phone: a.phone||'',
+  // Check if job already created from this appointment
+  if (jobs.find(j => j.fromAppt === fbKey)) {
+    showToast('Install job already exists for this appointment', 'info');
+    return;
+  }
+  // Auto-create customer if they don't exist
+  const existingCust = customers.find(c => c.name.toLowerCase() === (a.customerName||'').toLowerCase());
+  if (!existingCust && a.customerName) {
+    const newCust = {
+      id: Date.now(),
+      name: a.customerName,
+      address: a.address || '',
+      phone: a.phone || '',
       email: '',
       cs: '',
-      notes: 'Created from closer appointment. '+( a.notes||''),
+      notes: 'Added from closed appointment ' + (a.date || ''),
+    };
+    customers.push(newCust);
+    saveCustomers();
+  }
+  // Create a new job in the tech system
+  const newJob = {
+    id: Date.now() + 1,
+    status: 'pending',
+    sent: false,
+    scheduledDate: a.date ? new Date(a.date).toISOString() : null,
+    scheduledTime: a.time || '',
+    scheduledDuration: 120,
+    lastModified: Date.now(),
+    data: {
+      customerName: a.customerName || '',
+      address: a.address || '',
+      phone: a.phone || '',
+      email: '',
+      cs: '',
+      notes: (a.notes ? a.notes + ' | ' : '') + 'From closer — closed ' + new Date().toLocaleDateString(),
       installing: [],
       existing: [],
       zones: [],
-      arriveTime: '', finishTime: '', masterCode: '', verbalCode: ''
+      arriveTime: '', finishTime: '', masterCode: '', verbalCode: '', adtStatus: '',
+      lockedFields: ['customerName','address','phone'].filter(f => {
+        if (f === 'customerName') return !!a.customerName;
+        if (f === 'address') return !!a.address;
+        if (f === 'phone') return !!a.phone;
+        return false;
+      })
     },
     fromAppt: fbKey
   };
   jobs.push(newJob);
-  if (window.fbSet) window.fbSet('jobs/job_'+newJob.id, newJob);
+  jobCounter = Math.max(jobCounter, newJob.id);
+  if (window.fbSet) window.fbSet('jobs', JSON.parse(JSON.stringify(jobs)));
   saveToStorage();
-  document.getElementById('apptDetailPanel')?.remove();
-  showToast('&#10003; Install job created for tech!', 'success');
+  showToast('✓ Closed! Install job + customer created for tech', 'success');
 }
 
 // ── Call Center ────────────────────────────────────────────
@@ -6751,28 +7119,37 @@ function renderCCWeekView() {
   const startOfWeek = new Date(today);
   startOfWeek.setDate(today.getDate() - today.getDay());
   const days = Array.from({length:7}, (_,i) => { const d=new Date(startOfWeek); d.setDate(startOfWeek.getDate()+i); return d; });
-  let html = '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:#f59e0b;letter-spacing:2px;margin-bottom:10px;">CLOSER AVAILABILITY THIS WEEK</div>';
+  let html = '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:#f59e0b;letter-spacing:2px;margin-bottom:10px;">CLOSER SCHEDULE THIS WEEK</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">';
   days.forEach(d => {
     const isToday = d.toDateString() === today.toDateString();
     const dayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === d.toDateString());
     const slots = ['9 AM','10 AM','11 AM','1 PM','2 PM','3 PM','4 PM'];
-    const bookedTimes = dayAppts.map(a => a.time);
     html += '<div style="background:var(--panel);border:1px solid '+(isToday?'var(--accent)':'var(--border)')+';border-radius:8px;padding:6px;min-width:0;">';
     html += '<div style="font-family:Share Tech Mono,monospace;font-size:9px;color:'+(isToday?'var(--accent)':'var(--muted)')+';text-align:center;margin-bottom:4px;">'+d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()+'<br>'+d.getDate()+'</div>';
     slots.forEach(slot => {
-      const isBooked = dayAppts.some(a => a.time && a.time.includes(slot.replace(' ','').toLowerCase()) || (a.time||'').includes(slot));
-      const _bg=isBooked?'rgba(168,85,247,0.2)':'rgba(255,255,255,0.04)';
-      const _bd=isBooked?'#a855f7':'rgba(255,255,255,0.06)';
-      const _cl=isBooked?'#a855f7':'var(--muted)';
-      const _dt=d.toISOString().split('T')[0];
-      html+='<div class="cc-slot" style="background:'+_bg+';border:1px solid '+_bd+';border-radius:4px;padding:2px 3px;margin-bottom:2px;font-size:8px;font-family:Share Tech Mono,monospace;color:'+_cl+';text-align:center;cursor:'+(isBooked?'default':'pointer')+';" data-date="'+_dt+'" data-time="'+slot+'" data-booked="'+(isBooked?'1':'0')+'">'+(isBooked?'●':slot)+'</div>';
+      const matchedAppt = dayAppts.find(a => a.time && (a.time.includes(slot.replace(' ','').toLowerCase()) || (a.time||'').includes(slot)));
+      const isBooked = !!matchedAppt;
+      const isClosed = matchedAppt && matchedAppt.status === 'closed';
+      const _bg = isClosed ? 'rgba(0,230,118,0.15)' : isBooked ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)';
+      const _bd = isClosed ? 'var(--green)' : isBooked ? '#a855f7' : 'rgba(255,255,255,0.06)';
+      const _cl = isClosed ? 'var(--green)' : isBooked ? '#a855f7' : 'var(--muted)';
+      const _dt = d.toISOString().split('T')[0];
+      const label = isBooked ? (matchedAppt.customerName || '●').split(' ')[0].slice(0,6) : slot;
+      // Booked slots are NOT clickable — read only. Open slots are clickable to select for booking.
+      html += '<div class="cc-slot" style="background:'+_bg+';border:1px solid '+_bd+';border-radius:4px;padding:2px 3px;margin-bottom:2px;font-size:8px;font-family:Share Tech Mono,monospace;color:'+_cl+';text-align:center;cursor:'+(isBooked?'default':'pointer')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" data-date="'+_dt+'" data-time="'+slot+'" data-booked="'+(isBooked?'1':'0')+'" title="'+(isBooked?(matchedAppt.customerName||'Booked')+' at '+slot:'Available — tap to select')+'">'+esc(label)+'</div>';
     });
     html += '</div>';
   });
   html += '</div>';
+  // Legend
+  html += '<div style="display:flex;gap:12px;margin-top:8px;font-size:10px;color:var(--muted);">';
+  html += '<div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:#a855f7;"></div> Booked</div>';
+  html += '<div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div> Closed</div>';
+  html += '<div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:2px;background:rgba(255,255,255,0.06);border:1px solid var(--border);"></div> Open</div>';
+  html += '</div>';
   body.innerHTML = html;
-  // Wire slot clicks
+  // Wire slot clicks — only open slots
   body.querySelectorAll('.cc-slot[data-booked="0"]').forEach(el => {
     el.onclick = () => selectCCSlot(el.getAttribute('data-date'), el.getAttribute('data-time'));
   });
@@ -7090,7 +7467,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <div style="max-width:780px;margin:0 auto;padding:20px 16px 0;">
 
     <!-- Header row with add button -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;">
       <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;">👤 CUSTOMERS</div>
       <button onclick="toggleNewCustomerForm()" id="newCustToggleBtn" style="background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px 14px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;">+ NEW</button>
     </div>
@@ -7113,6 +7490,24 @@ document.addEventListener('DOMContentLoaded', function() {
     <!-- Search -->
     <div class="search-bar" style="margin-bottom:10px;"><input type="text" id="customerSearch" placeholder="Search by name, phone, address..." oninput="renderCustomers()" style="font-size:16px;"></div>
     <div id="customerList"></div>
+
+    <!-- Import section at bottom -->
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;">📥 IMPORT CUSTOMERS</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">
+        Upload a CSV file with your customer list. Format your spreadsheet with these column headers:
+      </div>
+      <div style="background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);margin-bottom:12px;overflow-x:auto;white-space:pre;line-height:1.8;">Name, Address, Phone, Email, CS, Notes
+John Smith, 123 Main St Phoenix AZ, (555) 123-4567, john@email.com, CS12345, Gate code 1234
+Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;">
+        Column order doesn't matter as long as headers are in the first row. Addresses with commas should be wrapped in quotes. Duplicates are skipped automatically.
+      </div>
+      <label style="display:block;width:100%;background:none;border:1px solid var(--green);color:var(--green);border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;cursor:pointer;text-align:center;font-weight:bold;">
+        📥 CHOOSE CSV FILE
+        <input type="file" accept=".csv,.txt" onchange="importCustomerCSV(event)" style="display:none;">
+      </label>
+    </div>
   </div>
 </div>
 
@@ -7195,24 +7590,11 @@ document.addEventListener('DOMContentLoaded', function() {
   <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
     <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:20px;">⚙️ SETTINGS</div>
 
-    <!-- PIN -->
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-head"><span>🔒</span><h2>Change PIN</h2></div>
-      <div class="card-body">
-        <div class="field"><label>New PIN (4 digits)</label>
-          <div class="copy-row"><input type="password" id="newPinInput" placeholder="Enter new 4-digit PIN" maxlength="4" style="font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:6px;"></div>
-        </div>
-        <div class="field"><label>Confirm PIN</label>
-          <div class="copy-row"><input type="password" id="confirmPinInput" placeholder="Re-enter PIN" maxlength="4" style="font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:6px;"></div>
-        </div>
-        <button onclick="savePinSetting()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE PIN</button>
-      </div>
-    </div>
-
     <!-- Email -->
     <div class="card" style="margin-bottom:12px;">
       <div class="card-head"><span>✉️</span><h2>Email Settings</h2></div>
       <div class="card-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Install records and daily summaries are sent to this email.</div>
         <div class="field"><label>Send Reports To</label>
           <input type="email" id="settingsEmail" placeholder="your@email.com" style="font-size:16px;">
         </div>
@@ -7220,10 +7602,23 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
 
+    <!-- Install Fee -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head"><span>💰</span><h2>Install Fee</h2></div>
+      <div class="card-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Fee shown on job screen and used in summaries/reports.</div>
+        <div class="field"><label>Fee Amount ($)</label>
+          <input type="text" id="settingsInstallFee" placeholder="150" style="font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:2px;">
+        </div>
+        <button onclick="saveFeeSetting()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE FEE</button>
+      </div>
+    </div>
+
     <!-- Daily Summary Time -->
     <div class="card" style="margin-bottom:12px;">
       <div class="card-head"><span>⏰</span><h2>Daily Summary Time</h2></div>
       <div class="card-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Auto-sends a daily summary email at this time.</div>
         <div class="field"><label>Auto-send summary at</label>
           <div style="display:flex;gap:8px;align-items:center;">
             <select id="summaryHour" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 10px;outline:none;">
@@ -7238,19 +7633,41 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
 
+    <!-- Equipment Template -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head"><span>⚡</span><h2>Install Template</h2></div>
+      <div class="card-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Default equipment loaded when you tap ⚡ Template on the job screen.</div>
+        <div id="templateEditorRows"></div>
+        <button class="btn-add" onclick="addTemplateRow()" style="margin-top:8px;">+ Add Item</button>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button onclick="saveTemplate()" style="flex:1;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:2px;cursor:pointer;">💾 SAVE TEMPLATE</button>
+          <button onclick="resetTemplate()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px 14px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;">↺ RESET</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Data -->
     <div class="card" style="margin-bottom:12px;">
       <div class="card-head"><span>💾</span><h2>Data</h2></div>
       <div class="card-body">
         <div style="font-size:12px;color:var(--muted);margin-bottom:12px;" id="settingsDataInfo"></div>
         <button onclick="exportData()" style="width:100%;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-bottom:8px;">📤 EXPORT ALL DATA</button>
+        <label style="width:100%;display:block;background:none;border:1px solid var(--green);color:var(--green);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-bottom:8px;text-align:center;">
+          📥 IMPORT BACKUP (.json)
+          <input type="file" accept=".json" onchange="importData(event)" style="display:none;">
+        </label>
+        <label style="width:100%;display:block;background:none;border:1px solid var(--green);color:var(--green);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-bottom:8px;text-align:center;">
+          👤 IMPORT CUSTOMERS (.csv)
+          <input type="file" accept=".csv,.txt" onchange="importCustomerCSV(event)" style="display:none;">
+        </label>
         <button onclick="clearAllData()" style="width:100%;background:none;border:1px solid rgba(255,68,68,0.4);color:rgba(255,68,68,0.8);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;">🗑 CLEAR ALL DATA</button>
       </div>
     </div>
 
     <!-- App Info -->
     <div style="text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);padding:16px;letter-spacing:1px;">
-      PROTECT22 CRM · v2.0<br>Built for Bridgepoint Service
+      PROTECT22 CRM · v2.1<br>Built for Bridgepoint Service
     </div>
   </div>
 </div>
