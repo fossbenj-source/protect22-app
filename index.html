@@ -537,6 +537,7 @@
 </div>
 
 
+<div id="techApp" style="display:none;">
 <!-- TODAY SCREEN -->
 <div class="screen active" id="screenToday">
   <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
@@ -4163,242 +4164,377 @@ window.onFirebaseJobs = function(data) {
   appReady = true;
   if (pendingUser) { currentUser = pendingUser; pendingUser = null; routeUser(); }
 }); // end DOMContentLoaded
+
+// ── initAppData (replaces old DOMContentLoaded init) ─────
+// ── Closer Calendar ───────────────────────────────────────
+let closerAppts = [];
+let closerCalDate = new Date();
+let closerSelectedDate = new Date();
+let closerView = 'week';
+// ── Call Center ────────────────────────────────────────────
+// ── initAppData (replaces old DOMContentLoaded init) ─────
+function initAppData() {
+  loadFromStorage();
+  renderTabs();
+  renderMonthCal();
+  updateTruckBadge();
+  document.getElementById('todayDateLabel').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
+  scheduleDailySummary();
+  showScreen('today');
+}
+
+// ── Closer Calendar ───────────────────────────────────────
+
+function renderCloserCalendar() {
+  const today = new Date();
+  document.getElementById('closerDateLabel').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
+  // Load appointments from Firebase
+  if (window.fbListen) {
+    window.fbListen('appointments', data => {
+      closerAppts = data ? Object.entries(data).map(([k,v]) => ({...v, fbKey:k})) : [];
+      renderCloserMonthCal();
+      updateCloserStats();
+    });
+  } else {
+    renderCloserMonthCal();
+  }
+}
+
+function updateCloserStats() {
+  const today = new Date().toDateString();
+  const todayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === today);
+  const closed = closerAppts.filter(a => a.status === 'closed');
+  document.getElementById('closerStatAppts').textContent = closerAppts.length;
+  document.getElementById('closerStatToday').textContent = todayAppts.length;
+  document.getElementById('closerStatClosed').textContent = closed.length;
+}
+
+function renderCloserMonthCal() {
+  const body = document.getElementById('closerCalBody');
+  const titleEl = document.getElementById('closerCalTitle');
+  if (!body) return;
+  const y = closerCalDate.getFullYear(), m = closerCalDate.getMonth();
+  if (titleEl) titleEl.textContent = closerCalDate.toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
+  const first = new Date(y,m,1), last = new Date(y,m+1,0);
+  const today = new Date();
+  let html = '<div class="month-grid">';
+  ['SUN','MON','TUE','WED','THU','FRI','SAT'].forEach(d => html += '<div class="month-day-hdr">'+d+'</div>');
+  for (let i=0;i<first.getDay();i++) html += '<div class="month-day other-month"><div class="month-day-num">'+(new Date(y,m,-first.getDay()+i+1)).getDate()+'</div></div>';
+  for (let d=1;d<=last.getDate();d++) {
+    const date = new Date(y,m,d);
+    const isToday = date.toDateString() === today.toDateString();
+    const isSel = date.toDateString() === closerSelectedDate.toDateString();
+    const dayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === date.toDateString());
+    let dots = dayAppts.slice(0,2).map(a => '<div class="month-job-dot" style="border-color:#a855f7;color:#a855f7;background:rgba(168,85,247,0.1);">'+a.customerName+'</div>').join('');
+    if (dayAppts.length > 0) dots += '<div style="font-size:8px;color:var(--muted);margin-top:2px;">'+dayAppts.length+' appt'+(dayAppts.length>1?'s':'')+'</div>';
+    html += '<div class="month-day'+(isToday?' today':'')+(isSel?' selected':'')+'" onclick="closerGoToDay(new Date('+y+','+m+','+d+'))"><div class="month-day-num">'+d+'</div>'+dots+'</div>';
+  }
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function closerGoToDay(d) {
+  closerSelectedDate = new Date(d);
+  const sec = document.getElementById('closerDaySection');
+  sec.style.display = 'block';
+  renderCloserDayTimeline(d);
+  setTimeout(() => sec.scrollIntoView({behavior:'smooth',block:'start'}), 50);
+}
+
+function renderCloserDayTimeline(d) {
+  const body = document.getElementById('closerDayBody');
+  const titleEl = document.getElementById('closerDayTitle');
+  if (!body) return;
+  if (titleEl) titleEl.textContent = d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
+  const HOUR_START=8, HOUR_END=20, HOUR_HEIGHT=60;
+  const TOTAL_HEIGHT=(HOUR_END-HOUR_START)*HOUR_HEIGHT;
+  const dayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === d.toDateString());
+  let html = '<div class="timeline-wrap"><div style="display:flex;">';
+  html += '<div style="width:38px;flex-shrink:0;position:relative;height:'+TOTAL_HEIGHT+'px;">';
+  for (let h=HOUR_START;h<=HOUR_END;h++) {
+    const top=(h-HOUR_START)*HOUR_HEIGHT;
+    const label=h===12?'12p':h>12?(h-12)+'p':h+'a';
+    html += '<div style="position:absolute;top:'+top+'px;right:4px;font-family:Share Tech Mono,monospace;font-size:9px;color:var(--muted);">'+label+'</div>';
+  }
+  html += '</div><div style="flex:1;position:relative;min-height:'+TOTAL_HEIGHT+'px;">';
+  for (let h=HOUR_START;h<=HOUR_END;h++) {
+    const top=(h-HOUR_START)*HOUR_HEIGHT;
+    html += '<div style="position:absolute;top:'+top+'px;left:0;right:0;border-top:1px solid rgba(255,255,255,0.05);"></div>';
+    const hLabel=(h>12?h-12:h)+':00 '+(h>=12?'PM':'AM');
+    html += '<div class="tap-to-add" style="top:'+top+'px;height:30px;" data-time="'+hLabel+'" onclick="openCloserScheduleModal(new Date('+d.getFullYear()+','+d.getMonth()+','+d.getDate()+'),'+h+',0)"></div>';
+    html += '<div class="tap-to-add" style="top:'+(top+30)+'px;height:30px;" data-time="'+(h>12?h-12:h)+':30 '+(h>=12?'PM':'AM')+'" onclick="openCloserScheduleModal(new Date('+d.getFullYear()+','+d.getMonth()+','+d.getDate()+'),'+h+',30)"></div>';
+  }
+  dayAppts.forEach(a => {
+    const mins = timeToMinutes(a.time);
+    if (mins===null) return;
+    const topPx=((mins/60)-HOUR_START)*HOUR_HEIGHT;
+    const dur=a.duration||60;
+    const heightPx=Math.max(30,(dur/60)*HOUR_HEIGHT);
+    const color = a.status==='closed'?'var(--green)':'#a855f7';
+    html += '<div id="appt_'+a.fbKey+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:2px;right:2px;background:rgba(168,85,247,0.12);border:1px solid '+color+';border-radius:6px;padding:4px 8px;cursor:pointer;-webkit-user-select:none;user-select:none;z-index:5;">'+
+      '<div style="font-weight:700;font-size:12px;color:'+color+';">'+a.customerName+'</div>'+
+      (heightPx>35?'<div style="font-size:10px;color:var(--muted);">'+a.time+(a.address?' · '+a.address.split(',')[0]:'')+'</div>':'')+
+      '</div>';
+  });
+  html += '</div></div></div>';
+  body.innerHTML = html;
+  // Wire appointment clicks
+  dayAppts.forEach(a => {
+    const el = body.querySelector('#appt_'+a.fbKey);
+    if (el) el.onclick = () => showApptDetail(a.fbKey);
+  });
+}
+
+function closerCalNav(dir) { closerCalDate.setMonth(closerCalDate.getMonth()+dir); renderCloserMonthCal(); }
+function closerDayNav(dir) { closerSelectedDate.setDate(closerSelectedDate.getDate()+dir); renderCloserDayTimeline(closerSelectedDate); }
+function setCloserView(v) {
+  closerView = v;
+  document.getElementById('closerBtnWeek').className = 'cal-view-btn'+(v==='week'?' active':'');
+  document.getElementById('closerBtnDay').className = 'cal-view-btn'+(v==='day'?' active':'');
+}
+
+function openCloserScheduleModal(date, hour, minute) {
+  const modal = document.getElementById('closerScheduleModal');
+  if (!modal) return;
+  if (date) {
+    document.getElementById('csApptDate').value = date.toISOString().split('T')[0];
+    if (hour !== undefined) {
+      const h = hour > 12 ? hour-12 : hour===0?12:hour;
+      const m = (minute||0).toString().padStart(2,'0');
+      const ap = hour >= 12 ? 'PM' : 'AM';
+      document.getElementById('csApptTime').value = h+':'+m+' '+ap;
+    }
+  } else {
+    document.getElementById('csApptDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('csApptTime').value = '';
+  }
+  document.getElementById('csApptName').value = '';
+  document.getElementById('csApptAddr').value = '';
+  document.getElementById('csApptPhone').value = '';
+  document.getElementById('csApptNotes').value = '';
+  modal.classList.add('open');
+}
+function closeCloserModal() { document.getElementById('closerScheduleModal').classList.remove('open'); }
+
+function saveCloserAppt() {
+  const name = document.getElementById('csApptName').value.trim();
+  const date = document.getElementById('csApptDate').value;
+  const time = document.getElementById('csApptTime').value.trim();
+  if (!name || !date || !time) { showToast('Name, date and time required', 'error'); return; }
+  const appt = {
+    customerName: name,
+    address: document.getElementById('csApptAddr').value.trim(),
+    phone: document.getElementById('csApptPhone').value.trim(),
+    date: date,
+    time: time,
+    notes: document.getElementById('csApptNotes').value.trim(),
+    status: 'pending',
+    duration: 60,
+    createdBy: currentUser?.email || 'closer',
+    created: new Date().toISOString()
+  };
+  if (window.fbSet) {
+    const key = 'appt_' + Date.now();
+    window.fbSet('appointments/'+key, appt);
+  } else {
+    closerAppts.push({...appt, fbKey:'local_'+Date.now()});
+    renderCloserMonthCal();
+    updateCloserStats();
+  }
+  closeCloserModal();
+  showToast('&#10003; Appointment saved', 'success');
+}
+
+function showApptDetail(fbKey) {
+  const a = closerAppts.find(x => x.fbKey === fbKey);
+  if (!a) return;
+  const existing = document.getElementById('apptDetailPanel');
+  if (existing) existing.remove();
+  const panel = document.createElement('div');
+  panel.id = 'apptDetailPanel';
+  panel.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
+  panel.onclick = e => { if(e.target===panel) panel.remove(); };
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;';
+  const statusColor = a.status==='closed'?'var(--green)':a.status==='cancelled'?'var(--red)':'#a855f7';
+  const hdrRow = document.createElement('div');
+  hdrRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;';
+  const hdrTitle = document.createElement('div');
+  hdrTitle.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:12px;color:#a855f7;letter-spacing:2px;';
+  hdrTitle.textContent = 'APPOINTMENT';
+  const closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;';
+  closeBtn.innerHTML = '&#10005;';
+  closeBtn.onclick = () => panel.remove();
+  hdrRow.appendChild(hdrTitle); hdrRow.appendChild(closeBtn);
+  sheet.appendChild(hdrRow);
+
+  const nameEl = document.createElement('div');
+  nameEl.style.cssText = 'font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px;';
+  nameEl.textContent = a.customerName;
+  sheet.appendChild(nameEl);
+
+  const dateEl = document.createElement('div');
+  dateEl.style.cssText = 'font-size:11px;color:var(--muted);margin-bottom:16px;';
+  dateEl.textContent = a.date + ' at ' + a.time;
+  sheet.appendChild(dateEl);
+
+  if (a.address) { const el=document.createElement('div'); el.style.cssText='font-size:13px;color:var(--text);margin-bottom:8px;'; el.textContent='📍 '+a.address; sheet.appendChild(el); }
+  if (a.phone) { const el=document.createElement('div'); el.style.cssText='font-size:13px;color:var(--text);margin-bottom:8px;'; el.textContent='📞 '+a.phone; sheet.appendChild(el); }
+  if (a.notes) { const el=document.createElement('div'); el.style.cssText='font-size:13px;color:var(--muted);margin-bottom:16px;'; el.textContent='📝 '+a.notes; sheet.appendChild(el); }
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;';
+  const closedBtn = document.createElement('button');
+  closedBtn.style.cssText = 'flex:1;background:rgba(0,230,118,0.1);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;';
+  closedBtn.textContent = '✓ CLOSED';
+  closedBtn.onclick = () => updateApptStatus(fbKey, 'closed');
+  const cancelBtn2 = document.createElement('button');
+  cancelBtn2.style.cssText = 'flex:1;background:rgba(255,68,68,0.1);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;';
+  cancelBtn2.textContent = '✗ CANCEL';
+  cancelBtn2.onclick = () => updateApptStatus(fbKey, 'cancelled');
+  btnRow.appendChild(closedBtn); btnRow.appendChild(cancelBtn2);
+  sheet.appendChild(btnRow);
+
+  const installBtn = document.createElement('button');
+  installBtn.style.cssText = 'width:100%;background:rgba(0,212,255,0.1);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;margin-bottom:8px;';
+  installBtn.textContent = '→ CREATE INSTALL JOB FOR TECH';
+  installBtn.onclick = () => createInstallFromAppt(fbKey);
+  sheet.appendChild(installBtn);
+  panel.appendChild(sheet);
+  document.body.appendChild(panel);
+}
+
+function updateApptStatus(fbKey, status) {
+  const a = closerAppts.find(x => x.fbKey === fbKey);
+  if (a) a.status = status;
+  if (window.fbSet) window.fbSet('appointments/'+fbKey+'/status', status);
+  document.getElementById('apptDetailPanel')?.remove();
+  renderCloserDayTimeline(closerSelectedDate);
+  updateCloserStats();
+  showToast(status==='closed'?'&#10003; Marked as closed!':'Appointment cancelled', status==='closed'?'success':'info');
+}
+
+function createInstallFromAppt(fbKey) {
+  const a = closerAppts.find(x => x.fbKey === fbKey);
+  if (!a) return;
+  // Create a new job in the tech system
+  const newJob = {
+    id: Date.now(),
+    status: 'pending',
+    sent: false,
+    scheduledDate: new Date(a.date).toISOString(),
+    scheduledTime: a.time,
+    scheduledDuration: 120,
+    data: {
+      customerName: a.customerName,
+      address: a.address||'',
+      phone: a.phone||'',
+      email: '',
+      cs: '',
+      notes: 'Created from closer appointment. '+( a.notes||''),
+      installing: [],
+      existing: [],
+      zones: [],
+      arriveTime: '', finishTime: '', masterCode: '', verbalCode: ''
+    },
+    fromAppt: fbKey
+  };
+  jobs.push(newJob);
+  if (window.fbSet) window.fbSet('jobs/job_'+newJob.id, newJob);
+  saveToStorage();
+  document.getElementById('apptDetailPanel')?.remove();
+  showToast('&#10003; Install job created for tech!', 'success');
+}
+
+// ── Call Center ────────────────────────────────────────────
+function renderCallCenterView() {
+  const today = new Date();
+  document.getElementById('ccDateLabel').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
+  document.getElementById('ccApptDate').value = today.toISOString().split('T')[0];
+  // Load appointments real-time
+  if (window.fbListen) {
+    window.fbListen('appointments', data => {
+      closerAppts = data ? Object.entries(data).map(([k,v]) => ({...v, fbKey:k})) : [];
+      renderCCWeekView();
+    });
+  } else {
+    renderCCWeekView();
+  }
+}
+
+function renderCCWeekView() {
+  const body = document.getElementById('ccWeekView');
+  if (!body) return;
+  const today = new Date();
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+  const days = Array.from({length:7}, (_,i) => { const d=new Date(startOfWeek); d.setDate(startOfWeek.getDate()+i); return d; });
+  let html = '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:#f59e0b;letter-spacing:2px;margin-bottom:10px;">CLOSER AVAILABILITY THIS WEEK</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">';
+  days.forEach(d => {
+    const isToday = d.toDateString() === today.toDateString();
+    const dayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === d.toDateString());
+    const slots = ['9 AM','10 AM','11 AM','1 PM','2 PM','3 PM','4 PM'];
+    const bookedTimes = dayAppts.map(a => a.time);
+    html += '<div style="background:var(--panel);border:1px solid '+(isToday?'var(--accent)':'var(--border)')+';border-radius:8px;padding:6px;min-width:0;">';
+    html += '<div style="font-family:Share Tech Mono,monospace;font-size:9px;color:'+(isToday?'var(--accent)':'var(--muted)')+';text-align:center;margin-bottom:4px;">'+d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()+'<br>'+d.getDate()+'</div>';
+    slots.forEach(slot => {
+      const isBooked = dayAppts.some(a => a.time && a.time.includes(slot.replace(' ','').toLowerCase()) || (a.time||'').includes(slot));
+      const _bg=isBooked?'rgba(168,85,247,0.2)':'rgba(255,255,255,0.04)';
+      const _bd=isBooked?'#a855f7':'rgba(255,255,255,0.06)';
+      const _cl=isBooked?'#a855f7':'var(--muted)';
+      const _dt=d.toISOString().split('T')[0];
+      html+='<div class="cc-slot" style="background:'+_bg+';border:1px solid '+_bd+';border-radius:4px;padding:2px 3px;margin-bottom:2px;font-size:8px;font-family:Share Tech Mono,monospace;color:'+_cl+';text-align:center;cursor:'+(isBooked?'default':'pointer')+';" data-date="'+_dt+'" data-time="'+slot+'" data-booked="'+(isBooked?'1':'0')+'">'+(isBooked?'●':slot)+'</div>';
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
+  // Wire slot clicks
+  body.querySelectorAll('.cc-slot[data-booked="0"]').forEach(el => {
+    el.onclick = () => selectCCSlot(el.getAttribute('data-date'), el.getAttribute('data-time'));
+  });
+}
+
+function selectCCSlot(date, time) {
+  document.getElementById('ccApptDate').value = date;
+  document.getElementById('ccApptTime').value = time;
+  document.getElementById('ccCustName').focus();
+  showToast('Slot selected: '+time+' on '+date, 'info');
+}
+
+function bookCCAppt() {
+  const name = document.getElementById('ccCustName').value.trim();
+  const date = document.getElementById('ccApptDate').value;
+  const time = document.getElementById('ccApptTime').value.trim();
+  if (!name || !date || !time) { showToast('Name, date and time required', 'error'); return; }
+  const appt = {
+    customerName: name,
+    phone: document.getElementById('ccCustPhone').value.trim(),
+    address: document.getElementById('ccCustAddr').value.trim(),
+    date: date, time: time,
+    notes: document.getElementById('ccApptNotes').value.trim(),
+    status: 'pending', duration: 60,
+    createdBy: currentUser?.email || 'callcenter',
+    created: new Date().toISOString()
+  };
+  if (window.fbSet) {
+    window.fbSet('appointments/appt_'+Date.now(), appt);
+  } else {
+    closerAppts.push({...appt, fbKey:'local_'+Date.now()});
+    renderCCWeekView();
+  }
+  document.getElementById('ccCustName').value = '';
+  document.getElementById('ccCustPhone').value = '';
+  document.getElementById('ccCustAddr').value = '';
+  document.getElementById('ccApptNotes').value = '';
+  showToast('&#10003; Appointment booked for closer!', 'success');
+}
+
 </script>
 
-  
-</div>
-
-
-</div>
-
-<!-- HISTORY SCREEN -->
-<div class="screen" id="screenHistory">
-  <div style="max-width:780px;margin:0 auto;padding:20px 16px 0;">
-    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">📋 JOB HISTORY</div>
-    <div class="search-bar">
-      <input type="text" id="historySearch" placeholder="Search by name, address, CS#..." oninput="renderHistory()">
-    </div>
-    <div id="historyList"></div>
-  </div>
-</div>
-
-<!-- TRUCK SCREEN -->
-<div class="screen" id="screenTruck">
-  <div style="max-width:780px;margin:0 auto;padding:20px 16px 0;">
-    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">🚛 TRUCK INVENTORY</div>
-
-    <!-- Truck sub tabs -->
-    <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <button class="truck-tab-btn active" id="truckTabInventory" onclick="showTruckTab('inventory')">📦 Current Stock</button>
-      <button class="truck-tab-btn" id="truckTabRestock" onclick="showTruckTab('restock')">➕ Restock</button>
-    </div>
-
-    <!-- Inventory tab -->
-    <div id="truckPanelInventory">
-      <div class="search-bar" style="margin-bottom:10px;">
-        <input type="text" id="truckSearch" placeholder="Search inventory..." oninput="renderTruck()" style="font-size:16px;">
-      </div>
-      <div id="truckList"></div>
-    </div>
-
-    <!-- Restock tab -->
-    <div id="truckPanelRestock" style="display:none;">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;letter-spacing:0.5px;">Add equipment to your truck. Each line adds to existing stock.</div>
-      <div id="truckRestockRows"></div>
-      <button class="btn-add" onclick="addRestockRow()" style="margin-top:8px;">+ Add Equipment</button>
-      <button onclick="submitRestock()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;">✓ ADD TO TRUCK</button>
-    </div>
-  </div>
-</div>
-
-<!-- CUSTOMERS SCREEN -->
-<div class="screen" id="screenCustomers">
-  <div style="max-width:780px;margin:0 auto;padding:20px 16px 0;">
-    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">👤 CUSTOMERS</div>
-
-    <!-- New customer form -->
-    <div class="customer-form-card" id="newCustomerForm">
-      <h3>+ NEW CUSTOMER</h3>
-      <div class="field"><label>Name</label><input type="text" id="ncName" placeholder="Full name" style="font-size:16px;"></div>
-      <div class="field"><label>Address</label><input type="text" id="ncAddress" placeholder="123 Main St, City, State" style="font-size:16px;"></div>
-      <div class="field"><label>Phone</label><input type="tel" id="ncPhone" placeholder="(555) 000-0000" oninput="formatPhone(this)" style="font-size:16px;"></div>
-      <div class="field"><label>Email</label><input type="email" id="ncEmail" placeholder="customer@email.com" style="font-size:16px;"></div>
-      <div class="field"><label>CS #</label><input type="text" id="ncCs" placeholder="CS number" style="font-size:16px;"></div>
-      <div class="field"><label>Notes</label><textarea id="ncNotes" placeholder="Any notes about this customer..." style="min-height:60px;"></textarea></div>
-      <button onclick="saveNewCustomer()" style="width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:12px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE CUSTOMER</button>
-    </div>
-
-    <!-- Search -->
-    <div class="search-bar"><input type="text" id="customerSearch" placeholder="Search customers..." oninput="renderCustomers()"></div>
-    <div id="customerList"></div>
-  </div>
-</div>
-
-<!-- SCHEDULE MODAL -->
-<div class="modal-overlay" id="scheduleModal">
-  <div class="modal-sheet">
-    <div class="modal-title">
-      <span>📅 SCHEDULE JOB</span>
-      <button class="modal-close" onclick="closeScheduleModal()">×</button>
-    </div>
-    <div class="field">
-      <label>Customer</label>
-
-      <!-- Selected customer display -->
-      <div id="schedSelectedCust" style="display:none;background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:none;align-items:center;gap:10px;">
-        <div style="flex:1;">
-          <div id="schedSelectedCustName" style="font-weight:700;font-size:14px;color:var(--accent);"></div>
-          <div id="schedSelectedCustMeta" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
-        </div>
-        <button onclick="clearSchedCustomer()" style="background:none;border:1px solid rgba(255,68,68,0.4);color:rgba(255,68,68,0.7);border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;">✕</button>
-      </div>
-
-      <!-- Search + New row -->
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <input type="text" id="schedCustSearch" placeholder="Search customers..." oninput="renderSchedCustomerList()" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;padding:8px 12px;outline:none;">
-        <button onclick="toggleSchedNewCustomer()" id="schedAddCustBtn" style="background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ New</button>
-      </div>
-
-      <!-- Customer list -->
-      <div id="schedCustList" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);margin-bottom:6px;"></div>
-
-      <!-- Hidden select for form value -->
-      <select id="schedJobCustomer" style="display:none;"></select>
-      <!-- Inline new customer form -->
-      <div id="schedNewCustForm" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:4px;">
-        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">NEW CUSTOMER</div>
-        <div class="field"><label>Name *</label><input type="text" id="schedNcName" placeholder="Full name" style="font-size:16px;"></div>
-        <div class="field"><label>Phone</label><input type="tel" id="schedNcPhone" placeholder="(555) 000-0000" oninput="formatPhone(this)" style="font-size:16px;"></div>
-        <div class="field"><label>Address</label><input type="text" id="schedNcAddress" placeholder="123 Main St, City, State" style="font-size:16px;"></div>
-        <div class="field"><label>Email</label><input type="email" id="schedNcEmail" placeholder="customer@email.com" style="font-size:16px;"></div>
-        <div class="field"><label>CS #</label><input type="text" id="schedNcCs" placeholder="CS number" style="font-size:16px;"></div>
-        <button onclick="saveSchedNewCustomer()" style="width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:1px;cursor:pointer;margin-top:4px;">💾 SAVE & SELECT</button>
-      </div>
-    </div>
-    <div class="field"><label>Date</label><input type="date" id="schedDate" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 12px;outline:none;"></div>
-    <div class="field"><label>Start Time</label>
-      <input type="text" id="schedTimeInput" placeholder="e.g. 9 or 930 or 9:30" oninput="formatSchedTime(this)" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:2px;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--accent);width:100%;padding:10px 12px;outline:none;">
-      <div style="font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:0.5px;" id="schedTimeParsed"></div>
-    </div>
-    <div class="field">
-      <label>Duration</label>
-      <div class="duration-row">
-        <button class="duration-btn" onclick="setDuration(30,this)">30 min</button>
-        <button class="duration-btn" onclick="setDuration(60,this)">1 hr</button>
-        <button class="duration-btn" onclick="setDuration(90,this)">1.5 hr</button>
-        <button class="duration-btn active" id="defaultDurationBtn" onclick="setDuration(120,this)">2 hr</button>
-        <button class="duration-btn" onclick="setDuration(180,this)">3 hr</button>
-        <button class="duration-btn" onclick="setDuration(240,this)">4 hr</button>
-      </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:5px;" id="schedTimeBlock"></div>
-    </div>
-    <!-- Installing -->
-    <div class="equip-section-label" style="display:flex;align-items:center;justify-content:space-between;">🔧 Equipment Needed <span id="truckFlagSummary" style="font-size:10px;color:var(--red);display:none;">⚠️ Missing from truck</span></div>
-    <div id="schedInstallRows"></div>
-    <button class="btn-add" onclick="addSchedEquipRow('install');checkTruckStock()" style="margin-bottom:12px;">+ Add Equipment</button>
-
-    <!-- Existing Equipment -->
-    <div class="equip-section-label">📦 Existing Equipment</div>
-    <div id="schedExistRows"></div>
-    <button class="btn-add" onclick="addSchedEquipRow('exist')" style="margin-bottom:8px;">+ Add Existing Equipment</button>
-
-    <div class="field" style="margin-top:12px;"><label>Notes</label><input type="text" id="schedNotes" placeholder="Any other notes..." style="font-size:16px;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 12px;width:100%;outline:none;"></div>
-
-    <button onclick="confirmScheduleJob()" style="width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:8px;">✓ SCHEDULE JOB</button>
-  </div>
-</div>
-
-<!-- SETTINGS SCREEN -->
-<div class="screen" id="screenSettings">
-  <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
-    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:20px;">⚙️ SETTINGS</div>
-
-    <!-- PIN -->
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-head"><span>🔒</span><h2>Change PIN</h2></div>
-      <div class="card-body">
-        <div class="field"><label>New PIN (4 digits)</label>
-          <div class="copy-row"><input type="password" id="newPinInput" placeholder="Enter new 4-digit PIN" maxlength="4" style="font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:6px;"></div>
-        </div>
-        <div class="field"><label>Confirm PIN</label>
-          <div class="copy-row"><input type="password" id="confirmPinInput" placeholder="Re-enter PIN" maxlength="4" style="font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:6px;"></div>
-        </div>
-        <button onclick="savePinSetting()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE PIN</button>
-      </div>
-    </div>
-
-    <!-- Email -->
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-head"><span>✉️</span><h2>Email Settings</h2></div>
-      <div class="card-body">
-        <div class="field"><label>Send Reports To</label>
-          <input type="email" id="settingsEmail" placeholder="your@email.com" style="font-size:16px;">
-        </div>
-        <button onclick="saveEmailSetting()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE EMAIL</button>
-      </div>
-    </div>
-
-    <!-- Daily Summary Time -->
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-head"><span>⏰</span><h2>Daily Summary Time</h2></div>
-      <div class="card-body">
-        <div class="field"><label>Auto-send summary at</label>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <select id="summaryHour" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 10px;outline:none;">
-              <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">1</option><option value="14">2</option><option value="15">3</option><option value="16">4</option><option value="17">5</option><option value="18" selected>6</option><option value="19">7</option><option value="20">8</option>
-            </select>
-            <select id="summaryAmPm" style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 10px;outline:none;">
-              <option value="am">AM</option><option value="pm" selected>PM</option>
-            </select>
-          </div>
-        </div>
-        <button onclick="saveSummaryTime()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE TIME</button>
-      </div>
-    </div>
-
-    <!-- Data -->
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-head"><span>💾</span><h2>Data</h2></div>
-      <div class="card-body">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;" id="settingsDataInfo"></div>
-        <button onclick="exportData()" style="width:100%;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-bottom:8px;">📤 EXPORT ALL DATA</button>
-        <button onclick="clearAllData()" style="width:100%;background:none;border:1px solid rgba(255,68,68,0.4);color:rgba(255,68,68,0.8);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;">🗑 CLEAR ALL DATA</button>
-      </div>
-    </div>
-
-    <!-- App Info -->
-    <div style="text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);padding:16px;letter-spacing:1px;">
-      PROTECT22 CRM · v2.0<br>Built for Bridgepoint Service
-    </div>
-  </div>
-</div>
-
-<!-- NAV BAR -->
-<button onclick="openGlobalSearch()" style="position:fixed;top:12px;right:16px;z-index:8998;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Search">🔍</button>
-<nav class="crm-nav">
-  <button class="nav-btn active" id="navToday" onclick="showScreen('today')"><span class="nav-icon">📅</span>Today</button>
-  <button class="nav-btn" id="navJob" onclick="showScreen('job')"><span class="nav-icon">📝</span>Job</button>
-  <button class="nav-btn" id="navCustomers" onclick="showScreen('customers')"><span class="nav-icon">👤</span>Customers</button>
-  <button class="nav-btn" id="navHistory" onclick="showScreen('history')"><span class="nav-icon">📋</span>History</button>
-  <button class="nav-btn" id="navTruck" onclick="showScreen('truck')"><span class="nav-icon">🚛</span>Truck</button>
-  <button class="nav-btn" id="navSettings" onclick="showScreen('settings')"><span class="nav-icon">⚙️</span>Settings</button>
-</nav>
-
-
-<div class="job-tooltip" id="jobTooltip"><div class="job-tooltip-name" id="ttName"></div><div class="job-tooltip-time" id="ttTime"></div><div class="job-tooltip-row" id="ttAddr"></div><div class="job-tooltip-row" id="ttEquip"></div><div class="job-tooltip-row" id="ttNotes"></div><div class="job-tooltip-status" id="ttStatus"></div></div>
-
-<div class="global-search-overlay" id="globalSearch" onclick="if(event.target===this)closeGlobalSearch()">
-  <div class="global-search-box">
-    <div class="global-search-input-wrap">
-      <span style="font-size:18px;">🔍</span>
-      <input type="text" id="globalSearchInput" placeholder="Search jobs, customers, equipment..." oninput="runGlobalSearch()" autocomplete="off">
-      <button onclick="closeGlobalSearch()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
-    </div>
-    <div class="global-search-results" id="globalSearchResults" style="display:none;"></div>
-  </div>
-</div>
-</body>
-</html><!-- LOGIN SCREEN -->
+<!-- LOGIN SCREEN -->
 <div id="loginScreen" style="position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;">
   <div style="width:100%;max-width:400px;">
     <!-- Logo -->
@@ -4948,6 +5084,16 @@ window.onFirebaseJobs = function(data) {
     <div class="global-search-results" id="globalSearchResults" style="display:none;"></div>
   </div>
 </div>
+
+
+
+
+
+
+
+
+
+
 </div><!-- end techApp -->
 
 <!-- CLOSER APP -->
@@ -5042,331 +5188,656 @@ window.onFirebaseJobs = function(data) {
   </div>
 </div>
 
+
+
+
+
+});
+</script>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:400px;">
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:40px;">
+      <div style="width:64px;height:64px;background:linear-gradient(135deg,var(--accent),#0088aa);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;">🛡️</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--accent);letter-spacing:3px;">PROTECT22</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;">OPERATIONS PLATFORM</div>
+    </div>
+    <!-- Form -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;">
+      <div id="loginError" style="display:none;background:rgba(255,68,68,0.1);border:1px solid var(--red);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--red);margin-bottom:16px;"></div>
+      <div style="margin-bottom:14px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:6px;">EMAIL</label>
+        <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')document.getElementById('loginPassword').focus()">
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:6px;">PASSWORD</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button onclick="doLogin()" id="loginBtn" style="width:100%;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;">SIGN IN</button>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);">Protect22 · Bridgepoint Service</div>
+  </div>
+</div>
+
+<!-- TODAY SCREEN -->
+<div class="screen active" id="screenToday">
+  <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+      <div style="width:44px;height:44px;background:linear-gradient(135deg,var(--accent),#0088aa);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">🛡️</div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:16px;color:var(--accent);letter-spacing:2px;">PROTECT22</div>
+        <div style="font-size:10px;color:var(--muted);letter-spacing:1px;" id="todayDateLabel"></div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;"><div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:5px 10px;" id="syncStatus">⬤ Local</div><button onclick="doLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 8px;font-size:10px;cursor:pointer;font-family:Share Tech Mono,monospace;">OUT</button></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card" onclick="showAllJobsList()" style="cursor:pointer;"><div class="stat-num" id="statTotal" style="color:var(--accent)">0</div><div class="stat-label">Jobs</div></div>
+      <div class="stat-card" onclick="showCompletedJobsList()" style="cursor:pointer;"><div class="stat-num" id="statComplete" style="color:var(--green)">0</div><div class="stat-label">Done</div></div>
+      <div class="stat-card" onclick="showFeesBreakdown()" style="cursor:pointer;"><div class="stat-num" id="statFees" style="color:var(--green)">$0</div><div class="stat-label">Fees</div></div>
+    </div>
+
+    <!-- Schedule Job button -->
+    <button class="btn-today-add" onclick="openScheduleModal()" style="margin-bottom:14px;">+ Schedule Job</button>
+
+    <!-- Month calendar always visible -->
+    <div id="monthCalSection">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="calNavMonth(-1)">&#8249;</button>
+        <div class="cal-title" id="calTitleMonth"></div>
+        <button class="cal-nav" onclick="calNavMonth(1)">&#8250;</button>
+      </div>
+      <div id="calBodyMonth"></div>
+    </div>
+
+    <!-- View toggle between month and day -->
+    <div class="cal-view-btns" style="margin-top:10px;margin-bottom:0;">
+      <button class="cal-view-btn active" id="calBtnWeek" onclick="setCalView('week')">Week</button>
+      <button class="cal-view-btn" id="calBtnMonth" onclick="setCalView('day')">Day</button>
+    </div>
+
+    <!-- Day timeline slides in below month -->
+    <div id="dayTimelineSection" style="display:none;margin-top:16px;padding-bottom:80px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <button class="cal-nav" onclick="dayNavTimeline(-1)">&#8249;</button>
+        <div style="flex:1;text-align:center;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;" id="calTitleDay"></div>
+        <button class="cal-nav" onclick="dayNavTimeline(1)">&#8250;</button>
+        <button onclick="document.getElementById('dayTimelineSection').style.display='none'" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">&#10005;</button>
+      </div>
+      <div id="calBodyDay"></div>
+      <button class="btn-today-add" onclick="openScheduleModal()" style="margin-top:8px;">+ Schedule Job for This Day</button>
+    </div>
+
+    <!-- Week view -->
+    <div id="weekCalSection" style="display:none;margin-top:16px;padding-bottom:80px;">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="calNavWeek(-1)">&#8249;</button>
+        <div class="cal-title" id="calTitleWeek"></div>
+        <button class="cal-nav" onclick="calNavWeek(1)">&#8250;</button>
+      </div>
+      <div id="calBodyWeek"></div>
+    </div>
+
+
+
+  </div>
+</div>
+<!-- JOB SCREEN -->
+<div class="screen" id="screenJob">
+<div class="header" style="margin-top:0;">
+  <div class="logo">🛡️</div>
+  <div>
+    <h1>Alarm Install</h1>
+    <p>Protect22</p>
+  </div>
+  <div class="date-badge" id="dateBadge"></div>
+</div>
+
+<div class="jobs-bar" id="jobsBar">
+  <div class="current-job-bar" onclick="toggleJobsDropdown()">
+    <div style="flex:1;min-width:0;">
+      <div class="current-job-label">Current Job</div>
+      <div class="current-job-name" id="currentJobName">—</div>
+    </div>
+    <span class="current-job-status pending" id="currentJobStatus">…</span>
+    <span class="current-job-chevron" id="jobChevron">▾</span>
+  </div>
+  <div class="jobs-dropdown" id="jobsDropdown">
+    <div class="jobs-dropdown-header">
+      <span class="jobs-dropdown-title">All Jobs</span>
+    </div>
+    <div id="jobsList"></div>
+    <button class="btn-new-job" onclick="addJob();toggleJobsDropdown()">+ New Job</button>
+  </div>
+</div>
+
+<div class="form-wrap">
+
+  <!-- Status + Time -->
+  <div class="card">
+    <div class="card-head"><span>📍</span><h2>Job Status & Time</h2></div>
+    <div class="card-body">
+      <div class="field">
+        <label>Status</label>
+        <div class="status-row" style="gap:8px;">
+          <button class="status-btn" id="btnInProgress" onclick="setStatus('inprogress')" style="flex:1;">🔧 In Progress</button>
+          <button class="status-btn" id="btnComplete" onclick="setStatus('complete')" style="flex:1;">✓ Complete</button>
+          <button class="status-btn" id="btnCantFinish" onclick="triggerCantFinish()" style="flex:1;">⚠️ Couldn't Finish</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Time on Site</label>
+        <div class="time-row">
+          <button class="time-btn" id="btnArrive" onclick="stampTime('arrive')">🕐 Arrived</button>
+          <button class="time-btn" id="btnFinish" onclick="stampTime('finish')">🏁 Finished</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <div style="flex:1;">
+            <label style="font-size:9px;margin-bottom:3px;">ARRIVE TIME</label>
+            <input type="text" id="arriveInput" placeholder="e.g. 9:30 AM" oninput="editTime('arrive')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:9px;margin-bottom:3px;">FINISH TIME</label>
+            <input type="text" id="finishInput" placeholder="e.g. 11:45 AM" oninput="editTime('finish')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Fee -->
+  <div class="fee-card">
+    <div>
+      <div class="fee-label">Install Fee</div>
+      <div class="fee-note">Standard Protect22 install</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="fee-amount">$150</div>
+      <div class="fee-note">flat rate</div>
+    </div>
+  </div>
+
+  <!-- FillQuick -->
+  <a href="https://protect22.fillquick.com/Account/Login?ReturnUrl=%2F" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a2a1a,#0d1a0d);border:1px solid rgba(0,230,118,0.3);"
+    <span>📋</span><span>Protect22 FillQuick</span><span class="ql-arrow">→</span>
+  </a>
+
+  <!-- Customer & Contact -->
+  <div class="card">
+    <div class="card-head"><span>👤</span><h2>Customer Info & Contact</h2></div>
+    <div class="card-body">
+      <div class="field">
+        <label>Customer Name</label>
+        <div class="copy-row">
+          <input type="text" id="customerName" onblur="lockIfFilled('customerName')" placeholder="Full name or search..." oninput="autoSave();filterJobCustomers()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('address').focus();}">
+          <button class="btn-copy" onclick="copyField('customerName',this)" title="Copy name">⎘</button>
+          <button class="btn-paste" onclick="pasteField('customerName',this)" title="Paste name">⏎</button>
+        </div>
+        <div id="jobCustomerDropdown" style="display:none;background:var(--input-bg);border:1px solid var(--accent);border-radius:6px;margin-top:4px;max-height:160px;overflow-y:auto;z-index:500;position:relative;"></div>
+        <div id="jobCustomerSearch" style="display:none;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:160px;overflow-y:auto;position:relative;"></div>
+      </div>
+      <div class="field">
+        <label>Address</label>
+        <div class="addr-row">
+          <input type="text" id="address" onblur="lockIfFilled('address')" placeholder="123 Main St, City, State" oninput="autoSave();updateCrossStreet()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('email').focus();}">
+          <a id="mapsBtn" class="btn-maps" href="#" onclick="openMaps(event)" title="Open in Maps">📌</a>
+          <button class="btn-maps" onclick="getMyLocation(event)" title="Use my current location">📍</button><button class="btn-copy" onclick="copyField('address',this)" title="Copy address" style="height:34px;">⎘</button><button class="btn-paste" onclick="pasteField('address',this)" title="Paste address" style="height:34px;">⏎</button>
+        </div>
+        <div class="cross-street" id="crossStreet"></div>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <div class="copy-row"><input type="email" id="email" onblur="lockIfFilled('email')" placeholder="customer@email.com" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('phone').focus();}"><button class="btn-copy" onclick="copyField('email',this)" title="Copy email">⎘</button><button class="btn-paste" onclick="pasteField('email',this)" title="Paste email">⏎</button></div>
+      </div>
+      <div class="field">
+        <label>Phone</label>
+        <div class="copy-row"><input type="tel" id="phone" onblur="lockIfFilled('phone')" placeholder="(555) 000-0000" oninput="formatPhone(this);autoSave()" onpaste="setTimeout(()=>{formatPhone(this);autoSave();},0)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('cs').focus();}"><button class="btn-copy" onclick="copyField('phone',this)" title="Copy phone">⎘</button><button class="btn-paste" onclick="pasteField('phone',this)" title="Paste phone">⏎</button><button class="btn-call" onclick="callPhone()" title="Call">📞</button></div>
+      </div>
+      <div class="field">
+        <label>CS #</label>
+        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
+      </div>
+      <div class="field">
+        <label>ADT Bot Status #</label>
+        <div class="copy-row">
+          <input type="text" id="adtStatus" onblur="lockIfFilled('adtStatus')" placeholder="ADT bot status number" oninput="autoSave()">
+          <button class="btn-copy" onclick="copyField('adtStatus',this)" title="Copy ADT status">⎘</button>
+          <button class="btn-paste" onclick="pasteField('adtStatus',this)" title="Paste ADT status">⏎</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Confirmation #</label>
+        <div class="copy-row"><input type="text" id="confirmation" onblur="lockIfFilled('confirmation')" placeholder="Confirmation number" oninput="autoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('notes').focus();}"><button class="btn-copy" onclick="copyField('confirmation',this)" title="Copy confirmation #">⎘</button><button class="btn-paste" onclick="pasteField('confirmation',this)" title="Paste confirmation #">⏎</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3PS -->
+  <a href="https://3ps.dealer.adt.com/LoginPage.htm?originalUrl=https%3A%2F%2F3ps.dealer.adt.com%2F#!/search/customer" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a1a0a,#120f00);border:1px solid rgba(255,165,0,0.3);"
+    <span>🔍</span><span>3PS — ADT Customer Search</span><span class="ql-arrow">→</span>
+  </a>
+
+  <!-- ADT DCC -->
+  <a href="https://adtdcc-live-gme5sigejq-ue.a.run.app/" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#0a0d1a,#0d1020);border:1px solid rgba(0,212,255,0.3);"
+    <span>🖥️</span><span>ADT DCC Portal</span><span class="ql-arrow">→</span>
+  </a>
+
+
+  <!-- Existing -->
+  <div class="card">
+    <div class="card-head"><span>📦</span><h2>Existing Equipment</h2></div>
+    <div class="card-body">
+      <div id="existingRows"></div>
+      <button class="btn-add" onclick="addExistingRow()">+ Add Existing Equipment</button>
+    </div>
+  </div>
+
+
+
+
+  <!-- Installing -->
+  <div class="card">
+    <div class="card-head"><span>🔧</span><h2>Installing</h2></div>
+    <div class="card-body">
+      <div class="list-rows" id="installingRows"></div>
+      <button class="btn-add" onclick="addInstallingRow()">+ Add Equipment</button>
+    </div>
+  </div>
+
+  <!-- Master Code -->
+  <div class="card">
+    <div class="card-head"><span>🔑</span><h2>Codes</h2></div>
+    <div class="card-body">
+      <div class="field">
+        <label>Master Code</label>
+        <div class="copy-row">
+          <input type="text" id="masterCode" placeholder="Enter master code" oninput="autoSave()" onblur="lockIfFilled('masterCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
+          <button class="btn-copy" onclick="copyField('masterCode',this)" title="Copy master code">⎘</button>
+          <button class="btn-paste" onclick="pasteField('masterCode',this)" title="Paste master code">⏎</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Verbal Code</label>
+        <div class="copy-row">
+          <input type="text" id="verbalCode" placeholder="Enter verbal code" oninput="autoSave()" onblur="lockIfFilled('verbalCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
+          <button class="btn-copy" onclick="copyField('verbalCode',this)" title="Copy verbal code">⎘</button>
+          <button class="btn-paste" onclick="pasteField('verbalCode',this)" title="Paste verbal code">⏎</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zones -->
+  <div class="card">
+    <div class="card-head"><span>📡</span><h2>Zones</h2></div>
+    <div class="card-body">
+      <div id="zoneRows"></div>
+      <button class="btn-add" onclick="addZoneRow()">+ Add Zone</button>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="card">
+    <div class="card-head"><span>📝</span><h2>Notes</h2></div>
+    <div class="card-body">
+      <textarea id="notes" placeholder="Gate code, parking, special instructions, anything to remember..." oninput="autoSave()"></textarea>
+    </div>
+  </div>
+
+  <!-- MyADT -->
+  <div class="adt-banner">
+    <p><strong>For Signs</strong> — Register at MyADT.com</p>
+    <a class="adt-link" href="https://MyADT.com" target="_blank">MyADT.com →</a>
+  </div>
+
+  <!-- LeadConnector -->
+  <a href="https://api.leadconnectorhq.com/widget/form/F5f31hA1mM1CFsmkuiSQ" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a0a1a,#150d20);border:1px solid rgba(180,0,255,0.3);"
+    <span>📝</span><span>LeadConnector Form</span><span class="ql-arrow">→</span>
+  </a>
+
+  <div class="sent-banner" id="sentBanner">✓ Install record already sent for this job</div>
+
+  <button class="btn-submit" id="submitBtn" onclick="submitForm()">✉ Send Install Record</button>
+  <button class="btn-summary" onclick="sendDailySummary()">📊 Send Daily Summary</button>
+  <button class="btn-clear" onclick="clearJobData()">↺ Clear This Job's Customer Data</button>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+
+  
+</div>
+
+
+</div>
+
+<!-- HISTORY SCREEN -->
+<div class="screen" id="screenHistory">
+  <div style="max-width:780px;margin:0 auto;padding:20px 16px 0;">
+    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">📋 JOB HISTORY</div>
+    <div class="search-bar">
+      <input type="text" id="historySearch" placeholder="Search by name, address, CS#..." oninput="renderHistory()">
+    </div>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<!-- TRUCK SCREEN -->
+<div class="screen" id="screenTruck">
+  <div style="max-width:780px;margin:0 auto;padding:20px 16px 0;">
+    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">🚛 TRUCK INVENTORY</div>
+
+    <!-- Truck sub tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="truck-tab-btn active" id="truckTabInventory" onclick="showTruckTab('inventory')">📦 Current Stock</button>
+      <button class="truck-tab-btn" id="truckTabRestock" onclick="showTruckTab('restock')">➕ Restock</button>
+    </div>
+
+    <!-- Inventory tab -->
+    <div id="truckPanelInventory">
+      <div class="search-bar" style="margin-bottom:10px;">
+        <input type="text" id="truckSearch" placeholder="Search inventory..." oninput="renderTruck()" style="font-size:16px;">
+      </div>
+      <div id="truckList"></div>
+    </div>
+
+    <!-- Restock tab -->
+    <div id="truckPanelRestock" style="display:none;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;letter-spacing:0.5px;">Add equipment to your truck. Each line adds to existing stock.</div>
+      <div id="truckRestockRows"></div>
+      <button class="btn-add" onclick="addRestockRow()" style="margin-top:8px;">+ Add Equipment</button>
+      <button onclick="submitRestock()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;">✓ ADD TO TRUCK</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOMERS SCREEN -->
+<div class="screen" id="screenCustomers">
+  <div style="max-width:780px;margin:0 auto;padding:20px 16px 0;">
+    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">👤 CUSTOMERS</div>
+
+    <!-- New customer form -->
+    <div class="customer-form-card" id="newCustomerForm">
+      <h3>+ NEW CUSTOMER</h3>
+      <div class="field"><label>Name</label><input type="text" id="ncName" placeholder="Full name" style="font-size:16px;"></div>
+      <div class="field"><label>Address</label><input type="text" id="ncAddress" placeholder="123 Main St, City, State" style="font-size:16px;"></div>
+      <div class="field"><label>Phone</label><input type="tel" id="ncPhone" placeholder="(555) 000-0000" oninput="formatPhone(this)" style="font-size:16px;"></div>
+      <div class="field"><label>Email</label><input type="email" id="ncEmail" placeholder="customer@email.com" style="font-size:16px;"></div>
+      <div class="field"><label>CS #</label><input type="text" id="ncCs" placeholder="CS number" style="font-size:16px;"></div>
+      <div class="field"><label>Notes</label><textarea id="ncNotes" placeholder="Any notes about this customer..." style="min-height:60px;"></textarea></div>
+      <button onclick="saveNewCustomer()" style="width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:12px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE CUSTOMER</button>
+    </div>
+
+    <!-- Search -->
+    <div class="search-bar"><input type="text" id="customerSearch" placeholder="Search customers..." oninput="renderCustomers()"></div>
+    <div id="customerList"></div>
+  </div>
+</div>
+
+<!-- SCHEDULE MODAL -->
+<div class="modal-overlay" id="scheduleModal">
+  <div class="modal-sheet">
+    <div class="modal-title">
+      <span>📅 SCHEDULE JOB</span>
+      <button class="modal-close" onclick="closeScheduleModal()">×</button>
+    </div>
+    <div class="field">
+      <label>Customer</label>
+
+      <!-- Selected customer display -->
+      <div id="schedSelectedCust" style="display:none;background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:none;align-items:center;gap:10px;">
+        <div style="flex:1;">
+          <div id="schedSelectedCustName" style="font-weight:700;font-size:14px;color:var(--accent);"></div>
+          <div id="schedSelectedCustMeta" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
+        </div>
+        <button onclick="clearSchedCustomer()" style="background:none;border:1px solid rgba(255,68,68,0.4);color:rgba(255,68,68,0.7);border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Search + New row -->
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input type="text" id="schedCustSearch" placeholder="Search customers..." oninput="renderSchedCustomerList()" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;padding:8px 12px;outline:none;">
+        <button onclick="toggleSchedNewCustomer()" id="schedAddCustBtn" style="background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ New</button>
+      </div>
+
+      <!-- Customer list -->
+      <div id="schedCustList" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);margin-bottom:6px;"></div>
+
+      <!-- Hidden select for form value -->
+      <select id="schedJobCustomer" style="display:none;"></select>
+      <!-- Inline new customer form -->
+      <div id="schedNewCustForm" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:4px;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">NEW CUSTOMER</div>
+        <div class="field"><label>Name *</label><input type="text" id="schedNcName" placeholder="Full name" style="font-size:16px;"></div>
+        <div class="field"><label>Phone</label><input type="tel" id="schedNcPhone" placeholder="(555) 000-0000" oninput="formatPhone(this)" style="font-size:16px;"></div>
+        <div class="field"><label>Address</label><input type="text" id="schedNcAddress" placeholder="123 Main St, City, State" style="font-size:16px;"></div>
+        <div class="field"><label>Email</label><input type="email" id="schedNcEmail" placeholder="customer@email.com" style="font-size:16px;"></div>
+        <div class="field"><label>CS #</label><input type="text" id="schedNcCs" placeholder="CS number" style="font-size:16px;"></div>
+        <button onclick="saveSchedNewCustomer()" style="width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:1px;cursor:pointer;margin-top:4px;">💾 SAVE & SELECT</button>
+      </div>
+    </div>
+    <div class="field"><label>Date</label><input type="date" id="schedDate" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 12px;outline:none;"></div>
+    <div class="field"><label>Start Time</label>
+      <input type="text" id="schedTimeInput" placeholder="e.g. 9 or 930 or 9:30" oninput="formatSchedTime(this)" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:2px;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--accent);width:100%;padding:10px 12px;outline:none;">
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:0.5px;" id="schedTimeParsed"></div>
+    </div>
+    <div class="field">
+      <label>Duration</label>
+      <div class="duration-row">
+        <button class="duration-btn" onclick="setDuration(30,this)">30 min</button>
+        <button class="duration-btn" onclick="setDuration(60,this)">1 hr</button>
+        <button class="duration-btn" onclick="setDuration(90,this)">1.5 hr</button>
+        <button class="duration-btn active" id="defaultDurationBtn" onclick="setDuration(120,this)">2 hr</button>
+        <button class="duration-btn" onclick="setDuration(180,this)">3 hr</button>
+        <button class="duration-btn" onclick="setDuration(240,this)">4 hr</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px;" id="schedTimeBlock"></div>
+    </div>
+    <!-- Installing -->
+    <div class="equip-section-label" style="display:flex;align-items:center;justify-content:space-between;">🔧 Equipment Needed <span id="truckFlagSummary" style="font-size:10px;color:var(--red);display:none;">⚠️ Missing from truck</span></div>
+    <div id="schedInstallRows"></div>
+    <button class="btn-add" onclick="addSchedEquipRow('install');checkTruckStock()" style="margin-bottom:12px;">+ Add Equipment</button>
+
+    <!-- Existing Equipment -->
+    <div class="equip-section-label">📦 Existing Equipment</div>
+    <div id="schedExistRows"></div>
+    <button class="btn-add" onclick="addSchedEquipRow('exist')" style="margin-bottom:8px;">+ Add Existing Equipment</button>
+
+    <div class="field" style="margin-top:12px;"><label>Notes</label><input type="text" id="schedNotes" placeholder="Any other notes..." style="font-size:16px;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 12px;width:100%;outline:none;"></div>
+
+    <button onclick="confirmScheduleJob()" style="width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:8px;">✓ SCHEDULE JOB</button>
+  </div>
+</div>
+
+<!-- SETTINGS SCREEN -->
+<div class="screen" id="screenSettings">
+  <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
+    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:20px;">⚙️ SETTINGS</div>
+
+    <!-- PIN -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head"><span>🔒</span><h2>Change PIN</h2></div>
+      <div class="card-body">
+        <div class="field"><label>New PIN (4 digits)</label>
+          <div class="copy-row"><input type="password" id="newPinInput" placeholder="Enter new 4-digit PIN" maxlength="4" style="font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:6px;"></div>
+        </div>
+        <div class="field"><label>Confirm PIN</label>
+          <div class="copy-row"><input type="password" id="confirmPinInput" placeholder="Re-enter PIN" maxlength="4" style="font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:6px;"></div>
+        </div>
+        <button onclick="savePinSetting()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE PIN</button>
+      </div>
+    </div>
+
+    <!-- Email -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head"><span>✉️</span><h2>Email Settings</h2></div>
+      <div class="card-body">
+        <div class="field"><label>Send Reports To</label>
+          <input type="email" id="settingsEmail" placeholder="your@email.com" style="font-size:16px;">
+        </div>
+        <button onclick="saveEmailSetting()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE EMAIL</button>
+      </div>
+    </div>
+
+    <!-- Daily Summary Time -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head"><span>⏰</span><h2>Daily Summary Time</h2></div>
+      <div class="card-body">
+        <div class="field"><label>Auto-send summary at</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="summaryHour" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 10px;outline:none;">
+              <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">1</option><option value="14">2</option><option value="15">3</option><option value="16">4</option><option value="17">5</option><option value="18" selected>6</option><option value="19">7</option><option value="20">8</option>
+            </select>
+            <select id="summaryAmPm" style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 10px;outline:none;">
+              <option value="am">AM</option><option value="pm" selected>PM</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="saveSummaryTime()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE TIME</button>
+      </div>
+    </div>
+
+    <!-- Data -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head"><span>💾</span><h2>Data</h2></div>
+      <div class="card-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;" id="settingsDataInfo"></div>
+        <button onclick="exportData()" style="width:100%;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-bottom:8px;">📤 EXPORT ALL DATA</button>
+        <button onclick="clearAllData()" style="width:100%;background:none;border:1px solid rgba(255,68,68,0.4);color:rgba(255,68,68,0.8);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;">🗑 CLEAR ALL DATA</button>
+      </div>
+    </div>
+
+    <!-- App Info -->
+    <div style="text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);padding:16px;letter-spacing:1px;">
+      PROTECT22 CRM · v2.0<br>Built for Bridgepoint Service
+    </div>
+  </div>
+</div>
+
+<!-- NAV BAR -->
+<button onclick="openGlobalSearch()" style="position:fixed;top:12px;right:16px;z-index:8998;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Search">🔍</button>
+<nav class="crm-nav">
+  <button class="nav-btn active" id="navToday" onclick="showScreen('today')"><span class="nav-icon">📅</span>Today</button>
+  <button class="nav-btn" id="navJob" onclick="showScreen('job')"><span class="nav-icon">📝</span>Job</button>
+  <button class="nav-btn" id="navCustomers" onclick="showScreen('customers')"><span class="nav-icon">👤</span>Customers</button>
+  <button class="nav-btn" id="navHistory" onclick="showScreen('history')"><span class="nav-icon">📋</span>History</button>
+  <button class="nav-btn" id="navTruck" onclick="showScreen('truck')"><span class="nav-icon">🚛</span>Truck</button>
+  <button class="nav-btn" id="navSettings" onclick="showScreen('settings')"><span class="nav-icon">⚙️</span>Settings</button>
+</nav>
+
+
+<div class="job-tooltip" id="jobTooltip"><div class="job-tooltip-name" id="ttName"></div><div class="job-tooltip-time" id="ttTime"></div><div class="job-tooltip-row" id="ttAddr"></div><div class="job-tooltip-row" id="ttEquip"></div><div class="job-tooltip-row" id="ttNotes"></div><div class="job-tooltip-status" id="ttStatus"></div></div>
+
+<div class="global-search-overlay" id="globalSearch" onclick="if(event.target===this)closeGlobalSearch()">
+  <div class="global-search-box">
+    <div class="global-search-input-wrap">
+      <span style="font-size:18px;">🔍</span>
+      <input type="text" id="globalSearchInput" placeholder="Search jobs, customers, equipment..." oninput="runGlobalSearch()" autocomplete="off">
+      <button onclick="closeGlobalSearch()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div class="global-search-results" id="globalSearchResults" style="display:none;"></div>
+  </div>
+</div>
+
+
+<!-- CLOSER APP -->
+<div id="closerApp" style="display:none;min-height:100vh;background:var(--bg);">
+  <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+      <div style="width:44px;height:44px;background:linear-gradient(135deg,#a855f7,#6d28d9);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">🎯</div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:16px;color:#a855f7;letter-spacing:2px;">CLOSER PORTAL</div>
+        <div style="font-size:10px;color:var(--muted);letter-spacing:1px;" id="closerDateLabel"></div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <button onclick="doLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;">Sign Out</button>
+      </div>
+    </div>
+    <div class="stats-row" style="margin-bottom:16px;">
+      <div class="stat-card"><div class="stat-num" id="closerStatAppts" style="color:#a855f7;">0</div><div class="stat-label">Total Appts</div></div>
+      <div class="stat-card"><div class="stat-num" id="closerStatToday" style="color:var(--accent);">0</div><div class="stat-label">Today</div></div>
+      <div class="stat-card"><div class="stat-num" id="closerStatClosed" style="color:var(--green);">0</div><div class="stat-label">Closed</div></div>
+    </div>
+    <button onclick="openCloserScheduleModal()" style="width:100%;background:rgba(168,85,247,0.1);border:1px dashed #a855f7;color:#a855f7;border-radius:8px;padding:12px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-bottom:14px;">+ ADD APPOINTMENT</button>
+    <div>
+      <div class="cal-header">
+        <button class="cal-nav" onclick="closerCalNav(-1)">&#8249;</button>
+        <div class="cal-title" id="closerCalTitle"></div>
+        <button class="cal-nav" onclick="closerCalNav(1)">&#8250;</button>
+      </div>
+      <div id="closerCalBody"></div>
+    </div>
+    <div id="closerDaySection" style="display:none;margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <button class="cal-nav" onclick="closerDayNav(-1)">&#8249;</button>
+        <div style="flex:1;text-align:center;font-family:'Share Tech Mono',monospace;font-size:11px;color:#a855f7;letter-spacing:1px;" id="closerDayTitle"></div>
+        <button class="cal-nav" onclick="closerDayNav(1)">&#8250;</button>
+        <button onclick="document.getElementById('closerDaySection').style.display='none'" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">&#10005;</button>
+      </div>
+      <div id="closerDayBody"></div>
+    </div>
+    <div class="cal-view-btns" style="margin-top:14px;">
+      <button class="cal-view-btn active" id="closerBtnWeek" onclick="setCloserView('week')">Week</button>
+      <button class="cal-view-btn" id="closerBtnDay" onclick="setCloserView('day')">Day</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="closerScheduleModal">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:#a855f7;letter-spacing:2px;">NEW APPOINTMENT</div>
+      <button onclick="closeCloserModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">&#10005;</button>
+    </div>
+    <div class="field"><label>Customer Name</label><input type="text" id="csApptName" placeholder="Full name" style="font-size:16px;"></div>
+    <div class="field"><label>Address</label><input type="text" id="csApptAddr" placeholder="Full address" style="font-size:16px;"></div>
+    <div class="field"><label>Phone</label><input type="tel" id="csApptPhone" placeholder="(555) 000-0000" style="font-size:16px;"></div>
+    <div class="field"><label>Date</label><input type="date" id="csApptDate" style="font-size:16px;"></div>
+    <div class="field"><label>Time</label><input type="text" id="csApptTime" placeholder="9:00 AM" style="font-size:16px;font-family:'Share Tech Mono',monospace;"></div>
+    <div class="field"><label>Notes</label><textarea id="csApptNotes" placeholder="Any notes..." style="font-size:16px;min-height:60px;resize:none;width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 12px;outline:none;"></textarea></div>
+    <button onclick="saveCloserAppt()" style="width:100%;background:linear-gradient(135deg,#a855f7,#6d28d9);color:#fff;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:4px;">&#10003; SAVE APPOINTMENT</button>
+  </div>
+</div>
+
+<!-- CALL CENTER APP -->
+<div id="callCenterApp" style="display:none;min-height:100vh;background:var(--bg);">
+  <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+      <div style="width:44px;height:44px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">&#128222;</div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:16px;color:#f59e0b;letter-spacing:2px;">CALL CENTER</div>
+        <div style="font-size:10px;color:var(--muted);letter-spacing:1px;" id="ccDateLabel"></div>
+      </div>
+      <div style="margin-left:auto;">
+        <button onclick="doLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;">Sign Out</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:2px;background:#a855f7;"></div> Booked</div>
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--green);"><div style="width:10px;height:10px;border-radius:2px;background:var(--green);"></div> Closed</div>
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:2px;background:rgba(255,255,255,0.06);border:1px solid var(--border);"></div> Available</div>
+    </div>
+    <div id="ccWeekView" style="margin-bottom:20px;"></div>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:#f59e0b;letter-spacing:2px;margin-bottom:12px;">&#128197; BOOK APPOINTMENT FOR CLOSER</div>
+      <div class="field"><label>Customer Name</label><input type="text" id="ccCustName" placeholder="Full name" style="font-size:16px;"></div>
+      <div class="field"><label>Phone</label><input type="tel" id="ccCustPhone" placeholder="(555) 000-0000" style="font-size:16px;"></div>
+      <div class="field"><label>Address</label><input type="text" id="ccCustAddr" placeholder="Full address" style="font-size:16px;"></div>
+      <div style="display:flex;gap:8px;">
+        <div class="field" style="flex:1;"><label>Date</label><input type="date" id="ccApptDate" style="font-size:16px;"></div>
+        <div class="field" style="flex:1;"><label>Time</label><input type="text" id="ccApptTime" placeholder="9:00 AM" style="font-size:16px;font-family:Share Tech Mono,monospace;"></div>
+      </div>
+      <div class="field"><label>Notes / Lead Source</label><input type="text" id="ccApptNotes" placeholder="e.g. Facebook lead, door knock..." style="font-size:16px;"></div>
+      <button onclick="bookCCAppt()" style="width:100%;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:4px;">&#10003; BOOK APPOINTMENT</button>
+    </div>
+  </div>
+</div>
+
 </body>
-</html><div id="techApp" style="display:none;">
-
-
-// ── initAppData (replaces old DOMContentLoaded init) ─────
-function initAppData() {
-  loadFromStorage();
-  renderTabs();
-  renderMonthCal();
-  updateTruckBadge();
-  document.getElementById('todayDateLabel').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  scheduleDailySummary();
-  showScreen('today');
-}
-
-// ── Closer Calendar ───────────────────────────────────────
-let closerAppts = [];
-let closerCalDate = new Date();
-let closerSelectedDate = new Date();
-let closerView = 'week';
-
-function renderCloserCalendar() {
-  const today = new Date();
-  document.getElementById('closerDateLabel').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  // Load appointments from Firebase
-  if (window.fbListen) {
-    window.fbListen('appointments', data => {
-      closerAppts = data ? Object.entries(data).map(([k,v]) => ({...v, fbKey:k})) : [];
-      renderCloserMonthCal();
-      updateCloserStats();
-    });
-  } else {
-    renderCloserMonthCal();
-  }
-}
-
-function updateCloserStats() {
-  const today = new Date().toDateString();
-  const todayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === today);
-  const closed = closerAppts.filter(a => a.status === 'closed');
-  document.getElementById('closerStatAppts').textContent = closerAppts.length;
-  document.getElementById('closerStatToday').textContent = todayAppts.length;
-  document.getElementById('closerStatClosed').textContent = closed.length;
-}
-
-function renderCloserMonthCal() {
-  const body = document.getElementById('closerCalBody');
-  const titleEl = document.getElementById('closerCalTitle');
-  if (!body) return;
-  const y = closerCalDate.getFullYear(), m = closerCalDate.getMonth();
-  if (titleEl) titleEl.textContent = closerCalDate.toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
-  const first = new Date(y,m,1), last = new Date(y,m+1,0);
-  const today = new Date();
-  let html = '<div class="month-grid">';
-  ['SUN','MON','TUE','WED','THU','FRI','SAT'].forEach(d => html += '<div class="month-day-hdr">'+d+'</div>');
-  for (let i=0;i<first.getDay();i++) html += '<div class="month-day other-month"><div class="month-day-num">'+(new Date(y,m,-first.getDay()+i+1)).getDate()+'</div></div>';
-  for (let d=1;d<=last.getDate();d++) {
-    const date = new Date(y,m,d);
-    const isToday = date.toDateString() === today.toDateString();
-    const isSel = date.toDateString() === closerSelectedDate.toDateString();
-    const dayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === date.toDateString());
-    let dots = dayAppts.slice(0,2).map(a => '<div class="month-job-dot" style="border-color:#a855f7;color:#a855f7;background:rgba(168,85,247,0.1);">'+a.customerName+'</div>').join('');
-    if (dayAppts.length > 0) dots += '<div style="font-size:8px;color:var(--muted);margin-top:2px;">'+dayAppts.length+' appt'+(dayAppts.length>1?'s':'')+'</div>';
-    html += '<div class="month-day'+(isToday?' today':'')+(isSel?' selected':'')+'" onclick="closerGoToDay(new Date('+y+','+m+','+d+'))"><div class="month-day-num">'+d+'</div>'+dots+'</div>';
-  }
-  html += '</div>';
-  body.innerHTML = html;
-}
-
-function closerGoToDay(d) {
-  closerSelectedDate = new Date(d);
-  const sec = document.getElementById('closerDaySection');
-  sec.style.display = 'block';
-  renderCloserDayTimeline(d);
-  setTimeout(() => sec.scrollIntoView({behavior:'smooth',block:'start'}), 50);
-}
-
-function renderCloserDayTimeline(d) {
-  const body = document.getElementById('closerDayBody');
-  const titleEl = document.getElementById('closerDayTitle');
-  if (!body) return;
-  if (titleEl) titleEl.textContent = d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  const HOUR_START=8, HOUR_END=20, HOUR_HEIGHT=60;
-  const TOTAL_HEIGHT=(HOUR_END-HOUR_START)*HOUR_HEIGHT;
-  const dayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === d.toDateString());
-  let html = '<div class="timeline-wrap"><div style="display:flex;">';
-  html += '<div style="width:38px;flex-shrink:0;position:relative;height:'+TOTAL_HEIGHT+'px;">';
-  for (let h=HOUR_START;h<=HOUR_END;h++) {
-    const top=(h-HOUR_START)*HOUR_HEIGHT;
-    const label=h===12?'12p':h>12?(h-12)+'p':h+'a';
-    html += '<div style="position:absolute;top:'+top+'px;right:4px;font-family:Share Tech Mono,monospace;font-size:9px;color:var(--muted);">'+label+'</div>';
-  }
-  html += '</div><div style="flex:1;position:relative;min-height:'+TOTAL_HEIGHT+'px;">';
-  for (let h=HOUR_START;h<=HOUR_END;h++) {
-    const top=(h-HOUR_START)*HOUR_HEIGHT;
-    html += '<div style="position:absolute;top:'+top+'px;left:0;right:0;border-top:1px solid rgba(255,255,255,0.05);"></div>';
-    const hLabel=(h>12?h-12:h)+':00 '+(h>=12?'PM':'AM');
-    html += '<div class="tap-to-add" style="top:'+top+'px;height:30px;" data-time="'+hLabel+'" onclick="openCloserScheduleModal(new Date('+d.getFullYear()+','+d.getMonth()+','+d.getDate()+'),'+h+',0)"></div>';
-    html += '<div class="tap-to-add" style="top:'+(top+30)+'px;height:30px;" data-time="'+(h>12?h-12:h)+':30 '+(h>=12?'PM':'AM')+'" onclick="openCloserScheduleModal(new Date('+d.getFullYear()+','+d.getMonth()+','+d.getDate()+'),'+h+',30)"></div>';
-  }
-  dayAppts.forEach(a => {
-    const mins = timeToMinutes(a.time);
-    if (mins===null) return;
-    const topPx=((mins/60)-HOUR_START)*HOUR_HEIGHT;
-    const dur=a.duration||60;
-    const heightPx=Math.max(30,(dur/60)*HOUR_HEIGHT);
-    const color = a.status==='closed'?'var(--green)':'#a855f7';
-    html += '<div style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:2px;right:2px;background:rgba(168,85,247,0.12);border:1px solid '+color+';border-radius:6px;padding:4px 8px;cursor:pointer;-webkit-user-select:none;user-select:none;z-index:5;" onclick="showApptDetail(''+a.fbKey+'')">'+
-      '<div style="font-weight:700;font-size:12px;color:'+color+';">'+a.customerName+'</div>'+
-      (heightPx>35?'<div style="font-size:10px;color:var(--muted);">'+a.time+(a.address?' · '+a.address.split(',')[0]:'')+'</div>':'')+
-      '</div>';
-  });
-  html += '</div></div></div>';
-  body.innerHTML = html;
-}
-
-function closerCalNav(dir) { closerCalDate.setMonth(closerCalDate.getMonth()+dir); renderCloserMonthCal(); }
-function closerDayNav(dir) { closerSelectedDate.setDate(closerSelectedDate.getDate()+dir); renderCloserDayTimeline(closerSelectedDate); }
-function setCloserView(v) {
-  closerView = v;
-  document.getElementById('closerBtnWeek').className = 'cal-view-btn'+(v==='week'?' active':'');
-  document.getElementById('closerBtnDay').className = 'cal-view-btn'+(v==='day'?' active':'');
-}
-
-function openCloserScheduleModal(date, hour, minute) {
-  const modal = document.getElementById('closerScheduleModal');
-  if (!modal) return;
-  if (date) {
-    document.getElementById('csApptDate').value = date.toISOString().split('T')[0];
-    if (hour !== undefined) {
-      const h = hour > 12 ? hour-12 : hour===0?12:hour;
-      const m = (minute||0).toString().padStart(2,'0');
-      const ap = hour >= 12 ? 'PM' : 'AM';
-      document.getElementById('csApptTime').value = h+':'+m+' '+ap;
-    }
-  } else {
-    document.getElementById('csApptDate').value = new Date().toISOString().split('T')[0];
-    document.getElementById('csApptTime').value = '';
-  }
-  document.getElementById('csApptName').value = '';
-  document.getElementById('csApptAddr').value = '';
-  document.getElementById('csApptPhone').value = '';
-  document.getElementById('csApptNotes').value = '';
-  modal.classList.add('open');
-}
-function closeCloserModal() { document.getElementById('closerScheduleModal').classList.remove('open'); }
-
-function saveCloserAppt() {
-  const name = document.getElementById('csApptName').value.trim();
-  const date = document.getElementById('csApptDate').value;
-  const time = document.getElementById('csApptTime').value.trim();
-  if (!name || !date || !time) { showToast('Name, date and time required', 'error'); return; }
-  const appt = {
-    customerName: name,
-    address: document.getElementById('csApptAddr').value.trim(),
-    phone: document.getElementById('csApptPhone').value.trim(),
-    date: date,
-    time: time,
-    notes: document.getElementById('csApptNotes').value.trim(),
-    status: 'pending',
-    duration: 60,
-    createdBy: currentUser?.email || 'closer',
-    created: new Date().toISOString()
-  };
-  if (window.fbSet) {
-    const key = 'appt_' + Date.now();
-    window.fbSet('appointments/'+key, appt);
-  } else {
-    closerAppts.push({...appt, fbKey:'local_'+Date.now()});
-    renderCloserMonthCal();
-    updateCloserStats();
-  }
-  closeCloserModal();
-  showToast('&#10003; Appointment saved', 'success');
-}
-
-function showApptDetail(fbKey) {
-  const a = closerAppts.find(x => x.fbKey === fbKey);
-  if (!a) return;
-  const existing = document.getElementById('apptDetailPanel');
-  if (existing) existing.remove();
-  const panel = document.createElement('div');
-  panel.id = 'apptDetailPanel';
-  panel.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
-  panel.onclick = e => { if(e.target===panel) panel.remove(); };
-  const sheet = document.createElement('div');
-  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;';
-  const statusColor = a.status==='closed'?'var(--green)':a.status==='cancelled'?'var(--red)':'#a855f7';
-  sheet.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'+
-      '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:#a855f7;letter-spacing:2px;">APPOINTMENT</div>'+
-      '<button id="apptCloseBtn" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">&#10005;</button>'+
-    '</div>'+
-    '<div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px;">'+a.customerName+'</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:16px;">'+a.date+' at '+a.time+'</div>'+
-    (a.address?'<div style="font-size:13px;color:var(--text);margin-bottom:8px;">&#128205; '+a.address+'</div>':'')+
-    (a.phone?'<div style="font-size:13px;color:var(--text);margin-bottom:8px;">&#128222; '+a.phone+'</div>':'')+
-    (a.notes?'<div style="font-size:13px;color:var(--muted);margin-bottom:16px;">&#128203; '+a.notes+'</div>':'')+
-    '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
-      '<button onclick="updateApptStatus(''+fbKey+'','closed')" style="flex:1;background:rgba(0,230,118,0.1);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;">&#10003; CLOSED</button>'+
-      '<button onclick="updateApptStatus(''+fbKey+'','cancelled')" style="flex:1;background:rgba(255,68,68,0.1);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;">&#10007; CANCEL</button>'+
-    '</div>'+
-    '<button onclick="createInstallFromAppt(''+fbKey+'')" style="width:100%;background:rgba(0,212,255,0.1);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;margin-bottom:8px;">&#8594; CREATE INSTALL JOB FOR TECH</button>';
-  sheet.querySelector('#apptCloseBtn').onclick = () => panel.remove();
-  panel.appendChild(sheet);
-  document.body.appendChild(panel);
-}
-
-function updateApptStatus(fbKey, status) {
-  const a = closerAppts.find(x => x.fbKey === fbKey);
-  if (a) a.status = status;
-  if (window.fbSet) window.fbSet('appointments/'+fbKey+'/status', status);
-  document.getElementById('apptDetailPanel')?.remove();
-  renderCloserDayTimeline(closerSelectedDate);
-  updateCloserStats();
-  showToast(status==='closed'?'&#10003; Marked as closed!':'Appointment cancelled', status==='closed'?'success':'info');
-}
-
-function createInstallFromAppt(fbKey) {
-  const a = closerAppts.find(x => x.fbKey === fbKey);
-  if (!a) return;
-  // Create a new job in the tech system
-  const newJob = {
-    id: Date.now(),
-    status: 'pending',
-    sent: false,
-    scheduledDate: new Date(a.date).toISOString(),
-    scheduledTime: a.time,
-    scheduledDuration: 120,
-    data: {
-      customerName: a.customerName,
-      address: a.address||'',
-      phone: a.phone||'',
-      email: '',
-      cs: '',
-      notes: 'Created from closer appointment. '+( a.notes||''),
-      installing: [],
-      existing: [],
-      zones: [],
-      arriveTime: '', finishTime: '', masterCode: '', verbalCode: ''
-    },
-    fromAppt: fbKey
-  };
-  jobs.push(newJob);
-  if (window.fbSet) window.fbSet('jobs/job_'+newJob.id, newJob);
-  saveToStorage();
-  document.getElementById('apptDetailPanel')?.remove();
-  showToast('&#10003; Install job created for tech!', 'success');
-}
-
-// ── Call Center ────────────────────────────────────────────
-function renderCallCenterView() {
-  const today = new Date();
-  document.getElementById('ccDateLabel').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  document.getElementById('ccApptDate').value = today.toISOString().split('T')[0];
-  // Load appointments real-time
-  if (window.fbListen) {
-    window.fbListen('appointments', data => {
-      closerAppts = data ? Object.entries(data).map(([k,v]) => ({...v, fbKey:k})) : [];
-      renderCCWeekView();
-    });
-  } else {
-    renderCCWeekView();
-  }
-}
-
-function renderCCWeekView() {
-  const body = document.getElementById('ccWeekView');
-  if (!body) return;
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay());
-  const days = Array.from({length:7}, (_,i) => { const d=new Date(startOfWeek); d.setDate(startOfWeek.getDate()+i); return d; });
-  let html = '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:#f59e0b;letter-spacing:2px;margin-bottom:10px;">CLOSER AVAILABILITY THIS WEEK</div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">';
-  days.forEach(d => {
-    const isToday = d.toDateString() === today.toDateString();
-    const dayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === d.toDateString());
-    const slots = ['9 AM','10 AM','11 AM','1 PM','2 PM','3 PM','4 PM'];
-    const bookedTimes = dayAppts.map(a => a.time);
-    html += '<div style="background:var(--panel);border:1px solid '+(isToday?'var(--accent)':'var(--border)')+';border-radius:8px;padding:6px;min-width:0;">';
-    html += '<div style="font-family:Share Tech Mono,monospace;font-size:9px;color:'+(isToday?'var(--accent)':'var(--muted)')+';text-align:center;margin-bottom:4px;">'+d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()+'<br>'+d.getDate()+'</div>';
-    slots.forEach(slot => {
-      const isBooked = dayAppts.some(a => a.time && a.time.includes(slot.replace(' ','').toLowerCase()) || (a.time||'').includes(slot));
-      html += '<div style="background:'+(isBooked?'rgba(168,85,247,0.2)':'rgba(255,255,255,0.04)')+';border:1px solid '+(isBooked?'#a855f7':'rgba(255,255,255,0.06)')+';border-radius:4px;padding:2px 3px;margin-bottom:2px;font-size:8px;font-family:Share Tech Mono,monospace;color:'+(isBooked?'#a855f7':'var(--muted)')+';text-align:center;cursor:'+(isBooked?'default':'pointer')+'" '+(!isBooked?'onclick="selectCCSlot(''+d.toISOString().split('T')[0]+'',''+slot+'')"':'')+'>'+(isBooked?'&#9679;':slot)+'</div>';
-    });
-    html += '</div>';
-  });
-  html += '</div>';
-  body.innerHTML = html;
-}
-
-function selectCCSlot(date, time) {
-  document.getElementById('ccApptDate').value = date;
-  document.getElementById('ccApptTime').value = time;
-  document.getElementById('ccCustName').focus();
-  showToast('Slot selected: '+time+' on '+date, 'info');
-}
-
-function bookCCAppt() {
-  const name = document.getElementById('ccCustName').value.trim();
-  const date = document.getElementById('ccApptDate').value;
-  const time = document.getElementById('ccApptTime').value.trim();
-  if (!name || !date || !time) { showToast('Name, date and time required', 'error'); return; }
-  const appt = {
-    customerName: name,
-    phone: document.getElementById('ccCustPhone').value.trim(),
-    address: document.getElementById('ccCustAddr').value.trim(),
-    date: date, time: time,
-    notes: document.getElementById('ccApptNotes').value.trim(),
-    status: 'pending', duration: 60,
-    createdBy: currentUser?.email || 'callcenter',
-    created: new Date().toISOString()
-  };
-  if (window.fbSet) {
-    window.fbSet('appointments/appt_'+Date.now(), appt);
-  } else {
-    closerAppts.push({...appt, fbKey:'local_'+Date.now()});
-    renderCCWeekView();
-  }
-  document.getElementById('ccCustName').value = '';
-  document.getElementById('ccCustPhone').value = '';
-  document.getElementById('ccCustAddr').value = '';
-  document.getElementById('ccApptNotes').value = '';
-  showToast('&#10003; Appointment booked for closer!', 'success');
-}
-
-
+</html>
