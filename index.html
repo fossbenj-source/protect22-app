@@ -1392,15 +1392,22 @@ function saveCurrentJob() {
       cell: item.querySelector('[data-cls="on-cell"]').classList.contains('on-cell')
     }));
   d.zones = [...document.getElementById('zoneRows').querySelectorAll('input')].map(i => i.value);
+  // Persist locked state so it survives navigation
+  const lockableFields = ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'];
+  d.lockedFields = lockableFields.filter(fid => {
+    const el = document.getElementById(fid);
+    return el && el.readOnly;
+  });
 }
 
 function loadJob(id) {
   const j = jobs.find(x => x.id === id);
   if (!j) return;
   const d = j.data;
-  // Unlock all contact fields on job load
-  ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'].forEach(id => {
-    const el = document.getElementById(id);
+  // Restore lock state — unlock all first, then re-lock whichever were saved as locked
+  const _lockable = ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'];
+  _lockable.forEach(fid => {
+    const el = document.getElementById(fid);
     if (el) { el.readOnly = false; el.classList.remove('locked'); }
     const row = (el && el.closest) ? (el.closest('.copy-row') || el.closest('.addr-row')) : null;
     if (row) {
@@ -1417,6 +1424,13 @@ function loadJob(id) {
   document.getElementById('email').value = d.email || '';
   document.getElementById('phone').value = d.phone || '';
   document.getElementById('confirmation').value = d.confirmation || '';
+  // Re-apply lock state for fields that were locked when last saved
+  if (d.lockedFields && d.lockedFields.length) {
+    d.lockedFields.forEach(fid => {
+      const el = document.getElementById(fid);
+      if (el && el.value.trim()) lockField(fid);
+    });
+  }
   // Show scheduled time from calendar
   const banner = document.getElementById('scheduledBanner');
   const label = document.getElementById('scheduledTimeLabel');
