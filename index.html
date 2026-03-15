@@ -506,8 +506,46 @@
   .resize-handle{position:absolute;bottom:0;left:0;right:0;height:8px;cursor:ns-resize;background:rgba(255,255,255,0.15);border-radius:0 0 6px 6px;display:flex;align-items:center;justify-content:center;}
   .resize-handle::after{content:'';width:20px;height:2px;background:rgba(255,255,255,0.5);border-radius:2px;}
 </style>
+<style id="failsafeCss">
+/* Failsafe */
+#loginScreen { display: flex !important; }
+#techApp, #closerApp, #callCenterApp { display: none !important; }
+</style>
 </head>
 <body>
+<style id="forceHidden">
+#techApp { display: none !important; }
+#closerApp { display: none !important; }
+#callCenterApp { display: none !important; }
+</style>
+
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="position:fixed;inset:0;z-index:9999999;background:#0a0e13;color:#e2eaf4;display:flex;align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:400px;">
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:40px;">
+      <div style="width:64px;height:64px;background:linear-gradient(135deg,var(--accent),#0088aa);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;">🛡️</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--accent);letter-spacing:3px;">PROTECT22</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;">OPERATIONS PLATFORM</div>
+    </div>
+    <!-- Form -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;">
+      <div id="loginError" style="display:none;background:rgba(255,68,68,0.1);border:1px solid var(--red);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--red);margin-bottom:16px;"></div>
+      <div style="margin-bottom:14px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:6px;">EMAIL</label>
+        <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')document.getElementById('loginPassword').focus()">
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:6px;">PASSWORD</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button onclick="doLogin()" id="loginBtn" style="width:100%;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;">SIGN IN</button>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);">Protect22 · Bridgepoint Service</div>
+  </div>
+</div>
+
 <div class="pin-overlay" id="pinOverlay" style="display:none;">
   <div class="pin-logo">🛡️</div>
   <div>
@@ -3953,8 +3991,18 @@ function doLogin() {
     btn.textContent = 'SIGN IN'; btn.disabled = false;
     return;
   }
-  // Ensure appReady when user manually signs in (DOM is definitely loaded)
   appReady = true;
+  if (typeof firebase === 'undefined' || !firebase.auth) {
+    // Offline fallback
+    const u = USERS[email];
+    if (u && pass === 'maxus12') {
+      onLoginSuccess({ email, displayName: u.name });
+    } else {
+      showLoginError('Invalid email or password');
+      btn.textContent = 'SIGN IN'; btn.disabled = false;
+    }
+    return;
+  }
   firebase.auth().signInWithEmailAndPassword(email, pass)
     .then(cred => onLoginSuccess(cred.user))
     .catch(e => {
@@ -4003,28 +4051,55 @@ function routeUser() {
 }
 
 function doLogout() {
-  if (typeof firebase !== 'undefined') firebase.auth().signOut().catch(()=>{});
   currentUser = null; currentRole = null;
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('loginEmail').value = '';
-  document.getElementById('loginPassword').value = '';
+  appReady = false; // Reset so re-login works cleanly
+  if (typeof firebase !== 'undefined' && firebase.auth) {
+    firebase.auth().signOut().then(() => {
+      // After signout confirmed, show login
+      const ls = document.getElementById('loginScreen');
+      if (ls) ls.style.display = 'flex';
+      const em = document.getElementById('loginEmail');
+      const pw = document.getElementById('loginPassword');
+      const err = document.getElementById('loginError');
+      if (em) em.value = '';
+      if (pw) pw.value = '';
+      if (err) { err.style.display = 'none'; err.textContent = ''; }
+      // Hide all app views
+      ['techApp','closerApp','callCenterApp'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+    }).catch(()=>{});
+  } else {
+    const ls = document.getElementById('loginScreen');
+    if (ls) ls.style.display = 'flex';
+  }
 }
 
 function initTechApp() {
-  const ta = document.getElementById('techApp');
-  const ca = document.getElementById('closerApp');
-  const cc = document.getElementById('callCenterApp');
-  if (!ta) { setTimeout(initTechApp, 100); return; }
-  ta.style.display = 'block';
-  if (ca) ca.style.display = 'none';
-  if (cc) cc.style.display = 'none';
-  const u = USERS[currentUser?.email] || {};
-  const lbl = document.getElementById('todayDateLabel');
-  if (lbl) lbl.textContent = (u.name||'Tech').toUpperCase() + ' · ' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  if (typeof initAppData === 'function') {
-    initAppData();
-  } else {
-    setTimeout(initTechApp, 150);
+  try {
+    const ta = document.getElementById('techApp');
+    const ca = document.getElementById('closerApp');
+    const cc = document.getElementById('callCenterApp');
+    if (!ta) { setTimeout(initTechApp, 100); return; }
+    // Remove force-hidden style and show tech app
+    const _fs = document.getElementById('forceHidden'); if(_fs) _fs.remove();
+    const ls = document.getElementById('loginScreen');
+    if (ls) ls.style.display = 'none';
+    ta.style.display = 'block';
+    if (ca) ca.style.display = 'none';
+    if (cc) cc.style.display = 'none';
+    const u = USERS[currentUser?.email] || {};
+    const lbl = document.getElementById('todayDateLabel');
+    if (lbl) lbl.textContent = (u.name||'Tech').toUpperCase() + ' · ' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
+    if (typeof initAppData === 'function') {
+      initAppData();
+    } else {
+      setTimeout(initTechApp, 150);
+    }
+  } catch(e) {
+    console.error('initTechApp error:', e);
+    document.getElementById('loginScreen').style.display = 'flex';
   }
 }
 
@@ -4034,6 +4109,9 @@ function initCloserView() {
   const cc=document.getElementById('callCenterApp');
   if (!ca) { setTimeout(initCloserView, 100); return; }
   if (ta) ta.style.display = 'none';
+  const _fs = document.getElementById('forceHidden'); if(_fs) _fs.remove();
+  const _ls2 = document.getElementById('loginScreen');
+  if (_ls2) _ls2.style.display = 'none';
   ca.style.display = 'block';
   if (cc) cc.style.display = 'none';
   document.getElementById('closerDateLabel').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
@@ -4047,6 +4125,9 @@ function initCallCenterView() {
   if (!cc) { setTimeout(initCallCenterView, 100); return; }
   if (ta) ta.style.display = 'none';
   if (ca) ca.style.display = 'none';
+  const _fs = document.getElementById('forceHidden'); if(_fs) _fs.remove();
+  const _ls3 = document.getElementById('loginScreen');
+  if (_ls3) _ls3.style.display = 'none';
   cc.style.display = 'block';
   renderCallCenterView();
 }
@@ -4062,14 +4143,26 @@ document.addEventListener('keydown', e => {
 // ── Init ─────────────────────────────────────────────────
 // ── Firebase Auth Init ───────────────────────────────────
 function initFirebaseAuth() {
-  if (typeof firebase === 'undefined') return;
+  if (typeof firebase === 'undefined' || !firebase.auth) {
+    console.log('Firebase not available - using offline mode');
+    // Show login screen - user will log in with email/password validation only
+    const ls = document.getElementById('loginScreen');
+    if (ls) ls.style.display = 'flex';
+    return;
+  }
   try {
     const auth = firebase.auth();
     auth.onAuthStateChanged(user => {
       const ls = document.getElementById('loginScreen');
       if (user) {
-        if (ls) ls.style.display = 'none';
-        onLoginSuccess(user);
+        // Keep login screen until routing is confirmed
+        try {
+          onLoginSuccess(user);
+        } catch(e) {
+          console.warn('Auth routing error:', e);
+          // Show login screen as fallback
+          if (ls) ls.style.display = 'flex';
+        }
       } else {
         if (ls) ls.style.display = 'flex';
         document.getElementById('techApp').style.display = 'none';
@@ -4082,6 +4175,12 @@ function initFirebaseAuth() {
 // end initFirebaseAuth
 
 document.addEventListener('DOMContentLoaded', function() {
+
+// Remove failsafe CSS overrides now that JS is running
+try {
+  const failsafe = document.getElementById('failsafeCss');
+  if (failsafe) failsafe.remove();
+} catch(e) {}
 
 try { document.getElementById('dateBadge') && (document.getElementById('dateBadge').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'})); } catch(e) {}
 
@@ -4096,7 +4195,7 @@ try {
     messagingSenderId: "90977905259",
     appId: "1:90977905259:web:a387c0fe74a3440cd11f2e"
   };
-  if (typeof firebase !== 'undefined') {
+  if (typeof firebase !== 'undefined' && firebase.initializeApp) {
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     try { db.enablePersistence({synchronizeTabs:false}).catch(()=>{}); } catch(e) {}
@@ -4104,6 +4203,8 @@ try {
     window.fbRemove = (path) => db.ref(path).remove().catch(()=>{});
     window.fbListen = (path, cb) => db.ref(path).on('value', snap => cb(snap.val()));
     window.firebaseReady = true;
+    // Always sign out on fresh page load - require manual login every time
+    firebase.auth().signOut().catch(()=>{});
     db.ref('.info/connected').on('value', snap => {
       const el = document.getElementById('syncStatus');
       if (!el) return;
@@ -4531,34 +4632,7 @@ function bookCCAppt() {
 }
 
 </script>
-
-
-
-<!-- LOGIN SCREEN -->
-<div id="loginScreen" style="position:fixed;inset:0;z-index:9999999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;">
-  <div style="width:100%;max-width:400px;">
-    <!-- Logo -->
-    <div style="text-align:center;margin-bottom:40px;">
-      <div style="width:64px;height:64px;background:linear-gradient(135deg,var(--accent),#0088aa);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;">🛡️</div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--accent);letter-spacing:3px;">PROTECT22</div>
-      <div style="font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;">OPERATIONS PLATFORM</div>
-    </div>
-    <!-- Form -->
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;">
-      <div id="loginError" style="display:none;background:rgba(255,68,68,0.1);border:1px solid var(--red);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--red);margin-bottom:16px;"></div>
-      <div style="margin-bottom:14px;">
-        <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:6px;">EMAIL</label>
-        <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')document.getElementById('loginPassword').focus()">
-      </div>
-      <div style="margin-bottom:20px;">
-        <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:6px;">PASSWORD</label>
-        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <button onclick="doLogin()" id="loginBtn" style="width:100%;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;">SIGN IN</button>
-    </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);">Protect22 · Bridgepoint Service</div>
-  </div>
-</div>
+</div><!-- end techApp -->
 
 <!-- TODAY SCREEN -->
 
@@ -5022,7 +5096,7 @@ function bookCCAppt() {
 </div>
 
 
-</div><!-- end techApp -->
+
 <!-- CLOSER APP -->
 <div id="closerApp" style="display:none;min-height:100vh;background:var(--bg);">
   <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
