@@ -5501,16 +5501,19 @@ function doLogin() {
 
     if (!ready) {
       if (retriesLeft > 0) {
-        setTimeout(() => attemptLogin(retriesLeft - 1), 500);
+        setTimeout(() => attemptLogin(retriesLeft - 1), 400);
         return;
       }
-      showLoginError('Connection required to sign in');
+      showLoginError('Connection required — check your internet and try again');
       btn.textContent = 'SIGN IN'; btn.disabled = false;
       return;
     }
 
     firebase.auth().signInWithEmailAndPassword(email, pass)
-      .then(cred => onLoginSuccess(cred.user))
+      .then(cred => {
+        // onAuthStateChanged will also fire — onLoginSuccess handles routing
+        // No need to call onLoginSuccess here, the auth listener does it
+      })
       .catch(e => {
         const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials')
           ? 'Invalid email or password'
@@ -5520,7 +5523,7 @@ function doLogin() {
       });
   }
 
-  attemptLogin(6); // retry every 500ms for up to 3 seconds
+  attemptLogin(6);
 }
 
 function showLoginError(msg) {
@@ -5531,27 +5534,18 @@ function showLoginError(msg) {
 let appReady = false;
 let pendingUser = null;
 
-let _loginRoutingInProgress = false;
 function onLoginSuccess(user) {
-  // Prevent double-fire from signInWithEmailAndPassword + onAuthStateChanged both calling this
-  if (_loginRoutingInProgress) return;
-  _loginRoutingInProgress = true;
-  setTimeout(() => { _loginRoutingInProgress = false; }, 3000); // reset after 3s
-
   currentUser = user;
   const u = USERS[user.email] || { role: 'tech', name: user.email, uid: user.uid };
   currentRole = u.role;
   const ls = document.getElementById('loginScreen');
   const lb = document.getElementById('loginBtn');
   if (lb) { lb.textContent = 'SIGN IN'; lb.disabled = false; }
-
+  if (ls) ls.style.display = 'none';
   if (!appReady) {
-    // DOMContentLoaded hasn't fired yet — queue routing
     pendingUser = user;
     return;
   }
-  // Hide login and route
-  if (ls) ls.style.display = 'none';
   routeUser();
 }
 
@@ -5681,16 +5675,13 @@ function initFirebaseAuth() {
           if (ls) ls.style.display = 'flex';
         }
       } else {
-        // Only show login if we're not mid-login (doLogin handles its own UI)
-        if (!_loginRoutingInProgress) {
-          if (ls) ls.style.display = 'flex';
-          const ta = document.getElementById('techApp');
-          const ca = document.getElementById('closerApp');
-          const cc = document.getElementById('callCenterApp');
-          if (ta) ta.style.display = 'none';
-          if (ca) ca.style.display = 'none';
-          if (cc) cc.style.display = 'none';
-        }
+        if (ls) ls.style.display = 'flex';
+        const ta = document.getElementById('techApp');
+        const ca = document.getElementById('closerApp');
+        const cc = document.getElementById('callCenterApp');
+        if (ta) ta.style.display = 'none';
+        if (ca) ca.style.display = 'none';
+        if (cc) cc.style.display = 'none';
       }
     });
   } catch(e) { console.warn('Auth init failed', e); }
