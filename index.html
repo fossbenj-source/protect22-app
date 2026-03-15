@@ -5493,37 +5493,25 @@ function doLogin() {
   btn.textContent = 'SIGNING IN...';
   btn.disabled = true;
 
-  // Firebase loads async — if not ready yet, retry up to 3s before failing
-  function attemptLogin(retriesLeft) {
-    // window.firebaseReady is set immediately after firebase.initializeApp() runs
-    if (!window.firebaseReady) {
-      if (retriesLeft > 0) {
-        setTimeout(() => attemptLogin(retriesLeft - 1), 400);
-        return;
-      }
-      // Last resort — try anyway even if firebaseReady flag isn't set
-      if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
-        showLoginError('Connection required — check your internet and try again');
-        btn.textContent = 'SIGN IN'; btn.disabled = false;
-        return;
-      }
-      // Firebase SDK is loaded, just initializeApp may not have run — try anyway
-    }
-
-    firebase.auth().signInWithEmailAndPassword(email, pass)
-      .then(() => {
-        // onAuthStateChanged fires automatically after sign-in and handles routing
-      })
-      .catch(e => {
-        const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials')
-          ? 'Invalid email or password'
-          : 'Sign in failed — check your connection and try again.';
-        showLoginError(msg);
-        btn.textContent = 'SIGN IN'; btn.disabled = false;
-      });
+  // The Firebase compat SDK is loaded synchronously in <head> so firebase.auth
+  // is always available by the time the user can interact with the page.
+  if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
+    showLoginError('Firebase not loaded — check your connection and refresh');
+    btn.textContent = 'SIGN IN'; btn.disabled = false;
+    return;
   }
 
-  attemptLogin(6);
+  firebase.auth().signInWithEmailAndPassword(email, pass)
+    .then(() => {
+      // onAuthStateChanged fires automatically and calls onLoginSuccess → routeUser
+    })
+    .catch(e => {
+      const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials')
+        ? 'Invalid email or password'
+        : 'Sign in failed — check your connection and try again.';
+      showLoginError(msg);
+      btn.textContent = 'SIGN IN'; btn.disabled = false;
+    });
 }
 
 function showLoginError(msg) {
@@ -5710,7 +5698,10 @@ try {
     appId: "1:90977905259:web:a387c0fe74a3440cd11f2e"
   };
   if (typeof firebase !== 'undefined' && firebase.initializeApp) {
-    firebase.initializeApp(firebaseConfig);
+    // Guard against double-init (throws on compat SDK)
+    if (!firebase.apps || firebase.apps.length === 0) {
+      firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.database();
     try { db.enablePersistence({synchronizeTabs:false}).catch(()=>{}); } catch(e) {}
     window.fbSet = (path, data) => db.ref(path).set(data).catch(()=>{});
