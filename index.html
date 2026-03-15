@@ -13,15 +13,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:#0a0e13; --panel:#111620; --panel2:#161d28; --border:#1e2d3d;
-    --accent:#00d4ff; --accent-dim:rgba(0,212,255,0.12);
-    --green:#00e676; --red:#ff4444; --yellow:#ffd600; --orange:#ff6b2b;
-    --text:#e2eaf4; --muted:#5a7a99; --input-bg:#0d1219;
+    --bg:#1a1f2e; --panel:#222836; --panel2:#2a3142; --border:#3a4558;
+    --accent:#4dc9f6; --accent-dim:rgba(77,201,246,0.15);
+    --green:#34d399; --red:#f87171; --yellow:#fbbf24; --orange:#fb923c;
+    --text:#f0f4f8; --muted:#8899aa; --input-bg:#1e2433;
     --shadow:0 4px 24px rgba(0,0,0,0.4);
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html{overflow-x:hidden;}
-  body{font-family:'DM Sans',sans-serif;background:var(--bg);background-image:radial-gradient(ellipse at 20% 0%,rgba(0,212,255,0.04) 0%,transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(255,107,43,0.04) 0%,transparent 60%);color:var(--text);min-height:100vh;padding:0;overflow-x:hidden;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);background-image:radial-gradient(ellipse at 20% 0%,rgba(77,201,246,0.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(251,146,60,0.04) 0%,transparent 60%);color:var(--text);min-height:100vh;padding:0;overflow-x:hidden;}
 
   /* HEADER */
   .header{max-width:780px;margin:0 auto 16px;display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--border);position:relative;}
@@ -454,9 +454,9 @@
   .timeline-event{position:absolute;border-radius:6px;padding:4px 8px;cursor:grab;overflow:hidden;left:2px;right:2px;-webkit-user-select:none;user-select:none;transition:box-shadow 0.15s,opacity 0.15s;}
   .timeline-event.dragging{cursor:grabbing;opacity:0.75;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:50!important;}
   .timeline-event:hover{filter:brightness(1.2);}
-  .timeline-event-name{font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .timeline-event-time{font-family:'Share Tech Mono',monospace;font-size:10px;opacity:0.8;margin-top:1px;}
-  .timeline-event-addr{font-size:10px;opacity:0.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .timeline-event-name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .timeline-event-time{font-family:'Share Tech Mono',monospace;font-size:11px;opacity:0.9;margin-top:1px;}
+  .timeline-event-addr{font-size:11px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .timeline-event.pending{background:rgba(255,214,0,0.15);border:1px solid var(--yellow);color:var(--yellow);}
   .timeline-event.complete{background:rgba(0,230,118,0.15);border:1px solid var(--green);color:var(--green);}
   .timeline-event.reschedule{background:rgba(255,107,43,0.15);border:1px solid var(--orange);color:var(--orange);}
@@ -600,9 +600,9 @@
 
   /* ── Timeline events — more readable ── */
   .timeline-event { padding: 5px 7px; border-radius: 6px; }
-  .timeline-event-name { font-size: 13px; }
-  .timeline-event-time { font-size: 11px; }
-  .timeline-event-addr { font-size: 11px; }
+  .timeline-event-name { font-size: 14px; }
+  .timeline-event-time { font-size: 12px; }
+  .timeline-event-addr { font-size: 12px; }
   .resize-handle { height: 12px; }
   .resize-handle::after { width: 28px; height: 3px; }
 
@@ -808,6 +808,11 @@
       <div class="stat-card" onclick="showFeesBreakdown()" style="cursor:pointer;"><div class="stat-num" id="statFees" style="color:var(--green)">$0</div><div class="stat-label">Fees</div></div>
     </div>
 
+    <!-- Reports button -->
+    <button onclick="showReportsDashboard()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;">
+      📊 VIEW REPORTS & STATS
+    </button>
+
     <!-- Schedule Job button -->
     <button class="btn-today-add" onclick="openScheduleModal()" style="margin-bottom:14px;">+ Schedule Job</button>
 
@@ -914,6 +919,12 @@
     <button onclick="callPhone()" style="background:rgba(0,230,118,0.15);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:10px 12px;font-size:14px;cursor:pointer;flex-shrink:0;" title="Call customer">📞</button>
   </div>
 
+  <!-- Job Type -->
+  <div style="display:flex;gap:6px;margin-bottom:10px;">
+    <button class="status-btn" id="btnTypeInstall" onclick="setJobType('install')" style="flex:1;font-size:11px;padding:10px;">🔧 INSTALL</button>
+    <button class="status-btn" id="btnTypeService" onclick="setJobType('service')" style="flex:1;font-size:11px;padding:10px;">🛠️ SERVICE</button>
+  </div>
+
   <!-- Status + Time -->
   <div class="card">
     <div class="card-head"><span>📍</span><h2>Job Status & Time</h2></div>
@@ -932,6 +943,8 @@
           <button class="time-btn" id="btnArrive" onclick="stampTime('arrive')">🕐 Arrived</button>
           <button class="time-btn" id="btnFinish" onclick="stampTime('finish')">🏁 Finished</button>
         </div>
+        <!-- Live timer -->
+        <div id="liveTimer" style="display:none;text-align:center;margin-top:8px;font-family:'Share Tech Mono',monospace;font-size:20px;color:var(--accent);letter-spacing:2px;"></div>
         <div style="display:flex;gap:8px;margin-top:8px;">
           <div style="flex:1;">
             <label style="font-size:9px;margin-bottom:3px;">ARRIVE TIME</label>
@@ -1085,6 +1098,70 @@
     </div>
   </div>
 
+  <!-- Service-specific fields (hidden for install jobs) -->
+  <div class="card" id="serviceFieldsCard" style="display:none;">
+    <div class="card-head"><span>🛠️</span><h2>Service Details</h2></div>
+    <div class="card-body">
+      <div class="field">
+        <label>Service Type</label>
+        <select id="serviceType" onchange="debouncedAutoSave()" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:14px;padding:10px 12px;outline:none;">
+          <option value="">Select type...</option>
+          <option value="troubleshoot">🔍 Troubleshoot</option>
+          <option value="battery">🔋 Battery Replacement</option>
+          <option value="swap">🔄 Equipment Swap</option>
+          <option value="repair">🔧 Repair</option>
+          <option value="upgrade">⬆️ Upgrade</option>
+          <option value="callback">📞 Customer Callback</option>
+          <option value="other">📋 Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Issue Description</label>
+        <textarea id="serviceIssue" placeholder="What's the customer reporting? Error codes, symptoms..." oninput="debouncedAutoSave()" style="min-height:60px;"></textarea>
+      </div>
+      <div class="field">
+        <label>Resolution</label>
+        <textarea id="serviceResolution" placeholder="What was done to fix it? Parts replaced, settings changed..." oninput="debouncedAutoSave()" style="min-height:60px;"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photos -->
+  <div class="card">
+    <div class="card-head"><span>📷</span><h2>Photos</h2></div>
+    <div class="card-body">
+      <div id="photoGrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:12px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;">
+          📸 TAKE PHOTO
+          <input type="file" accept="image/*" capture="environment" onchange="addJobPhoto(event)" style="display:none;">
+        </label>
+        <label style="flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:6px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:12px 16px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;">
+          🖼️ Gallery
+          <input type="file" accept="image/*" multiple onchange="addJobPhoto(event)" style="display:none;">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Follow-up / Return Visit -->
+  <div class="card" id="followUpCard">
+    <div class="card-head"><span>🔄</span><h2>Follow-up</h2></div>
+    <div class="card-body">
+      <div id="followUpStatus" style="font-size:12px;color:var(--muted);margin-bottom:10px;">No follow-up scheduled</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        <button onclick="scheduleFollowUp(1)" class="btn-add" style="flex:1;min-width:80px;">Tomorrow</button>
+        <button onclick="scheduleFollowUp(3)" class="btn-add" style="flex:1;min-width:80px;">3 Days</button>
+        <button onclick="scheduleFollowUp(7)" class="btn-add" style="flex:1;min-width:80px;">1 Week</button>
+        <button onclick="scheduleFollowUp(0)" class="btn-add" style="flex:1;min-width:80px;border-color:var(--accent);color:var(--accent);">Custom...</button>
+      </div>
+      <div id="followUpCustom" style="display:none;margin-top:10px;">
+        <input type="date" id="followUpDate" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 12px;outline:none;">
+        <button onclick="confirmCustomFollowUp()" style="width:100%;margin-top:8px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;">✓ SCHEDULE FOLLOW-UP</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ★ QUICK LINKS — grouped together, collapsible -->
   <div class="card">
     <div class="card-head" onclick="const b=document.getElementById('quickLinksBody');b.style.display=b.style.display==='none'?'flex':'none'" style="cursor:pointer;">
@@ -1125,8 +1202,11 @@
 
 <!-- ★ FLOATING SEND BUTTON — always visible -->
 <div id="floatingSendBtn" style="position:fixed;bottom:68px;left:50%;transform:translateX(-50%);z-index:8990;width:calc(100% - 32px);max-width:748px;">
-  <button class="btn-submit" id="submitBtn" onclick="submitForm()" style="box-shadow:0 -4px 20px rgba(0,0,0,0.5);">✉ Send Install Record</button>
-</div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn-submit" id="submitBtn" onclick="submitForm()" style="box-shadow:0 -4px 20px rgba(0,0,0,0.5);flex:1;">✉ Send Install Record</button>
+    <button onclick="generateInvoice()" style="background:var(--panel);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px 14px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;box-shadow:0 -4px 20px rgba(0,0,0,0.5);white-space:nowrap;">📄</button>
+  </div>
+</div></div><!-- end screenJob -->
 
 <div class="toast" id="toast"></div>
 
@@ -1288,7 +1368,8 @@ function blankJob() {
     data: {
       customerName:'', address:'', cs:'', email:'', phone:'', masterCode:'', verbalCode:'', adtStatus:'',
       confirmation:'', notes:'', installing:[], existing:[], zones:[], userCodes:[],
-      arriveTime:'', finishTime:''
+      arriveTime:'', finishTime:'', jobType:'install', photos:[],
+      serviceType:'', serviceIssue:'', serviceResolution:''
     }
   };
 }
@@ -1492,6 +1573,10 @@ function saveCurrentJob() {
     }));
   d.zones = [...document.getElementById('zoneRows').querySelectorAll('input')].map(i => i.value);
   d.userCodes = getUserCodes();
+  // Service fields
+  if (document.getElementById('serviceType')) d.serviceType = document.getElementById('serviceType').value;
+  if (document.getElementById('serviceIssue')) d.serviceIssue = document.getElementById('serviceIssue').value;
+  if (document.getElementById('serviceResolution')) d.serviceResolution = document.getElementById('serviceResolution').value;
   // Persist locked state so it survives navigation
   const lockableFields = ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'];
   d.lockedFields = lockableFields.filter(fid => {
@@ -1606,6 +1691,20 @@ function loadJob(id) {
 
   // User codes
   loadUserCodes(d.userCodes || []);
+
+  // Job type
+  updateJobTypeUI(d.jobType || 'install');
+  // Service fields
+  if (document.getElementById('serviceType')) document.getElementById('serviceType').value = d.serviceType || '';
+  if (document.getElementById('serviceIssue')) document.getElementById('serviceIssue').value = d.serviceIssue || '';
+  if (document.getElementById('serviceResolution')) document.getElementById('serviceResolution').value = d.serviceResolution || '';
+  // Photos
+  renderJobPhotos();
+  // Follow-up
+  updateFollowUpStatus();
+  // Live timer
+  if (d.arriveTime && !d.finishTime) startLiveTimer();
+  else stopLiveTimer();
 
   // Status
   setStatus(j.status || 'pending', false);
@@ -2267,6 +2366,7 @@ function stampTime(type) {
     const input = document.getElementById('arriveInput');
     input.value = t;
     setTimeout(() => { input.focus(); input.select(); }, 50);
+    startLiveTimer();
     // Auto set status to In Progress
     if (j.status === 'pending' || !j.status) {
       setStatus('inprogress', false);
@@ -3500,6 +3600,13 @@ function clearJobData() {
     }
   });
   document.getElementById('zoneRows').innerHTML=''; addZoneRow();
+  // Clear new feature fields
+  j.data.photos = []; j.data.serviceType = ''; j.data.serviceIssue = ''; j.data.serviceResolution = '';
+  j.data.jobType = 'install'; j.data.userCodes = []; j.data.followUpJobId = null;
+  renderJobPhotos(); loadUserCodes([]); updateJobTypeUI('install'); updateFollowUpStatus(); stopLiveTimer();
+  if (document.getElementById('serviceType')) document.getElementById('serviceType').value = '';
+  if (document.getElementById('serviceIssue')) document.getElementById('serviceIssue').value = '';
+  if (document.getElementById('serviceResolution')) document.getElementById('serviceResolution').value = '';
   document.getElementById('sentBanner').classList.remove('show');
   document.getElementById('submitBtn').innerHTML='✉ Send Install Record';
   document.getElementById('btnArrive').className='time-btn';
@@ -4332,10 +4439,15 @@ function renderTodayJobCards() {
     html += '<div data-jobid="'+j.id+'" class="today-job-quick-card" style="background:var(--panel);border:1px solid var(--border);border-left:3px solid '+sc+';border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;'+(isDone?'opacity:0.6;':'')+'display:flex;align-items:center;gap:12px;">';
     html += '<div style="flex:1;min-width:0;">';
     html += '<div style="display:flex;align-items:center;gap:6px;">';
+    const typeIcon = j.data.jobType === 'service' ? '<span style="font-size:9px;background:rgba(251,146,60,0.2);color:var(--orange);padding:1px 4px;border-radius:3px;">SVC</span>' : '';
     html += '<span style="font-family:Share Tech Mono,monospace;font-size:12px;color:'+sc+';font-weight:bold;">'+esc(j.scheduledTime||'--:--')+'</span>';
+    html += typeIcon;
     html += '<span style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(j.data.customerName||'Unnamed')+'</span>';
     html += '</div>';
     if (addr) html += '<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 '+esc(addr)+'</div>';
+    if (isDone && j.data.arriveTime && j.data.finishTime) {
+      html += '<div style="font-size:10px;color:var(--green);margin-top:1px;">⏱ '+calcTimeOnSite(j.data.arriveTime, j.data.finishTime)+'</div>';
+    }
     html += '</div>';
     html += '<span style="font-size:14px;">'+statusIcon+'</span>';
     if (addr && !isDone) {
@@ -4389,10 +4501,13 @@ function showJobsPanel(title, filteredJobs) {
   const existing = document.getElementById('statsPanel');
   if (existing) existing.remove();
 
+  // Block background scrolling
+  document.body.style.overflow = 'hidden';
+
   const panel = document.createElement('div');
   panel.id = 'statsPanel';
-  panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;';
-  panel.onclick = (e) => { if(e.target===panel) panel.remove(); };
+  panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;overscroll-behavior:contain;';
+  panel.onclick = (e) => { if(e.target===panel) { document.body.style.overflow=''; panel.remove(); } };
 
   const sorted = [...filteredJobs].sort((a,b) => {
     const da = new Date(a.scheduledDate||a.data.date||0);
@@ -4411,7 +4526,7 @@ function showJobsPanel(title, filteredJobs) {
   const closeBtn = document.createElement('button');
   closeBtn.style.cssText = 'background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;';
   closeBtn.textContent = '×';
-  closeBtn.onclick = () => panel.remove();
+  closeBtn.onclick = () => { document.body.style.overflow=''; panel.remove(); };
   hdr.appendChild(titleEl);
   hdr.appendChild(closeBtn);
 
@@ -4430,7 +4545,7 @@ function showJobsPanel(title, filteredJobs) {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;';
       row.innerHTML = '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;color:var(--text);">'+esc(j.data.customerName||'Unnamed')+'</div><div style="font-size:11px;color:var(--muted);">'+esc(date)+(j.data.address?' · '+esc(j.data.address.split(',')[0]):'')+'</div></div><span style="font-size:11px;color:'+sc+';white-space:nowrap;">'+(j.status||'pending')+'</span>';
-      row.onclick = () => { switchJob(j.id); showScreen('job'); panel.remove(); };
+      row.onclick = () => { document.body.style.overflow=''; switchJob(j.id); showScreen('job'); panel.remove(); };
       row.onmouseover = () => { row.style.background = 'var(--accent-dim)'; };
       row.onmouseout = () => { row.style.background = ''; };
       body2.appendChild(row);
@@ -4456,6 +4571,405 @@ function showFeesBreakdown() {
   const done = jobs.filter(j => j.status === 'complete');
   const total = done.length * INSTALL_FEE;
   showJobsPanel('FEES — $' + total + ' (' + done.length + ' complete)', done);
+}
+
+// ══════════════════════════════════════════════════════════
+// FEATURE: Job Type (Install vs Service)
+// ══════════════════════════════════════════════════════════
+function setJobType(type) {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  j.data.jobType = type;
+  updateJobTypeUI(type);
+  debouncedAutoSave();
+}
+
+function updateJobTypeUI(type) {
+  const installBtn = document.getElementById('btnTypeInstall');
+  const serviceBtn = document.getElementById('btnTypeService');
+  const serviceCard = document.getElementById('serviceFieldsCard');
+  if (!installBtn || !serviceBtn) return;
+  installBtn.className = 'status-btn' + (type !== 'service' ? ' active' : '');
+  serviceBtn.className = 'status-btn' + (type === 'service' ? ' active' : '');
+  installBtn.style.background = type !== 'service' ? 'var(--accent-dim)' : '';
+  installBtn.style.borderColor = type !== 'service' ? 'var(--accent)' : 'var(--border)';
+  serviceBtn.style.background = type === 'service' ? 'rgba(251,146,60,0.15)' : '';
+  serviceBtn.style.borderColor = type === 'service' ? 'var(--orange)' : 'var(--border)';
+  serviceBtn.style.color = type === 'service' ? 'var(--orange)' : '';
+  if (serviceCard) serviceCard.style.display = type === 'service' ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════════════════════
+// FEATURE: Photo Capture
+// ══════════════════════════════════════════════════════════
+function addJobPhoto(event) {
+  const files = event.target.files;
+  if (!files || !files.length) return;
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  if (!j.data.photos) j.data.photos = [];
+
+  [...files].forEach(file => {
+    if (file.size > 3 * 1024 * 1024) {
+      showToast('Photo too large (max 3MB). Try a lower resolution.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      // Compress to smaller size
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 800;
+        const scale = maxW / img.width;
+        canvas.width = maxW;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.6);
+        j.data.photos.push({
+          data: compressed,
+          time: new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}),
+          label: ''
+        });
+        renderJobPhotos();
+        debouncedAutoSave();
+        showToast('📸 Photo added', 'success');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  event.target.value = '';
+}
+
+function renderJobPhotos() {
+  const j = jobs.find(x => x.id === activeJobId);
+  const grid = document.getElementById('photoGrid');
+  if (!grid || !j) return;
+  grid.innerHTML = '';
+  if (!j.data.photos || !j.data.photos.length) return;
+  j.data.photos.forEach((photo, idx) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;width:calc(33.33% - 6px);aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border);';
+    const img = document.createElement('img');
+    img.src = photo.data;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    img.onclick = () => viewPhoto(idx);
+    const rm = document.createElement('button');
+    rm.style.cssText = 'position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.7);border:none;color:var(--red);border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;';
+    rm.textContent = '×';
+    rm.onclick = (e) => { e.stopPropagation(); j.data.photos.splice(idx, 1); renderJobPhotos(); debouncedAutoSave(); };
+    const timeLabel = document.createElement('div');
+    timeLabel.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);padding:2px 4px;font-family:Share Tech Mono,monospace;font-size:8px;color:white;text-align:center;';
+    timeLabel.textContent = photo.time || '';
+    wrap.appendChild(img); wrap.appendChild(rm); wrap.appendChild(timeLabel);
+    grid.appendChild(wrap);
+  });
+}
+
+function viewPhoto(idx) {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j || !j.data.photos || !j.data.photos[idx]) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:80000;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;';
+  overlay.onclick = () => overlay.remove();
+  const img = document.createElement('img');
+  img.src = j.data.photos[idx].data;
+  img.style.cssText = 'max-width:95vw;max-height:85vh;border-radius:8px;';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+}
+
+// ══════════════════════════════════════════════════════════
+// FEATURE: Live Timer
+// ══════════════════════════════════════════════════════════
+let _timerInterval = null;
+function startLiveTimer() {
+  stopLiveTimer();
+  const el = document.getElementById('liveTimer');
+  if (!el) return;
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j || !j.data.arriveTime || j.data.finishTime) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const arriveMs = timeToMs(j.data.arriveTime);
+  if (arriveMs === null) { el.style.display = 'none'; return; }
+  _timerInterval = setInterval(() => {
+    const now = new Date();
+    const nowMs = now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000;
+    const elapsed = nowMs - arriveMs;
+    if (elapsed < 0) { el.textContent = '⏱ 0:00'; return; }
+    const h = Math.floor(elapsed / 3600000);
+    const m = Math.floor((elapsed % 3600000) / 60000);
+    const s = Math.floor((elapsed % 60000) / 1000);
+    el.textContent = '⏱ ' + (h > 0 ? h + ':' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    el.style.color = elapsed > 7200000 ? 'var(--red)' : elapsed > 3600000 ? 'var(--yellow)' : 'var(--accent)';
+  }, 1000);
+}
+
+function stopLiveTimer() {
+  if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+  const el = document.getElementById('liveTimer');
+  if (el) el.style.display = 'none';
+}
+
+function timeToMs(timeStr) {
+  const mins = timeToMinutes(timeStr);
+  return mins !== null ? mins * 60000 : null;
+}
+
+// ══════════════════════════════════════════════════════════
+// FEATURE: Follow-up / Return Visit
+// ══════════════════════════════════════════════════════════
+function scheduleFollowUp(days) {
+  if (days === 0) {
+    document.getElementById('followUpCustom').style.display = 'block';
+    return;
+  }
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  createFollowUpJob(d);
+}
+
+function confirmCustomFollowUp() {
+  const val = document.getElementById('followUpDate').value;
+  if (!val) { showToast('Pick a date', 'error'); return; }
+  createFollowUpJob(new Date(val + 'T12:00:00'));
+  document.getElementById('followUpCustom').style.display = 'none';
+}
+
+function createFollowUpJob(date) {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  // Check if follow-up already exists
+  if (j.data.followUpJobId && jobs.find(x => x.id === j.data.followUpJobId)) {
+    showToast('Follow-up already scheduled', 'info');
+    return;
+  }
+  const fu = blankJob();
+  fu.data.jobType = 'service';
+  fu.data.customerName = j.data.customerName;
+  fu.data.address = j.data.address;
+  fu.data.phone = j.data.phone;
+  fu.data.email = j.data.email;
+  fu.data.cs = j.data.cs;
+  fu.data.notes = 'Follow-up from ' + new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}) + '. Original: ' + (j.data.notes || '').slice(0,80);
+  fu.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => fu.data[f]);
+  fu.scheduledDate = date.toISOString();
+  fu.scheduledTime = j.scheduledTime || '9:00 AM';
+  fu.scheduledDuration = 60;
+  fu.scheduledEndTime = addMinutesToTime(fu.scheduledTime, 60);
+  fu.data.parentJobId = j.id;
+  jobs.push(fu);
+  j.data.followUpJobId = fu.id;
+  saveToStorage();
+  updateFollowUpStatus();
+  showToast('🔄 Follow-up scheduled for ' + date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), 'success');
+}
+
+function updateFollowUpStatus() {
+  const el = document.getElementById('followUpStatus');
+  if (!el) return;
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  if (j.data.followUpJobId) {
+    const fu = jobs.find(x => x.id === j.data.followUpJobId);
+    if (fu) {
+      const d = fu.scheduledDate ? new Date(fu.scheduledDate).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : 'TBD';
+      el.innerHTML = '<span style="color:var(--green);">✓ Follow-up on ' + d + '</span> <button onclick="switchJob('+fu.id+');showScreen(\'job\')" style="background:none;border:1px solid var(--accent);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-left:6px;">Open</button>';
+    } else {
+      el.textContent = 'No follow-up scheduled';
+    }
+  } else if (j.data.parentJobId) {
+    el.innerHTML = '<span style="color:var(--muted);">This is a follow-up from a previous job</span> <button onclick="switchJob('+j.data.parentJobId+');showScreen(\'job\')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-left:6px;">Original</button>';
+  } else {
+    el.textContent = 'No follow-up scheduled';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// FEATURE: Invoice / Receipt
+// ══════════════════════════════════════════════════════════
+function generateInvoice() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  const d = j.data;
+  const installing = (d.installing || []).filter(i => i && (typeof i==='object' ? i.name : i));
+  const zones = (d.zones || []).filter(Boolean);
+  const date = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
+  const fee = INSTALL_FEE;
+  const jobType = d.jobType === 'service' ? 'Service' : 'Installation';
+
+  let itemsHtml = '';
+  installing.forEach(item => {
+    const name = typeof item==='object' ? item.name : item;
+    const qty = parseInt(typeof item==='object' ? item.qty : '1') || 1;
+    itemsHtml += '<tr><td style="padding:6px 0;border-bottom:1px solid #e0e0e0;">' + esc(name) + '</td><td style="padding:6px 0;border-bottom:1px solid #e0e0e0;text-align:center;">' + qty + '</td></tr>';
+  });
+
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invoice - ' + esc(d.customerName||'Customer') + '</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Helvetica,Arial,sans-serif;color:#222;padding:24px;max-width:600px;margin:0 auto;background:#fff;}h1{font-size:20px;margin-bottom:4px;}h2{font-size:14px;color:#666;margin-bottom:20px;font-weight:normal;}.row{display:flex;justify-content:space-between;padding:4px 0;}.label{color:#888;font-size:12px;}.val{font-weight:600;font-size:13px;}.section{margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid #e0e0e0;}.total{font-size:24px;font-weight:700;color:#0088aa;text-align:right;margin-top:12px;}.footer{margin-top:30px;font-size:10px;color:#999;text-align:center;}</style></head><body>' +
+    '<h1>Protect22 — Bridgepoint Service</h1>' +
+    '<h2>' + jobType + ' Record — ' + date + '</h2>' +
+    '<div class="section">' +
+    '<div class="row"><span class="label">Customer</span><span class="val">' + esc(d.customerName||'—') + '</span></div>' +
+    '<div class="row"><span class="label">Address</span><span class="val">' + esc(d.address||'—') + '</span></div>' +
+    '<div class="row"><span class="label">Phone</span><span class="val">' + esc(d.phone||'—') + '</span></div>' +
+    '<div class="row"><span class="label">Email</span><span class="val">' + esc(d.email||'—') + '</span></div>' +
+    '<div class="row"><span class="label">CS #</span><span class="val">' + esc(d.cs||'—') + '</span></div>' +
+    '</div>' +
+    '<div class="section">' +
+    '<div class="row"><span class="label">Arrived</span><span class="val">' + esc(d.arriveTime||'—') + '</span></div>' +
+    '<div class="row"><span class="label">Finished</span><span class="val">' + esc(d.finishTime||'—') + '</span></div>' +
+    (d.arriveTime && d.finishTime ? '<div class="row"><span class="label">Time on Site</span><span class="val">' + calcTimeOnSite(d.arriveTime, d.finishTime) + '</span></div>' : '') +
+    '</div>' +
+    (installing.length ? '<div class="section"><div style="font-weight:600;margin-bottom:8px;">Equipment ' + (d.jobType==='service'?'Replaced/Used':'Installed') + '</div><table style="width:100%;border-collapse:collapse;"><tr><th style="text-align:left;padding:6px 0;border-bottom:2px solid #222;font-size:12px;">Item</th><th style="text-align:center;padding:6px 0;border-bottom:2px solid #222;font-size:12px;">Qty</th></tr>' + itemsHtml + '</table></div>' : '') +
+    (zones.length ? '<div class="section"><div style="font-weight:600;margin-bottom:8px;">Zones</div>' + zones.map((z,i) => '<div style="padding:2px 0;font-size:13px;">' + (i+1) + '. ' + esc(z) + '</div>').join('') + '</div>' : '') +
+    '<div class="total">$' + fee + ' — ' + jobType + ' Fee</div>' +
+    '<div class="footer">Protect22 — Bridgepoint Service<br>Generated ' + new Date().toLocaleString() + '</div>' +
+    '</body></html>';
+
+  const blob = new Blob([html], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'invoice_' + (d.customerName||'customer').replace(/\s+/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.html';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📄 Invoice downloaded', 'success');
+}
+
+function calcTimeOnSite(arrive, finish) {
+  const a = timeToMinutes(arrive);
+  const f = timeToMinutes(finish);
+  if (a === null || f === null) return '—';
+  const diff = f - a;
+  if (diff <= 0) return '—';
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  return (h > 0 ? h + 'h ' : '') + m + 'm';
+}
+
+// ══════════════════════════════════════════════════════════
+// FEATURE: Reports Dashboard
+// ══════════════════════════════════════════════════════════
+function showReportsDashboard() {
+  const existing = document.getElementById('reportsDashboard');
+  if (existing) existing.remove();
+  document.body.style.overflow = 'hidden';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'reportsDashboard';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;overscroll-behavior:contain;';
+  overlay.onclick = e => { if (e.target === overlay) { document.body.style.overflow=''; overlay.remove(); } };
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;max-height:85vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+
+  // Compute stats
+  const now = new Date();
+  const thisWeekStart = new Date(now); thisWeekStart.setDate(now.getDate() - now.getDay()); thisWeekStart.setHours(0,0,0,0);
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  const completed = jobs.filter(j => j.status === 'complete');
+  const weekJobs = completed.filter(j => j.scheduledDate && new Date(j.scheduledDate) >= thisWeekStart);
+  const monthJobs = completed.filter(j => j.scheduledDate && new Date(j.scheduledDate) >= thisMonthStart);
+  const lastMonthJobs = completed.filter(j => j.scheduledDate && new Date(j.scheduledDate) >= lastMonthStart && new Date(j.scheduledDate) <= lastMonthEnd);
+  const installJobs = completed.filter(j => (j.data.jobType||'install') !== 'service');
+  const serviceJobs = completed.filter(j => j.data.jobType === 'service');
+
+  // Avg time on site
+  let totalMins = 0, timedJobs = 0;
+  completed.forEach(j => {
+    const a = timeToMinutes(j.data.arriveTime);
+    const f = timeToMinutes(j.data.finishTime);
+    if (a !== null && f !== null && f > a) { totalMins += (f - a); timedJobs++; }
+  });
+  const avgTime = timedJobs > 0 ? Math.round(totalMins / timedJobs) : 0;
+
+  // Equipment usage
+  const equipUsage = {};
+  completed.forEach(j => {
+    (j.data.installing || []).forEach(item => {
+      const name = typeof item==='object' ? item.name : item;
+      const qty = parseInt(typeof item==='object' ? item.qty : '1') || 1;
+      if (name) equipUsage[name] = (equipUsage[name]||0) + qty;
+    });
+  });
+  const topEquip = Object.entries(equipUsage).sort((a,b) => b[1]-a[1]).slice(0,8);
+
+  // Revenue by week (last 8 weeks)
+  const weeklyRev = [];
+  for (let w = 7; w >= 0; w--) {
+    const ws = new Date(now); ws.setDate(now.getDate() - now.getDay() - (w*7)); ws.setHours(0,0,0,0);
+    const we = new Date(ws); we.setDate(ws.getDate() + 7);
+    const wJobs = completed.filter(j => j.scheduledDate && new Date(j.scheduledDate) >= ws && new Date(j.scheduledDate) < we);
+    weeklyRev.push({ label: ws.toLocaleDateString('en-US',{month:'short',day:'numeric'}), jobs: wJobs.length, rev: wJobs.length * INSTALL_FEE });
+  }
+  const maxRev = Math.max(1, ...weeklyRev.map(w => w.rev));
+
+  let h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:14px;color:var(--accent);letter-spacing:2px;">📊 REPORTS</div>';
+  h += '<button onclick="document.body.style.overflow=\'\';document.getElementById(\'reportsDashboard\').remove()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">×</button>';
+  h += '</div>';
+
+  // Summary cards
+  h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">';
+  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--accent);font-weight:bold;">' + weekJobs.length + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">This Week</div></div>';
+  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--green);font-weight:bold;">$' + (monthJobs.length * INSTALL_FEE) + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">This Month Revenue</div></div>';
+  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--text);font-weight:bold;">' + (avgTime > 0 ? Math.floor(avgTime/60) + 'h ' + (avgTime%60) + 'm' : '—') + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">Avg Time on Site</div></div>';
+  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--text);font-weight:bold;">' + completed.length + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">Total Completed</div></div>';
+  h += '</div>';
+
+  // Job type breakdown
+  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:8px;">JOB TYPE BREAKDOWN</div>';
+  h += '<div style="display:flex;gap:16px;">';
+  h += '<div style="flex:1;"><span style="font-size:16px;font-weight:bold;color:var(--accent);">' + installJobs.length + '</span><span style="font-size:11px;color:var(--muted);margin-left:6px;">Installs</span></div>';
+  h += '<div style="flex:1;"><span style="font-size:16px;font-weight:bold;color:var(--orange);">' + serviceJobs.length + '</span><span style="font-size:11px;color:var(--muted);margin-left:6px;">Service Calls</span></div>';
+  h += '</div></div>';
+
+  // Weekly revenue chart (simple bar chart)
+  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:12px;">WEEKLY REVENUE (8 WEEKS)</div>';
+  h += '<div style="display:flex;align-items:flex-end;gap:4px;height:100px;">';
+  weeklyRev.forEach(w => {
+    const pct = Math.max(4, (w.rev / maxRev) * 100);
+    h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">';
+    h += '<div style="font-family:Share Tech Mono,monospace;font-size:8px;color:var(--muted);">$' + w.rev + '</div>';
+    h += '<div style="width:100%;height:' + pct + '%;background:linear-gradient(to top,var(--accent),rgba(77,201,246,0.4));border-radius:3px 3px 0 0;min-height:4px;"></div>';
+    h += '<div style="font-size:7px;color:var(--muted);white-space:nowrap;">' + w.label + '</div>';
+    h += '</div>';
+  });
+  h += '</div></div>';
+
+  // Top equipment
+  if (topEquip.length > 0) {
+    h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;">';
+    h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:8px;">TOP EQUIPMENT USED</div>';
+    const maxQty = topEquip[0][1];
+    topEquip.forEach(([name, qty]) => {
+      const pct = (qty / maxQty) * 100;
+      h += '<div style="margin-bottom:6px;">';
+      h += '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;"><span style="color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%;">' + esc(name) + '</span><span style="color:var(--accent);font-family:Share Tech Mono,monospace;">' + qty + '</span></div>';
+      h += '<div style="height:4px;background:var(--border);border-radius:2px;"><div style="height:100%;width:' + pct + '%;background:var(--accent);border-radius:2px;"></div></div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  // Month comparison
+  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:8px;">MONTH COMPARISON</div>';
+  h += '<div style="display:flex;gap:12px;">';
+  h += '<div style="flex:1;text-align:center;padding:8px;background:var(--panel);border-radius:6px;"><div style="font-size:9px;color:var(--muted);margin-bottom:4px;">THIS MONTH</div><div style="font-size:18px;font-weight:bold;color:var(--green);">' + monthJobs.length + ' jobs</div><div style="font-size:12px;color:var(--green);">$' + (monthJobs.length * INSTALL_FEE) + '</div></div>';
+  h += '<div style="flex:1;text-align:center;padding:8px;background:var(--panel);border-radius:6px;"><div style="font-size:9px;color:var(--muted);margin-bottom:4px;">LAST MONTH</div><div style="font-size:18px;font-weight:bold;color:var(--muted);">' + lastMonthJobs.length + ' jobs</div><div style="font-size:12px;color:var(--muted);">$' + (lastMonthJobs.length * INSTALL_FEE) + '</div></div>';
+  h += '</div></div>';
+
+  sheet.innerHTML = h;
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
 }
 
 function tapToSchedule(date, hour, minute) {
@@ -5247,13 +5761,10 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     const colInfo = getWeekColAtX(clientX);
 
     if (colInfo && colInfo.col.getAttribute('data-date')) {
-      // WEEK VIEW — use column rect
-      const colRect = colInfo.col.getBoundingClientRect();
-      const colScrollWrap = colInfo.col.closest('.timeline-wrap');
-      const colScrollTop = colScrollWrap ? colScrollWrap.scrollTop : 0;
-      const ghostTop = clientY - grabOffsetY;
-      const topInCol = ghostTop - colRect.top + colScrollTop;
-      const result = getTimeFromTop(Math.max(0, topInCol));
+      // WEEK VIEW — use delta for vertical, detect column for date
+      const dy = clientY - startY;
+      const newTop = Math.max(0, startTop + dy);
+      const result = getTimeFromTop(newTop);
       newTime = result.time;
       const dateStr = colInfo.col.getAttribute('data-date');
       const nd = new Date(dateStr + 'T12:00:00');
@@ -5343,12 +5854,15 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     }
 
     const saveBtn = document.createElement('button');
-    saveBtn.style.cssText = 'width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-bottom:10px;';
+    saveBtn.style.cssText = 'width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:16px;font-family:Share Tech Mono,monospace;font-size:14px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-bottom:10px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;';
     saveBtn.textContent = '✓ SAVE CHANGES';
-    saveBtn.onclick = () => {
-      // Read the (possibly edited) time from the input
+    let _moveSaved = false;
+    const doSave = () => {
+      if (_moveSaved) return;
+      _moveSaved = true;
       let finalTime = normalizeTimeInput(toInput.value) || toInput.value.trim();
       if (!finalTime) { showToast('Enter a valid time', 'error'); return; }
+      document.body.style.overflow = '';
       overlay.remove();
       j.scheduledTime = finalTime;
       j.scheduledEndTime = addMinutesToTime(finalTime, j.scheduledDuration || 120);
@@ -5363,18 +5877,23 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       else { renderDayTimeline(calSelectedDate); }
       showToast('✓ Moved to ' + finalTime + (newDateISO && newDateLabel ? ' on ' + newDateLabel : ''), 'success');
     };
+    saveBtn.onclick = doSave;
 
     const cancelBtn = document.createElement('button');
-    cancelBtn.style.cssText = 'width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:12px;cursor:pointer;';
+    cancelBtn.style.cssText = 'width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:12px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;';
     cancelBtn.textContent = 'CANCEL';
     cancelBtn.onclick = () => { cancelMove(); };
 
     function cancelMove() {
+      document.body.style.overflow = '';
       overlay.remove();
       renderMonthCal();
       if (colInfo) { renderWeekTimeline(); }
       else { renderDayTimeline(calSelectedDate); }
     }
+
+    // Block background scroll while popup is open
+    document.body.style.overflow = 'hidden';
 
     sheet.appendChild(saveBtn);
     sheet.appendChild(cancelBtn);
@@ -5629,7 +6148,7 @@ function _finishSwipeComplete(el, jobId) {
 }
 
 function addResizeToEvent(el, jobId, HOUR_HEIGHT, HOUR_START) {
-  const handle = el.querySelector('#rh_'+jobId);
+  const handle = el.querySelector('#rh_'+jobId) || el.querySelector('#wrh_'+jobId);
   if (!handle) return;
   let startY = 0, startH = 0, dragging = false;
 
@@ -5672,7 +6191,7 @@ function addResizeToEvent(el, jobId, HOUR_HEIGHT, HOUR_START) {
       j.scheduledDuration = mins;
       j.scheduledEndTime = addMinutesToTime(j.scheduledTime || j.data.arriveTime, mins);
       saveToStorage();
-      renderMonthCal();
+      renderCal();
       showToast('⏱ Duration: ' + (mins >= 60 ? Math.floor(mins/60)+'h'+(mins%60?' '+mins%60+'m':'') : mins+'m'), 'info');
     }
   }
@@ -5886,64 +6405,47 @@ function getSchedEquipment(type) {
   }).filter(Boolean);
 }
 
+let _scheduleSubmitting = false;
 function confirmScheduleJob() {
+  if (_scheduleSubmitting) return; // Prevent double-submit
+  _scheduleSubmitting = true;
+  setTimeout(() => { _scheduleSubmitting = false; }, 1000);
+
   const customerId = document.getElementById('schedJobCustomer').value;
   const date = document.getElementById('schedDate').value;
   const notes = document.getElementById('schedNotes').value;
   const time = getSchedTime();
 
-  if (!date) { showToast('Please select a date', 'error'); return; }
+  if (!date) { showToast('Please select a date', 'error'); _scheduleSubmitting = false; return; }
 
-  // Create new job
   saveCurrentJob();
-  const j = blankJob();
-  j.scheduledDate = new Date(date + 'T12:00:00').toISOString();
-  j.scheduledTime = time;
-  j.data.date = j.scheduledDate;
-  j.data.notes = notes;
 
-  // Load customer if selected
-  if (customerId) {
-    const c = customers.find(x => x.id === parseInt(customerId));
-    if (c) {
-      j.data.customerName = c.name;
-      j.data.address = c.address;
-      j.data.phone = c.phone;
-      j.data.email = c.email;
-      j.data.cs = c.cs;
-      if (notes) j.data.notes = notes;
-    }
-  }
-
-  // Save duration
-  j.scheduledDuration = schedDuration;
-  j.scheduledEndTime = addMinutesToTime(time, schedDuration);
-  // Load equipment from schedule modal rows
-  const installItems = getSchedEquipItems('install');
-  const existItems = getSchedEquipItems('exist');
-  if (installItems.length) j.data.installing = installItems;
-  if (existItems.length) j.data.existing = existItems.map(i => ({name:i.name||i, qty:i.qty||'1', yes:i.yes||false, no:i.no||false, cell:i.cell||false}));
-
-  // If scheduling an existing job (from job screen), update it instead of creating new
+  // Check if we're scheduling an existing job (from job screen)
   if (window._schedulingExistingJobId) {
     const existingJob = jobs.find(x => x.id === window._schedulingExistingJobId);
     window._schedulingExistingJobId = null;
     if (existingJob) {
-      existingJob.scheduledDate = j.scheduledDate;
-      existingJob.scheduledTime = j.scheduledTime;
-      existingJob.scheduledDuration = j.scheduledDuration;
-      existingJob.scheduledEndTime = j.scheduledEndTime;
-      existingJob.data.date = j.scheduledDate;
+      existingJob.scheduledDate = new Date(date + 'T12:00:00').toISOString();
+      existingJob.scheduledTime = time;
+      existingJob.scheduledDuration = schedDuration;
+      existingJob.scheduledEndTime = addMinutesToTime(time, schedDuration);
+      existingJob.data.date = existingJob.scheduledDate;
+      if (notes) existingJob.data.notes = notes;
       // Merge customer info if the existing job had none
-      if (!existingJob.data.customerName && j.data.customerName) {
-        existingJob.data.customerName = j.data.customerName;
-        existingJob.data.address = j.data.address;
-        existingJob.data.phone = j.data.phone;
-        existingJob.data.email = j.data.email;
-        existingJob.data.cs = j.data.cs;
+      if (!existingJob.data.customerName && customerId) {
+        const c = customers.find(x => x.id === parseInt(customerId));
+        if (c) {
+          existingJob.data.customerName = c.name;
+          existingJob.data.address = c.address;
+          existingJob.data.phone = c.phone;
+          existingJob.data.email = c.email;
+          existingJob.data.cs = c.cs;
+        }
       }
-      if (j.data.installing && j.data.installing.length) existingJob.data.installing = j.data.installing;
-      if (j.data.existing && j.data.existing.length) existingJob.data.existing = j.data.existing;
+      const installItems = getSchedEquipItems('install');
+      const existItems = getSchedEquipItems('exist');
+      if (installItems.length) existingJob.data.installing = installItems;
+      if (existItems.length) existingJob.data.existing = existItems.map(i => ({name:i.name||i, qty:i.qty||'1', cell:i.cell||false}));
       activeJobId = existingJob.id;
       saveToStorage();
       renderTabs();
@@ -5955,12 +6457,37 @@ function confirmScheduleJob() {
       return;
     }
   }
+
+  // Create new job only if not updating existing
+  const j = blankJob();
+  j.scheduledDate = new Date(date + 'T12:00:00').toISOString();
+  j.scheduledTime = time;
+  j.data.date = j.scheduledDate;
+  j.data.notes = notes;
+
+  if (customerId) {
+    const c = customers.find(x => x.id === parseInt(customerId));
+    if (c) {
+      j.data.customerName = c.name;
+      j.data.address = c.address;
+      j.data.phone = c.phone;
+      j.data.email = c.email;
+      j.data.cs = c.cs;
+    }
+  }
+
+  j.scheduledDuration = schedDuration;
+  j.scheduledEndTime = addMinutesToTime(time, schedDuration);
+  const installItems = getSchedEquipItems('install');
+  const existItems = getSchedEquipItems('exist');
+  if (installItems.length) j.data.installing = installItems;
+  if (existItems.length) j.data.existing = existItems.map(i => ({name:i.name||i, qty:i.qty||'1', cell:i.cell||false}));
+
   jobs.push(j);
   activeJobId = j.id;
   saveToStorage();
   renderTabs();
   closeScheduleModal();
-  // Set calendar to show the scheduled date
   calSelectedDate = new Date(j.scheduledDate);
   renderCal();
   showToast('✓ Job scheduled for ' + time, 'success');
@@ -6267,18 +6794,6 @@ let appSettings = JSON.parse(localStorage.getItem('p22_settings') || '{}');
 function saveSettings() {
   localStorage.setItem('p22_settings', JSON.stringify(appSettings));
   if (window.fbSet) window.fbSet('settings', appSettings).catch(()=>{});
-}
-
-function savePinSetting() {
-  const p1 = document.getElementById('newPinInput').value;
-  const p2 = document.getElementById('confirmPinInput').value;
-  if (p1.length !== 4 || !/^\d{4}$/.test(p1)) { showToast('PIN must be 4 digits', 'error'); return; }
-  if (p1 !== p2) { showToast('PINs do not match', 'error'); return; }
-  appSettings.pin = p1;
-  saveSettings();
-  document.getElementById('newPinInput').value = '';
-  document.getElementById('confirmPinInput').value = '';
-  showToast('✓ PIN updated', 'success');
 }
 
 function saveEmailSetting() {
@@ -7544,12 +8059,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </script>
 </div><!-- end techApp -->
-
-<!-- TODAY SCREEN -->
-
-
-
-</div>
 
 <!-- HISTORY SCREEN -->
 <div class="screen" id="screenHistory">
