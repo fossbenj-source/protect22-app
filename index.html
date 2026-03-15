@@ -4789,6 +4789,8 @@ function getCumulativeStockAtJob(targetJob, dayJobs) {
   let hasCumulativeShortfall = false;
 
   for (const j of sorted) {
+    // Skip completed jobs — their items are already deducted from truck inventory
+    if (j.status === 'complete' && j.id !== targetJob.id) continue;
     const src = (j.data.installingRemaining?.length) ? j.data.installingRemaining : (j.data.installing || []);
     const items = src.filter(i => i && (typeof i==='object' ? i.name : i));
     if (j.id === targetJob.id) {
@@ -4829,7 +4831,10 @@ function renderDayBrief() {
   const shortfalls = []; // { itemName, qty, jobName, jobTime }
   const pickupNeeded = {}; // itemName -> total shortfall qty
 
-  todayJobs.forEach(j => {
+  // Only count pending/in-progress jobs — completed jobs already deducted from truck
+  const pendingTodayJobs = todayJobs.filter(j => j.status !== 'complete');
+
+  pendingTodayJobs.forEach(j => {
     const src = (j.data.installingRemaining?.length) ? j.data.installingRemaining : (j.data.installing || []);
     src.filter(i => i && (typeof i==='object' ? i.name : i)).forEach(item => {
       const name = typeof item==='object' ? item.name : item;
@@ -4839,7 +4844,6 @@ function renderDayBrief() {
       const before = running[key].qty;
       running[key].qty -= qty;
       if (running[key].qty < 0 && before >= 0) {
-        // First time this item goes negative — record the job it runs out at
         shortfalls.push({ name, key, jobName: j.data.customerName||j.scheduledTime||'Job', jobTime: j.scheduledTime||'' });
       }
       if (running[key].qty < 0) {
@@ -4852,7 +4856,7 @@ function renderDayBrief() {
   const pickupList = [];
   const runFinal = {};
   truck.forEach(t => { runFinal[t.name.toLowerCase()] = t.qty; });
-  todayJobs.forEach(j => {
+  pendingTodayJobs.forEach(j => {
     const src = (j.data.installingRemaining?.length) ? j.data.installingRemaining : (j.data.installing || []);
     src.filter(i => i && (typeof i==='object' ? i.name : i)).forEach(item => {
       const name = typeof item==='object' ? item.name : item;
@@ -4964,8 +4968,10 @@ function toggleDayBrief() {
 
 // "Truck Check" bottom sheet — focused shortfall list for today
 function showTruckCheckSheet() {
-  const todayJobs = sortJobsByTime(getJobsForDate(new Date()));
-  if (todayJobs.length === 0) { showToast('No jobs scheduled today', 'info'); return; }
+  const allTodayJobs = sortJobsByTime(getJobsForDate(new Date()));
+  if (allTodayJobs.length === 0) { showToast('No jobs scheduled today', 'info'); return; }
+  // Only count pending/in-progress — completed items already deducted from truck
+  const todayJobs = allTodayJobs.filter(j => j.status !== 'complete');
 
   const runFinal = {};
   truck.forEach(t => { runFinal[t.name.toLowerCase()] = { qty: t.qty, name: t.name }; });
@@ -5034,8 +5040,11 @@ function renderDailyEquipSummary(dayJobs, container, outsideTimeline) {
   const existing = container.querySelector('.daily-equip-summary');
   if (existing) existing.remove();
 
-  // Only show if there are jobs with real named equipment items
-  const jobsWithEquip = dayJobs.filter(j =>
+  // Only show pending/in-progress jobs — completed jobs already had items deducted from truck
+  const pendingJobs = dayJobs.filter(j => j.status !== 'complete');
+
+  // Only show if there are pending jobs with real named equipment items
+  const jobsWithEquip = pendingJobs.filter(j =>
     j.data.installing && j.data.installing.some(i => i && (typeof i==='object' ? i.name : i))
   );
   if (jobsWithEquip.length === 0) return;
@@ -5047,7 +5056,7 @@ function renderDailyEquipSummary(dayJobs, container, outsideTimeline) {
   // Title
   const title = document.createElement('div');
   title.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;';
-  title.textContent = '🔧 EQUIPMENT NEEDED TODAY';
+  title.textContent = '🔧 EQUIPMENT STILL NEEDED TODAY';
   summary.appendChild(title);
 
   // Accumulate equipment across jobs in order
@@ -5057,7 +5066,7 @@ function renderDailyEquipSummary(dayJobs, container, outsideTimeline) {
   // Pre-populate truck qtys
   truck.forEach(t => { runningTotals[t.name.toLowerCase()] = {used:0, truckQty:t.qty, displayName:t.name}; });
 
-  dayJobs.forEach((j, jobIdx) => {
+  jobsWithEquip.forEach((j, jobIdx) => {
     const _src = (j.data.installingRemaining && j.data.installingRemaining.length)
       ? j.data.installingRemaining : (j.data.installing || []);
     const realItems = _src.filter(i => i && (typeof i==='object' ? i.name : i));
@@ -5168,7 +5177,7 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
   function onStart(clientX, clientY) {
     startY = clientY;
     startX = clientX;
-    startTop = parseInt(el.style.top) || 0;
+    startTop = parseInt(el.style.top) || 0; // Original position in the events column (px)
     const rect = el.getBoundingClientRect();
     grabOffsetY = clientY - rect.top;
     grabOffsetX = clientX - rect.left;
@@ -5208,7 +5217,6 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     }
     if (!dragging) return;
     moved = true;
-    // Only move the ghost — don't touch el.style.top
     if (ghostEl) {
       ghostEl.style.top = (clientY - grabOffsetY) + 'px';
     }
@@ -5235,17 +5243,15 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       return;
     }
 
-    // Calculate drop time from ghost's final viewport position relative to the container
     let newTime, newDateISO, newDateLabel;
     const colInfo = getWeekColAtX(clientX);
-    // Ghost top edge in viewport
-    const ghostTop = clientY - grabOffsetY;
 
     if (colInfo && colInfo.col.getAttribute('data-date')) {
       // WEEK VIEW — use column rect
       const colRect = colInfo.col.getBoundingClientRect();
       const colScrollWrap = colInfo.col.closest('.timeline-wrap');
       const colScrollTop = colScrollWrap ? colScrollWrap.scrollTop : 0;
+      const ghostTop = clientY - grabOffsetY;
       const topInCol = ghostTop - colRect.top + colScrollTop;
       const result = getTimeFromTop(Math.max(0, topInCol));
       newTime = result.time;
@@ -5254,22 +5260,18 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       newDateISO = new Date(nd.getFullYear(), nd.getMonth(), nd.getDate()).toISOString();
       newDateLabel = colInfo.col.getAttribute('data-date-label') || dateStr;
     } else {
-      // DAY VIEW — use containerEl rect
-      const container = containerEl || el.parentElement;
-      const containerRect = container.getBoundingClientRect();
-      const scrollWrap = container.closest('.timeline-wrap');
-      const scrollTop = scrollWrap ? scrollWrap.scrollTop : 0;
-      const topInContainer = ghostTop - containerRect.top + scrollTop;
-      const result = getTimeFromTop(Math.max(0, topInContainer));
+      // DAY VIEW — use the drag delta from original position
+      // startTop = original el.style.top (px in events column)
+      // dy = how far the finger moved vertically
+      const dy = clientY - startY;
+      const newTop = Math.max(0, startTop + dy);
+      const result = getTimeFromTop(newTop);
       newTime = result.time;
       newDateISO = null;
       newDateLabel = null;
     }
 
-    // Remove ghost
     if (ghostEl) { ghostEl.remove(); ghostEl = null; }
-
-    // Show confirmation popup
     showMoveConfirm(j, newTime, newDateISO, newDateLabel, colInfo);
   }
 
@@ -5290,29 +5292,66 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     const sheet = document.createElement('div');
     sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
 
-    sheet.innerHTML =
-      '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">📅 CONFIRM MOVE</div>' +
-      '<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">' + esc(customerName) + '</div>' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
-        '<div style="flex:1;text-align:center;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;">' +
-          '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">FROM</div>' +
-          '<div style="font-family:Share Tech Mono,monospace;font-size:16px;color:var(--muted);">' + esc(oldTime) + '</div>' +
-        '</div>' +
-        '<div style="font-size:18px;color:var(--accent);">→</div>' +
-        '<div style="flex:1;text-align:center;padding:10px;background:rgba(0,212,255,0.08);border:1px solid var(--accent);border-radius:8px;">' +
-          '<div style="font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">TO</div>' +
-          '<div style="font-family:Share Tech Mono,monospace;font-size:16px;color:var(--accent);font-weight:bold;">' + esc(newTime) + esc(dateInfo) + '</div>' +
-        '</div>' +
-      '</div>';
+    // Header
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;';
+    hdr.textContent = '📅 CONFIRM MOVE';
+    sheet.appendChild(hdr);
+
+    const name = document.createElement('div');
+    name.style.cssText = 'font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;';
+    name.textContent = customerName;
+    sheet.appendChild(name);
+
+    // FROM / TO row
+    const timeRow = document.createElement('div');
+    timeRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:16px;';
+
+    // FROM (static)
+    const fromBox = document.createElement('div');
+    fromBox.style.cssText = 'flex:1;text-align:center;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;';
+    fromBox.innerHTML = '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">FROM</div><div style="font-family:Share Tech Mono,monospace;font-size:16px;color:var(--muted);">' + esc(oldTime) + '</div>';
+
+    const arrow = document.createElement('div');
+    arrow.style.cssText = 'font-size:18px;color:var(--accent);';
+    arrow.textContent = '→';
+
+    // TO (editable input)
+    const toBox = document.createElement('div');
+    toBox.style.cssText = 'flex:1;text-align:center;padding:6px 10px;background:rgba(0,212,255,0.08);border:1px solid var(--accent);border-radius:8px;';
+    toBox.innerHTML = '<div style="font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">TO — tap to edit</div>';
+    const toInput = document.createElement('input');
+    toInput.type = 'text';
+    toInput.value = newTime;
+    toInput.style.cssText = 'width:100%;background:transparent;border:none;font-family:Share Tech Mono,monospace;font-size:18px;color:var(--accent);font-weight:bold;text-align:center;outline:none;padding:4px 0;';
+    toInput.onblur = () => {
+      const normalized = normalizeTimeInput(toInput.value);
+      if (normalized) toInput.value = normalized;
+    };
+    toBox.appendChild(toInput);
+
+    timeRow.appendChild(fromBox);
+    timeRow.appendChild(arrow);
+    timeRow.appendChild(toBox);
+    sheet.appendChild(timeRow);
+
+    if (dateInfo) {
+      const dateEl = document.createElement('div');
+      dateEl.style.cssText = 'font-size:11px;color:var(--muted);text-align:center;margin-bottom:12px;margin-top:-8px;';
+      dateEl.textContent = dateInfo;
+      sheet.appendChild(dateEl);
+    }
 
     const saveBtn = document.createElement('button');
     saveBtn.style.cssText = 'width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-bottom:10px;';
     saveBtn.textContent = '✓ SAVE CHANGES';
     saveBtn.onclick = () => {
+      // Read the (possibly edited) time from the input
+      let finalTime = normalizeTimeInput(toInput.value) || toInput.value.trim();
+      if (!finalTime) { showToast('Enter a valid time', 'error'); return; }
       overlay.remove();
-      // Apply the move
-      j.scheduledTime = newTime;
-      j.scheduledEndTime = addMinutesToTime(newTime, j.scheduledDuration || 120);
+      j.scheduledTime = finalTime;
+      j.scheduledEndTime = addMinutesToTime(finalTime, j.scheduledDuration || 120);
       if (newDateISO) {
         j.scheduledDate = newDateISO;
         j.data.date = newDateISO;
@@ -5322,7 +5361,7 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       renderMonthCal();
       if (colInfo) { renderWeekTimeline(); }
       else { renderDayTimeline(calSelectedDate); }
-      showToast('✓ Moved to ' + newTime + (newDateISO && newDateLabel ? ' on ' + newDateLabel : ''), 'success');
+      showToast('✓ Moved to ' + finalTime + (newDateISO && newDateLabel ? ' on ' + newDateLabel : ''), 'success');
     };
 
     const cancelBtn = document.createElement('button');
@@ -5332,7 +5371,6 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
 
     function cancelMove() {
       overlay.remove();
-      // Revert — re-render timeline to original positions
       renderMonthCal();
       if (colInfo) { renderWeekTimeline(); }
       else { renderDayTimeline(calSelectedDate); }
