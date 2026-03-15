@@ -4020,7 +4020,7 @@ function renderDayBrief() {
   html += '<div id="dayBriefHdr" onclick="toggleDayBrief()" style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:var(--panel2);">';
   html += '<span style="font-size:18px;">📋</span>';
   html += '<div style="flex:1;">';
-  html +=   '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;">TODAY'S BRIEF</div>';
+  html +=   '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;">TODAY&#39;S BRIEF</div>';
   html +=   '<div style="font-size:11px;color:var(--muted);margin-top:1px;">'+pendingJobs.length+' job'+(pendingJobs.length!==1?'s':'')+' remaining'+(doneJobs.length?' · '+doneJobs.length+' done':'')+' · first at '+(firstJob.scheduledTime||'?')+'</div>';
   html += '</div>';
   html += '<span style="font-family:Share Tech Mono,monospace;font-size:10px;color:'+alertColor+';">'+alertIcon+' '+alertText+'</span>';
@@ -5492,20 +5492,35 @@ function doLogin() {
   if (!email || !pass) { showLoginError('Enter your email and password'); return; }
   btn.textContent = 'SIGNING IN...';
   btn.disabled = true;
-  if (typeof firebase === 'undefined' || !firebase.auth) {
-    showLoginError('Connection required to sign in');
-    btn.textContent = 'SIGN IN'; btn.disabled = false;
-    return;
-  }
-  firebase.auth().signInWithEmailAndPassword(email, pass)
-    .then(cred => onLoginSuccess(cred.user))
-    .catch(e => {
-      const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials')
-        ? 'Invalid email or password'
-        : 'Sign in failed — check your connection and try again.';
-      showLoginError(msg);
+
+  // Firebase loads async — if not ready yet, retry up to 3s before failing
+  function attemptLogin(retriesLeft) {
+    const ready = typeof firebase !== 'undefined'
+      && typeof firebase.auth === 'function'
+      && firebase.apps && firebase.apps.length > 0;
+
+    if (!ready) {
+      if (retriesLeft > 0) {
+        setTimeout(() => attemptLogin(retriesLeft - 1), 500);
+        return;
+      }
+      showLoginError('Connection required to sign in');
       btn.textContent = 'SIGN IN'; btn.disabled = false;
-    });
+      return;
+    }
+
+    firebase.auth().signInWithEmailAndPassword(email, pass)
+      .then(cred => onLoginSuccess(cred.user))
+      .catch(e => {
+        const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials')
+          ? 'Invalid email or password'
+          : 'Sign in failed — check your connection and try again.';
+        showLoginError(msg);
+        btn.textContent = 'SIGN IN'; btn.disabled = false;
+      });
+  }
+
+  attemptLogin(6); // retry every 500ms for up to 3 seconds
 }
 
 function showLoginError(msg) {
