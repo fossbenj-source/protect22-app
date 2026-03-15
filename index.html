@@ -248,7 +248,7 @@
   .nav-btn.active .nav-icon{filter:drop-shadow(0 0 6px var(--accent));}
 
   /* SCREENS */
-  .screen{display:none;max-width:780px;margin:0 auto;padding:20px 16px 120px;}
+  .screen{display:none;max-width:780px;margin:0 auto;padding:20px 16px 110px;}
   .screen.active{display:block;}
 
   /* TODAY SCREEN */
@@ -426,7 +426,7 @@
   .week-time-block{position:absolute;left:1px;right:1px;border-radius:4px;padding:2px 4px;font-size:8px;font-family:'Share Tech Mono',monospace;cursor:pointer;overflow:hidden;z-index:2;}
 
   /* TIMELINE VIEWS */
-  .timeline-wrap{position:relative;}
+  .timeline-wrap{position:relative;overflow:hidden;}
   .timeline-wrap::-webkit-scrollbar{width:3px;}
   .timeline-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
   .timeline-grid{position:relative;min-height:960px;}/* 16hrs * 60px */
@@ -511,6 +511,173 @@
 #loginScreen { display: flex !important; }
 #techApp, #closerApp, #callCenterApp { display: none !important; }
 </style>
+
+<style id="mobileCss">
+@media (max-width: 768px) {
+  /* ── Base spacing ── */
+  .screen { padding: 12px 12px 100px; }
+
+  /* ── Nav bar — bigger tap targets ── */
+  .crm-nav { height: 58px; }
+  .nav-btn { padding: 6px 2px 4px; font-size: 8px; gap: 2px; }
+  .nav-btn .nav-icon { font-size: 22px; }
+
+  /* ── Job screen header — compact on mobile ── */
+  .header { margin-bottom: 10px; padding-bottom: 10px; }
+  .header h1 { font-size: 15px; letter-spacing: 2px; }
+  .logo { width: 38px; height: 38px; font-size: 17px; }
+  .date-badge { font-size: 9px; padding: 4px 8px; }
+
+  /* ── Jobs bar / selector ── */
+  .jobs-bar { margin-bottom: 10px; }
+  .current-job-bar { padding: 12px 14px; min-height: 52px; }
+  .current-job-name { font-size: 15px; }
+  .job-row { padding: 14px 14px; min-height: 52px; }
+  .job-row-name { font-size: 13px; }
+  .btn-delete-job { font-size: 18px; padding: 4px 6px; min-width: 32px; min-height: 32px; }
+  .btn-new-job { padding: 14px; font-size: 12px; }
+
+  /* ── Cards ── */
+  .card { border-radius: 12px; }
+  .card-head { padding: 12px 16px; }
+  .card-head h2 { font-size: 11px; letter-spacing: 2px; }
+  .card-body { padding: 16px; }
+  .field { margin-bottom: 16px; }
+  label { font-size: 11px; margin-bottom: 6px; }
+
+  /* ── Inputs — full Apple recommended size ── */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  textarea { font-size: 16px; padding: 11px 14px; border-radius: 8px; }
+
+  /* ── Status buttons — primary action, make them BIG ── */
+  .status-btn { padding: 14px 8px; font-size: 12px; border-radius: 10px; min-height: 50px; }
+
+  /* ── Time buttons ── */
+  .time-btn { padding: 12px 16px; font-size: 13px; min-height: 46px; border-radius: 8px; }
+
+  /* ── Copy/paste/call/maps buttons ── */
+  .btn-copy, .btn-paste, .btn-edit { width: 40px; height: 44px; min-width: 40px; font-size: 16px; }
+  .btn-call { width: 40px; height: 44px; min-width: 40px; font-size: 18px; }
+  .btn-maps { width: 44px; height: 44px; font-size: 18px; }
+
+  /* ── Qty buttons ── */
+  .qty-btn { width: 32px; height: 36px; font-size: 16px; }
+  .qty-input { width: 48px; font-size: 14px; padding: 7px 0; }
+
+  /* ── Calendar — month grid tighter ── */
+  .month-grid { gap: 2px; }
+  .month-day { padding: 5px 4px; min-height: 56px; border-radius: 6px; }
+  .month-day-num { font-size: 12px; margin-bottom: 2px; }
+  .month-job-dot { font-size: 8px; padding: 1px 3px; }
+  .cal-header { margin-bottom: 8px; }
+  .cal-title { font-size: 13px; }
+  .cal-nav { width: 36px; height: 36px; font-size: 20px; }
+  .cal-view-btns { gap: 6px; }
+  .cal-view-btn { padding: 10px; font-size: 11px; min-height: 42px; }
+
+  /* ── Week timeline — time label column narrower ── */
+  .week-col-spacer { width: 28px; }
+  .week-timeline-day-hdr .hdr-num { font-size: 14px; }
+  .week-timeline-day-hdr { font-size: 8px; padding: 6px 1px; }
+
+  /* ── Timeline events — more readable ── */
+  .timeline-event { padding: 5px 7px; border-radius: 6px; }
+  .timeline-event-name { font-size: 13px; }
+  .timeline-event-time { font-size: 11px; }
+  .timeline-event-addr { font-size: 11px; }
+  .resize-handle { height: 12px; }
+  .resize-handle::after { width: 28px; height: 3px; }
+
+  /* ── Schedule job button ── */
+  .btn-today-add { padding: 14px; font-size: 12px; min-height: 48px; border-radius: 10px; }
+
+  /* ── Context menu / bottom sheets — bigger text and buttons ── */
+  .modal-sheet { padding: 20px 16px; }
+
+  /* ── Form wrap gap ── */
+  .form-wrap { gap: 10px; }
+
+  /* ── Global search button ── */
+  #globalSearchTrigger { width: 44px; height: 44px; font-size: 18px; top: 10px; right: 12px; }
+
+  /* ── Stat cards ── */
+  .stats-row { gap: 8px; margin-bottom: 12px; }
+  .stat-card { padding: 10px 8px; border-radius: 10px; }
+  .stat-num { font-size: 24px; }
+  .stat-label { font-size: 9px; }
+
+  /* ── Equip rows ── */
+  .btn-remove { width: 36px; height: 36px; min-width: 36px; font-size: 18px; }
+  .btn-add { padding: 12px; font-size: 12px; min-height: 44px; }
+  .list-row { gap: 8px; }
+
+  /* ── Zone rows ── */
+  .zone-row { margin-bottom: 10px; }
+
+  /* ── Fee card ── */
+  .fee-card { padding: 14px 16px; border-radius: 10px; }
+  .fee-amount { font-size: 26px; }
+  .fee-label { font-size: 12px; }
+
+  /* ── History cards ── */
+  .history-card { padding: 14px 16px; border-radius: 10px; }
+  .history-card-name { font-size: 15px; }
+  .history-card-meta { font-size: 12px; }
+
+  /* ── Customer cards ── */
+  .customer-card { padding: 14px 16px; border-radius: 10px; }
+  .customer-name { font-size: 15px; }
+  .customer-meta { font-size: 12px; }
+
+  /* ── Sched modal customer list ── */
+  .sched-cust-item { padding: 14px; min-height: 56px; }
+  .sched-cust-name { font-size: 14px; }
+  .sched-cust-meta { font-size: 11px; }
+
+  /* ── Two-col always stacks on mobile ── */
+  .two-col { grid-template-columns: 1fr !important; }
+
+  /* ── Duration buttons ── */
+  .duration-btn { padding: 10px 8px; font-size: 11px; min-height: 40px; }
+
+  /* ── Scheduled banner ── */
+  #scheduledBanner { padding: 10px 14px; border-radius: 10px; }
+
+  /* ── Hide decorative job screen header on mobile — save vertical space ── */
+  .job-screen-header { display: none; }
+
+  /* ── Job screen — tighter top since header is hidden ── */
+  #screenJob { padding-top: 8px; }
+
+  /* ── Jobs bar — always visible at top ── */
+  .jobs-bar { margin-bottom: 8px; }
+
+  /* ── Make status buttons the hero on mobile ── */
+  .status-row { gap: 6px; }
+  #btnInProgress, #btnComplete, #btnCantFinish {
+    padding: 16px 4px;
+    font-size: 11px;
+    min-height: 56px;
+    border-radius: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Arrive/Finish stamp buttons big and easy to hit ── */
+  #btnArrive, #btnFinish {
+    flex: 1;
+    padding: 14px 8px;
+    font-size: 13px;
+    min-height: 50px;
+    border-radius: 10px;
+  }
+  .time-row { gap: 8px; }
+
+  /* ── Week timeline time label narrower on small screens ── */
+  .week-col-spacer, [style*="width:38px"][style*="flex-shrink:0"] { width: 28px !important; min-width: 28px !important; }
+}
+</style>
 </head>
 <body>
 <style id="forceHidden">
@@ -578,7 +745,7 @@
 <div id="techApp" style="display:none;">
 <!-- TODAY SCREEN -->
 <div class="screen active" id="screenToday">
-  <div style="max-width:780px;margin:0 auto;padding:20px 16px 100px;">
+  <div style="max-width:780px;margin:0 auto;">
 
     <!-- Header -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);">
@@ -644,7 +811,7 @@
 </div>
 <!-- JOB SCREEN -->
 <div class="screen" id="screenJob">
-<div class="header" style="margin-top:0;">
+<div class="header job-screen-header" style="margin-top:0;">
   <div class="logo">🛡️</div>
   <div>
     <h1>Alarm Install</h1>
@@ -673,14 +840,15 @@
 
 <div class="form-wrap">
 
-  <!-- Scheduled banner -->
-  <div id="scheduledBanner" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;margin-bottom:8px;align-items:center;gap:8px;">
-    <span style="font-size:14px;">📅</span>
-    <div style="flex:1;">
-      <div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;">Scheduled</div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--accent);" id="scheduledTimeLabel">—</div>
+  <!-- Scheduled banner — only shown when job has a calendar date, never mandatory -->
+  <div id="scheduledBanner" style="display:none;background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:7px 12px;margin-bottom:8px;align-items:center;gap:10px;">
+    <span style="font-size:13px;">📅</span>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:1px;">Scheduled</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="scheduledTimeLabel">—</div>
     </div>
-    <button onclick="rescheduleCurrentJob()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📅 MOVE</button>
+    <button onclick="rescheduleCurrentJob()" style="background:none;border:1px solid rgba(0,212,255,0.2);color:var(--accent);border-radius:6px;padding:4px 9px;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer;letter-spacing:1px;white-space:nowrap;">MOVE</button>
+    <button onclick="removeJobFromSchedule()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 2px;line-height:1;" title="Remove from schedule">×</button>
   </div>
 
   <!-- Status + Time -->
@@ -1040,16 +1208,16 @@ function switchJob(id) {
 function deleteJob(id, e) {
   if (e) e.stopPropagation();
   jobs = jobs.filter(j => j.id !== id);
-  // If no jobs left, create a blank one
   if (jobs.length === 0) {
-    const j = blankJob();
-    jobs.push(j);
-    activeJobId = j.id;
-  } else if (activeJobId === id) {
-    activeJobId = jobs[jobs.length-1].id;
+    // Truly empty — clear the form and show empty state
+    activeJobId = null;
+    renderTabs();
+    renderEmptyJobState();
+  } else {
+    if (activeJobId === id) activeJobId = jobs[jobs.length - 1].id;
+    loadJob(activeJobId);
+    renderTabs();
   }
-  loadJob(activeJobId);
-  renderTabs();
   saveToStorage();
   renderMonthCal();
   showToast('Job removed', 'info');
@@ -1057,22 +1225,62 @@ function deleteJob(id, e) {
 
 function renderTabs() {
   const activeJob = jobs.find(j => j.id === activeJobId);
+  const nameEl = document.getElementById('currentJobName');
+  const stEl = document.getElementById('currentJobStatus');
   if (activeJob) {
-    document.getElementById('currentJobName').textContent = activeJob.data.customerName || ('Job ' + activeJob.id);
-    const stEl = document.getElementById('currentJobStatus');
+    nameEl.textContent = activeJob.data.customerName || (activeJob.scheduledTime ? activeJob.scheduledTime + (activeJob.scheduledDate ? ' · ' + new Date(activeJob.scheduledDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '') : 'Job ' + activeJob.id);
     if (activeJob.sent) { stEl.textContent = '✉ Sent'; stEl.className = 'current-job-status complete'; }
     else if (activeJob.status === 'complete') { stEl.textContent = '✓ Complete'; stEl.className = 'current-job-status complete'; }
     else { stEl.textContent = '⏳ Pending'; stEl.className = 'current-job-status pending'; }
+  } else {
+    nameEl.textContent = 'No job selected';
+    stEl.textContent = '';
+    stEl.className = 'current-job-status';
   }
+
+  // Filter dropdown to today ±1 day; fall back to all if nothing in range
+  const now = new Date();
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1); yesterday.setHours(0,0,0,0);
+  const tomorrow  = new Date(now); tomorrow.setDate(now.getDate() + 1);  tomorrow.setHours(23,59,59,999);
+  let visibleJobs = jobs.filter(j => {
+    const d = j.scheduledDate || (j.data && j.data.date);
+    if (!d) return false;
+    const jd = new Date(d);
+    return jd >= yesterday && jd <= tomorrow;
+  });
+  // Always include the active job even if outside range
+  if (activeJobId && !visibleJobs.find(j => j.id === activeJobId)) {
+    const aj = jobs.find(j => j.id === activeJobId);
+    if (aj) visibleJobs = [aj, ...visibleJobs];
+  }
+  // If nothing scheduled in range at all, show all jobs
+  if (visibleJobs.length === 0) visibleJobs = jobs;
+
+  // Update header label
+  const hdrLabel = document.querySelector('#jobsDropdown .jobs-dropdown-title');
+  if (hdrLabel) {
+    const hasAll = visibleJobs.length === jobs.length && jobs.length > 0;
+    hdrLabel.textContent = hasAll ? 'All Jobs' : 'Today ± 1 Day';
+  }
+
   const list = document.getElementById('jobsList');
   list.innerHTML = '';
-  jobs.forEach(j => {
+
+  if (visibleJobs.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:14px;text-align:center;font-size:12px;color:var(--muted);';
+    empty.textContent = 'No jobs yet — tap + New Job to add one';
+    list.appendChild(empty);
+    return;
+  }
+
+  visibleJobs.forEach(j => {
     const row = document.createElement('div');
     row.className = 'job-row' + (j.id === activeJobId ? ' active' : '');
     row.onclick = () => { switchJob(j.id); closeJobsDropdown(); };
     const name = document.createElement('span');
     name.className = 'job-row-name';
-    name.textContent = j.data.customerName || ('Job ' + j.id);
+    name.textContent = j.data.customerName || (j.scheduledTime ? j.scheduledTime + (j.scheduledDate ? ' · ' + new Date(j.scheduledDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '') : 'Job ' + j.id);
     const st = document.createElement('span');
     const stClass = j.status==='complete'?'complete':j.status==='inprogress'?'inprogress':j.status==='reschedule'?'reschedule':j.status==='cantfinish'?'cantfinish':'pending';
     st.className = 'job-row-status ' + stClass;
@@ -1099,6 +1307,23 @@ function closeJobsDropdown() {
   document.getElementById('jobsDropdown').classList.remove('open');
   document.getElementById('jobChevron').classList.remove('open');
 }
+function renderEmptyJobState() {
+  // Clear all form fields when no job is selected
+  ['customerName','address','cs','email','phone','confirmation','notes',
+   'masterCode','verbalCode','adtStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const ir = document.getElementById('installingRows'); if (ir) ir.innerHTML = '';
+  const er = document.getElementById('existingRows');   if (er) er.innerHTML = '';
+  const zr = document.getElementById('zoneRows');       if (zr) zr.innerHTML = '';
+  const pb = document.getElementById('partialInstallBanner'); if (pb) pb.remove();
+  const sb = document.getElementById('scheduledBanner'); if (sb) sb.style.display = 'none';
+  updateTimeDisplay('', '');
+  setStatus('pending', false);
+}
+
+
 
 document.addEventListener('click', e => {
   if (!e.target.closest('.jobs-bar')) closeJobsDropdown();
@@ -1172,10 +1397,32 @@ function loadJob(id) {
   document.getElementById('notes').value = d.notes || '';
 
   document.getElementById('installingRows').innerHTML = '';
-  (d.installing && d.installing.length ? d.installing : [{}]).forEach(v => addInstallingRow(typeof v==='object'?v.name:v, typeof v==='object'?v.qty:'1'));
+  (d.installing && d.installing.length ? d.installing : []).forEach(v => addInstallingRow(typeof v==='object'?v.name:v, typeof v==='object'?v.qty:'1'));
+
+  // Show partial-install record if this job was a cant-finish
+  const existingPartial = document.getElementById('partialInstallBanner');
+  if (existingPartial) existingPartial.remove();
+  if ((d.installedRecord && d.installedRecord.length) || (d.installingRemaining && d.installingRemaining.length)) {
+    const banner = document.createElement('div');
+    banner.id = 'partialInstallBanner';
+    banner.style.cssText = 'background:rgba(255,107,43,0.08);border:1px solid rgba(255,107,43,0.3);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:11px;';
+    let html = '<div style="font-family:Share Tech Mono,monospace;font-size:9px;color:var(--orange);letter-spacing:2px;margin-bottom:8px;">⚠️ PARTIAL INSTALL RECORD</div>';
+    if (d.installedRecord && d.installedRecord.length) {
+      html += '<div style="color:var(--green);font-weight:600;margin-bottom:4px;">✓ Installed this visit:</div>';
+      html += d.installedRecord.map(i => '<div style="color:var(--text);padding:2px 0 2px 10px;">• ' + i.name + (parseInt(i.qty)>1 ? ' ×'+i.qty : '') + '</div>').join('');
+    }
+    if (d.installingRemaining && d.installingRemaining.length) {
+      html += '<div style="color:var(--yellow);font-weight:600;margin-top:8px;margin-bottom:4px;">🔧 Still to install:</div>';
+      html += d.installingRemaining.map(i => '<div style="color:var(--text);padding:2px 0 2px 10px;">• ' + (typeof i==='object'?i.name:i) + (parseInt(typeof i==='object'?i.qty:'1')>1 ? ' ×'+(typeof i==='object'?i.qty:'1') : '') + '</div>').join('');
+    } else {
+      html += '<div style="color:var(--muted);margin-top:8px;font-size:10px;">All planned items installed.</div>';
+    }
+    banner.innerHTML = html;
+    document.getElementById('installingRows').parentElement.appendChild(banner);
+  }
 
   document.getElementById('existingRows').innerHTML = '';
-  (d.existing && d.existing.length ? d.existing : [{}]).forEach(e => addExistingRow(e.name||'', e));
+  (d.existing && d.existing.length ? d.existing : []).forEach(e => addExistingRow(e.name||'', e));
 
   document.getElementById('zoneRows').innerHTML = '';
   (d.zones && d.zones.length ? d.zones : ['']).forEach(z => addZoneRow(z));
@@ -1458,7 +1705,7 @@ function loadFromStorage() {
     if (saved) {
       jobs = JSON.parse(saved);
       jobCounter = parseInt(savedCounter) || jobs.length;
-      activeJobId = parseInt(savedId) || jobs[0].id;
+      activeJobId = jobs.length ? (parseInt(savedId) && jobs.find(j=>j.id===parseInt(savedId)) ? parseInt(savedId) : jobs[0].id) : null;
       if (savedCustomers) {
         const parsed = JSON.parse(savedCustomers);
         if (parsed && parsed.length > 0) customers = parsed;
@@ -1680,9 +1927,10 @@ function showCantFinishSheet(j, t) {
   schedBtn.onclick = () => {
     const notes = document.getElementById('cfNotes')?.value.trim();
     const itemData = sheet._cfItemData || [];
-    // Deduct partial installs and update installing list for new job
+    // Deduct what was actually installed; keep original list for records
     if (itemData.length > 0) {
-      const remainingItems = [];
+      const installedRecord = [];
+      const installingRemaining = [];
       itemData.forEach(({name, usedInput}) => {
         const used = parseInt(usedInput.value) || 0;
         const origItem = j.data.installing ? j.data.installing.find(i => {
@@ -1691,19 +1939,24 @@ function showCantFinishSheet(j, t) {
         }) : null;
         const plannedQty = origItem ? (parseInt(typeof origItem==='object' ? origItem.qty : '1') || 1) : 1;
         const remaining = plannedQty - used;
+        // Deduct from truck
         if (used > 0) {
           const truckItem = truck.find(ti => ti.name.toLowerCase() === name.toLowerCase());
           if (truckItem) truckItem.qty = Math.max(0, truckItem.qty - used);
+          installedRecord.push({name, qty: String(used)});
         }
         if (remaining > 0) {
-          remainingItems.push(
+          installingRemaining.push(
             typeof origItem === 'object'
               ? {...origItem, qty: String(remaining)}
               : {name, qty: String(remaining)}
           );
         }
       });
-      j.data.installing = remainingItems;
+      // j.data.installing stays untouched — full planned list for records
+      if (installedRecord.length) j.data.installedRecord = installedRecord;
+      if (installingRemaining.length) j.data.installingRemaining = installingRemaining;
+      else j.data.installingRemaining = [];
       saveTruck();
     }
     overlay.remove();
@@ -1740,12 +1993,12 @@ function showCantFinishSheet(j, t) {
 }
 
 function finishCantFinish(j, t, notes, daysAhead, cfItemData) {
-  // Deduct what was actually installed and update job's installing list
+  // Deduct what was actually installed; keep original installing list for records
   if (cfItemData && cfItemData.length > 0) {
-    const remainingInstalling = [];
+    const installedRecord = [];
+    const installingRemaining = [];
     cfItemData.forEach(({name, usedInput}) => {
       const used = parseInt(usedInput.value) || 0;
-      // Find the original item in installing list
       const origItem = j.data.installing ? j.data.installing.find(i => {
         const iName = typeof i === 'object' ? i.name : i;
         return iName && iName.toLowerCase() === name.toLowerCase();
@@ -1756,27 +2009,20 @@ function finishCantFinish(j, t, notes, daysAhead, cfItemData) {
       if (used > 0) {
         const truckItem = truck.find(ti => ti.name.toLowerCase() === name.toLowerCase());
         if (truckItem) truckItem.qty = Math.max(0, truckItem.qty - used);
+        installedRecord.push({name, qty: String(used)});
       }
-      // Keep item on list only if there's still qty remaining to install
       if (remaining > 0) {
-        remainingInstalling.push(
-          typeof origItem === 'object' 
+        installingRemaining.push(
+          typeof origItem === 'object'
             ? {...origItem, qty: String(remaining)}
             : {name, qty: String(remaining)}
         );
       }
     });
-    // Update the job's installing list to only what's left
-    j.data.installing = remainingInstalling;
-    // Also add a note about what was partially installed
-    const installedItems = cfItemData
-      .filter(({usedInput}) => parseInt(usedInput.value) > 0)
-      .map(({name, usedInput}) => name + ' (x' + usedInput.value + ')')
-      .join(', ');
-    if (installedItems) {
-      const partialNote = 'Partially installed: ' + installedItems;
-      j.data.notes = j.data.notes ? j.data.notes + ' | ' + partialNote : partialNote;
-    }
+    // j.data.installing stays untouched — full planned list kept for records
+    if (installedRecord.length) j.data.installedRecord = installedRecord;
+    if (installingRemaining.length) j.data.installingRemaining = installingRemaining;
+    else j.data.installingRemaining = [];
     saveTruck();
     renderTruck();
   }
@@ -1846,15 +2092,19 @@ function placeRescheduledJob(date, hour, minute) {
   const ap = hour >= 12 ? 'PM' : 'AM';
   const time = h+':'+m+' '+ap;
 
-  // MOVE the existing job - don't create a new one
-  const j = jobs.find(x => x.id === sourceJob.id);
-  if (j) {
-    j.scheduledDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
-    j.scheduledTime = time;
-    j.scheduledDuration = j.scheduledDuration || 120;
-    j.scheduledEndTime = addMinutesToTime(time, j.scheduledDuration || 120);
-    j.status = 'pending';
+  // MOVE the existing job — update in-place, never push a new one
+  const jobIndex = jobs.findIndex(x => x.id === sourceJob.id);
+  if (jobIndex === -1) {
+    showToast('Job not found — reschedule cancelled', 'error');
+    return false;
   }
+  const j = jobs[jobIndex];
+  j.scheduledDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
+  j.data.date = j.scheduledDate;
+  j.scheduledTime = time;
+  j.scheduledDuration = j.scheduledDuration || 120;
+  j.scheduledEndTime = addMinutesToTime(time, j.scheduledDuration || 120);
+  j.status = j.status === 'complete' ? 'complete' : 'pending';
   saveToStorage();
   renderTabs();
   renderMonthCal();
@@ -1864,6 +2114,25 @@ function placeRescheduledJob(date, hour, minute) {
   return true;
 }
 
+
+function removeJobFromSchedule() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  showConfirmSheet(
+    'Remove from schedule?',
+    'Keeps the job and all data — just removes the calendar date.',
+    'Remove',
+    () => {
+      j.scheduledDate = null; j.scheduledTime = null;
+      j.scheduledEndTime = null; j.scheduledDuration = null;
+      j.data.date = null;
+      const banner = document.getElementById('scheduledBanner');
+      if (banner) banner.style.display = 'none';
+      saveToStorage(); renderMonthCal(); renderWeekTimeline();
+      showToast('Removed from schedule', 'info');
+    }
+  );
+}
 function rescheduleCurrentJob() {
   const j = jobs.find(x => x.id === activeJobId);
   if (!j) return;
@@ -2782,7 +3051,9 @@ function dayNavTimeline(dir) {
 function getJobsForDate(d) {
   const ds = new Date(d).toDateString();
   return jobs.filter(j => {
-    const jd = j.scheduledDate || (j.data && j.data.date);
+    // Only use scheduledDate — never fall back to data.date (a form field) to avoid
+    // unscheduled jobs appearing on the calendar
+    const jd = j.scheduledDate;
     return jd && new Date(jd).toDateString() === ds;
   });
 }
@@ -2814,7 +3085,8 @@ function renderMonthCal() {
     const dayJobs = getJobsForDate(date);
     let jobDots = dayJobs.slice(0,2).map(j => {
       const sc = getStatusClass(j.status);
-      return '<div class="month-job-dot '+sc+'">'+(j.data.customerName||'Job')+'</div>';
+      const label = j.data.customerName || j.scheduledTime || 'Unscheduled';
+      return '<div class="month-job-dot '+sc+'">'+label+'</div>';
     }).join('');
     if (dayJobs.length > 2) jobDots += '<div class="month-job-dot">+' + (dayJobs.length-2) + ' more</div>';
     if (dayJobs.length > 0) {
@@ -2874,7 +3146,8 @@ function renderDayTimeline(d) {
     const sc=getStatusClass(j.status)||'pending';
     const addr=j.data&&j.data.address?j.data.address.split(',')[0]:'';
     const endT=j.scheduledEndTime||'';
-    const installingItems = j.data.installing ? j.data.installing.filter(i=>i&&(typeof i==='object'?i.name:i)) : [];
+    const _installSrc = (j.data.installingRemaining && j.data.installingRemaining.length) ? j.data.installingRemaining : (j.data.installing || []);
+    const installingItems = _installSrc.filter(i=>i&&(typeof i==='object'?i.name:i));
     const installing = installingItems.slice(0,2).map(i=>typeof i==='object'?i.name:i).join(', ');
     const jobNotes = j.data.notes && j.data.notes !== '—' ? j.data.notes.slice(0,40) : '';
     // Check stock for each item - show missing items by name
@@ -2901,7 +3174,7 @@ function renderDayTimeline(d) {
     }
     const hasWarning = missingLines.length > 0;
     html += '<div class="timeline-event '+sc+'" id="tevt_'+j.id+'" style="top:'+topPx+'px;height:'+heightPx+'px;z-index:5;">'+
-      '<div class="timeline-event-name" style="display:flex;align-items:center;gap:4px;">'+(hasWarning?'<span style="color:var(--red);font-size:10px;">⚠️</span>':'')+''+(j.data.customerName||'Job')+'</div>'+
+      '<div class="timeline-event-name" style="display:flex;align-items:center;gap:4px;">'+(hasWarning?'<span style="color:var(--red);font-size:10px;">⚠️</span>':'')+(j.data.customerName||j.scheduledTime||'No name')+'</div>'+
       (heightPx>30?'<div class="timeline-event-time">'+(time||'')+(endT?' – '+endT:'')+'</div>':'')+
       (heightPx>50&&addr?'<div class="timeline-event-addr">📍'+addr+'</div>':'')+
       (heightPx>60&&hasWarning?missingLines:'')+
@@ -2911,29 +3184,38 @@ function renderDayTimeline(d) {
       '</div>';
   });
 
-  // Now line
+  // Now line — only render if current time is within the visible 6a–10p window
   const nowMins=new Date().getHours()*60+new Date().getMinutes();
   const isToday2=d.toDateString()===today.toDateString();
   if (isToday2) {
     const nowTop=((nowMins/60)-HOUR_START)*HOUR_HEIGHT;
-    html += '<div style="position:absolute;top:'+nowTop+'px;left:0;right:0;height:2px;background:var(--red);z-index:10;pointer-events:none;"><div style="position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div></div>';
+    if (nowTop >= 0 && nowTop <= TOTAL_HEIGHT) {
+      html += '<div style="position:absolute;top:'+nowTop+'px;left:0;right:0;height:2px;background:var(--red);z-index:10;pointer-events:none;"><div style="position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div></div>';
+    }
   }
 
   html += '</div></div></div>';
   body.innerHTML = html;
 
-  // Add swipe-to-complete, drag-to-move, drag-to-resize, and click on all events
+  // Wire events — touch and mouse handled separately to prevent double-fire
   const HOUR_H = 60, HOUR_S = 6;
+  const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   dayJobs.forEach(j => {
     const el = body.querySelector('#tevt_'+j.id);
     if (el) {
-      // Click to open — only if not dragged
-      el.addEventListener('click', () => {
-        if (el._wasDragged) return;
-        switchJob(j.id); showScreen('job');
-      });
-      if (j.status !== 'complete') addSwipeToComplete(el, j.id);
-      addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, body);
+      if (isTouchDevice) {
+        // Touch: addDragMoveToEvent's touchend fires showJobContextMenu on tap.
+        // No click listener — it double-fires on mobile after touchend.
+        addSwipeToComplete(el, j.id);
+        addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, body);
+      } else {
+        // Desktop: click is reliable, drag uses mousemove/mouseup.
+        el.addEventListener('click', () => {
+          if (el._wasDragged) return;
+          showJobContextMenu(j.id, el);
+        });
+        addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, body);
+      }
       addResizeToEvent(el, j.id, HOUR_H, HOUR_S);
     }
   });
@@ -3015,7 +3297,7 @@ function renderWeekTimeline() {
         return !t2||t2.qty<qt;
       });
       timeHtml+='<div class="timeline-event '+sc+'" id="wevt_'+j.id+'" style="top:'+topPx+'px;height:'+heightPx+'px;z-index:5;">'+
-        '<div class="timeline-event-name">'+(j.data.customerName||'Job')+(hasMissing?' ⚠️':'')+'</div>'+
+        '<div class="timeline-event-name">'+(j.data.customerName||j.scheduledTime||'No name')+(hasMissing?' ⚠️':'')+'</div>'+
         (heightPx>35?'<div class="timeline-event-time">'+(time||'')+(endT?' – '+endT:'')+'</div>':'')+
         '<div class="resize-handle" id="wrh_'+j.id+'" onclick="event.stopPropagation()"></div>'+
         '</div>';
@@ -3025,13 +3307,18 @@ function renderWeekTimeline() {
   const nowMins=new Date().getHours()*60+new Date().getMinutes();
   const nowTop=((nowMins/60)-HOUR_START)*HOUR_HEIGHT;
   const isThisWeek=days.some(d=>d.toDateString()===today.toDateString());
-  if (isThisWeek) timeHtml+='</div><div style="position:absolute;top:'+(nowTop+0)+'px;left:38px;right:0;height:2px;background:var(--red);z-index:10;pointer-events:none;"><div style="position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div></div>';
-  else timeHtml+='</div>';
-  timeHtml+='</div></div>';
+  // Close week-cols-wrap, then place now-line inside a positioned wrapper
+  if (isThisWeek && nowTop >= 0 && nowTop <= TOTAL_HEIGHT) {
+    timeHtml+='</div></div><div style="position:relative;height:0;"><div style="position:absolute;top:'+(nowTop - TOTAL_HEIGHT)+'px;left:38px;right:0;height:2px;background:var(--red);z-index:10;pointer-events:none;"><div style="position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div></div></div>';
+  } else {
+    timeHtml+='</div></div>';
+  }
+  timeHtml+='</div>';
   body.innerHTML=hdrHtml+timeHtml;
 
   // Wire drag/resize/click for each week event
   const HOUR_H=HOUR_HEIGHT, HOUR_S=HOUR_START;
+  const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   days.forEach(d => {
     const dayJobs2=getJobsForDate(d);
     const col = body.querySelectorAll('.week-timeline-col')[days.indexOf(d)];
@@ -3039,11 +3326,16 @@ function renderWeekTimeline() {
     dayJobs2.forEach(j => {
       const el = body.querySelector('#wevt_'+j.id);
       if (!el) return;
-      el.addEventListener('click', () => {
-        if (el._wasDragged) return;
-        showJobContextMenu(j.id, el);
-      });
-      addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, col);
+      if (isTouchDevice) {
+        // Touch: context menu handled inside addDragMoveToEvent touchend
+        addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, col);
+      } else {
+        el.addEventListener('click', () => {
+          if (el._wasDragged) return;
+          showJobContextMenu(j.id, el);
+        });
+        addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, col);
+      }
       addResizeToEvent(el, j.id, HOUR_H, HOUR_S);
     });
   });
@@ -3454,8 +3746,10 @@ function renderDailyEquipSummary(dayJobs, container) {
   const existing = container.querySelector('.daily-equip-summary');
   if (existing) existing.remove();
 
-  // Only show if there are jobs with equipment
-  const jobsWithEquip = dayJobs.filter(j => j.data.installing && j.data.installing.length > 0);
+  // Only show if there are jobs with real named equipment items
+  const jobsWithEquip = dayJobs.filter(j =>
+    j.data.installing && j.data.installing.some(i => i && (typeof i==='object' ? i.name : i))
+  );
   if (jobsWithEquip.length === 0) return;
 
   const summary = document.createElement('div');
@@ -3476,17 +3770,20 @@ function renderDailyEquipSummary(dayJobs, container) {
   truck.forEach(t => { runningTotals[t.name.toLowerCase()] = {used:0, truckQty:t.qty, displayName:t.name}; });
 
   dayJobs.forEach((j, jobIdx) => {
-    if (!j.data.installing || j.data.installing.length === 0) return;
+    const _src = (j.data.installingRemaining && j.data.installingRemaining.length)
+      ? j.data.installingRemaining : (j.data.installing || []);
+    const realItems = _src.filter(i => i && (typeof i==='object' ? i.name : i));
+    if (realItems.length === 0) return;
     const sc = j.status==='complete'?'var(--green)':j.status==='inprogress'?'var(--accent)':j.status==='cantfinish'?'var(--red)':'var(--yellow)';
 
     // Job header
     const jobHdr = document.createElement('div');
     jobHdr.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:6px;margin-top:'+(jobIdx>0?'12px':'0')+';';
-    jobHdr.innerHTML = '<span style="font-size:10px;color:'+sc+';">●</span><span style="font-size:12px;font-weight:600;color:var(--text);">'+(j.data.customerName||'Job '+(jobIdx+1))+'</span><span style="font-size:10px;color:var(--muted);">'+(j.scheduledTime||'')+'</span>';
+    jobHdr.innerHTML = '<span style="font-size:10px;color:'+sc+';">●</span><span style="font-size:12px;font-weight:600;color:var(--text);">'+(j.data.customerName||j.scheduledTime||'Job '+(jobIdx+1))+'</span><span style="font-size:10px;color:var(--muted);">'+(j.scheduledTime||'')+'</span>';
     summary.appendChild(jobHdr);
 
     // Equipment rows for this job
-    j.data.installing.forEach(item => {
+    realItems.forEach(item => {
       const name = typeof item==='object'?item.name:item;
       const qty = parseInt(typeof item==='object'?item.qty:'1')||1;
       const key = name.toLowerCase();
@@ -3565,10 +3862,17 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     return null;
   }
 
+  // grabOffsetY/X = where within the element the user grabbed (px from element top-left)
+  let grabOffsetY = 0, grabOffsetX = 0;
+
   function onStart(clientX, clientY) {
     startY = clientY;
     startX = clientX;
     startTop = parseInt(el.style.top) || 0;
+    // Record grab offset so ghost and drop position stay anchored to grab point
+    const rect = el.getBoundingClientRect();
+    grabOffsetY = clientY - rect.top;
+    grabOffsetX = clientX - rect.left;
     dragging = false; moved = false;
   }
 
@@ -3580,7 +3884,7 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       el.classList.add('dragging');
       document.body.style.userSelect = 'none';
       document.body.style.webkitUserSelect = 'none';
-      // Create a ghost element fixed to screen
+      // Ghost starts exactly where the element is — no jump
       origParent = el.parentElement;
       const rect = el.getBoundingClientRect();
       ghostEl = el.cloneNode(true);
@@ -3597,26 +3901,26 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       ghostEl.style.borderRadius = '6px';
       ghostEl.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
       document.body.appendChild(ghostEl);
-      // Hide original but keep space
       el.style.opacity = '0.2';
     }
     if (!dragging) return;
     moved = true;
-    // Move ghost
+    // Move ghost so grab point stays under the finger/cursor
     if (ghostEl) {
-      ghostEl.style.top = (clientY - 30) + 'px';
-      ghostEl.style.left = (clientX - 40) + 'px';
+      ghostEl.style.top  = (clientY - grabOffsetY) + 'px';
+      ghostEl.style.left = (clientX - grabOffsetX) + 'px';
     }
-    // Also update el.style.top for day view drop position tracking
+    // Track el.style.top as the element TOP (not cursor pos) for day-view drop
     const parentRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0};
-    const relativeTop = clientY - parentRect.top;
-    el.style.top = Math.max(0, relativeTop) + 'px';
-    // Show ghost time
+    const elTop = (clientY - grabOffsetY) - parentRect.top;
+    el.style.top = Math.max(0, elTop) + 'px';
+    // Update ghost label with snapped time (week view)
     const colInfo = getWeekColAtX(clientX);
     if (colInfo) {
       const colRect = colInfo.col.getBoundingClientRect();
-      const relY = clientY - colRect.top;
-      const { time } = getTimeFromTop(Math.max(0, relY));
+      // Time is based on element top edge, not cursor
+      const elTopInCol = (clientY - grabOffsetY) - colRect.top;
+      const { time } = getTimeFromTop(Math.max(0, elTopInCol));
       if (ghostEl) {
         const nameEl = ghostEl.querySelector('.timeline-event-name');
         if (nameEl) nameEl.textContent = time;
@@ -3643,10 +3947,11 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     const colInfo = getWeekColAtX(clientX);
 
     if (colInfo && colInfo.col.getAttribute('data-date')) {
-      // WEEK VIEW DROP - get time from Y position relative to column
+      // WEEK VIEW DROP — use element TOP edge (not cursor) so time matches
+      // where the block lands visually, not where the user grabbed it.
       const colRect = colInfo.col.getBoundingClientRect();
-      const relY = clientY - colRect.top + (colInfo.col.scrollTop || 0);
-      const { time } = getTimeFromTop(Math.max(0, relY));
+      const elTopInCol = (clientY - grabOffsetY) - colRect.top;
+      const { time } = getTimeFromTop(Math.max(0, elTopInCol));
       const dateStr = colInfo.col.getAttribute('data-date');
       const newDate = new Date(dateStr + 'T12:00:00');
       j.scheduledDate = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate()).toISOString();
@@ -3677,17 +3982,59 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
   }
 
   // Touch
+  // Touch — higher threshold and tap detection for mobile
+  let touchStartTime = 0;
+  const TOUCH_DRAG_THRESHOLD = 12; // px — higher than mouse to avoid accidental drags
+  const TAP_MAX_DURATION = 300;    // ms — anything shorter than this is a tap, not a drag
+
   el.addEventListener('touchstart', e => {
     if (e.target.closest('.resize-handle')) return;
+    touchStartTime = Date.now();
     onStart(e.touches[0].clientX, e.touches[0].clientY);
   }, {passive:true});
+
   el.addEventListener('touchmove', e => {
-    if (!dragging && Math.hypot(e.touches[0].clientX - startX, e.touches[0].clientY - startY) <= dragThreshold) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.hypot(dx, dy) <= TOUCH_DRAG_THRESHOLD) return; // not far enough yet
     e.preventDefault();
     onMove(e.touches[0].clientX, e.touches[0].clientY);
   }, {passive:false});
+
   el.addEventListener('touchend', e => {
-    onEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+    const elapsed = Date.now() - touchStartTime;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const didMove = Math.hypot(dx, dy) > TOUCH_DRAG_THRESHOLD;
+
+    // Clean up any drag state
+    el.style.opacity = '';
+    el.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
+
+    // Check for left swipe-to-complete first
+    if (typeof _finishSwipeComplete === 'function') {
+      const wasSwipe = _finishSwipeComplete(el, jobId);
+      if (wasSwipe) {
+        dragging = false; moved = false;
+        if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+        return;
+      }
+    }
+
+    if (!didMove || elapsed < TAP_MAX_DURATION) {
+      // Tap — show context menu
+      dragging = false; moved = false;
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+      showJobContextMenu(jobId, el);
+      return;
+    }
+
+    // Actual drag drop
+    onEnd(endX, endY);
   }, {passive:true});
 
   // Mouse
@@ -3746,12 +4093,12 @@ function showJobContextMenu(jobId, el) {
   // Job name header
   const hdr = document.createElement('div');
   hdr.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;';
-  hdr.textContent = (j.data.customerName||'Job') + (j.scheduledTime?' · '+j.scheduledTime:'');
+  hdr.textContent = (j.data.customerName||j.scheduledTime||'Unnamed Job') + (j.data.customerName&&j.scheduledTime?' · '+j.scheduledTime:'');
   sheet.appendChild(hdr);
 
   // Action buttons
   const actions = [
-    { icon:'📋', label:'Open Job', color:'var(--accent)', fn:() => { switchJob(jobId); showScreen('job'); menu.remove(); }},
+    { icon:'📋', label:'Open Job', color:'var(--accent)', fn:() => { switchJob(jobId); showScreen('job'); menu.remove(); const cn = document.getElementById('customerName'); if(cn && !cn.value) setTimeout(()=>cn.focus(),200); }},
     { icon:'📅', label:'Reschedule', color:'var(--muted)', fn:() => {
       menu.remove();
       // Enter placement mode with THIS job
@@ -3799,33 +4146,44 @@ function showJobContextMenu(jobId, el) {
 }
 
 function addSwipeToComplete(el, jobId) {
-  let startX = 0, currentX = 0, swiping = false;
-  el.addEventListener('touchstart', e => { startX = e.touches[0].clientX; swiping = true; }, {passive:true});
+  // Only handles the visual slide transform.
+  // The actual complete action is triggered from addDragMoveToEvent's touchend
+  // via el._swipeX so there's only one touchend handler making decisions.
+  let startX = 0;
+  el._swipeX = 0;
+  el.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    el._swipeX = 0;
+  }, {passive:true});
   el.addEventListener('touchmove', e => {
-    if (!swiping) return;
-    currentX = e.touches[0].clientX - startX;
-    if (currentX < -10) {
-      el.style.transform = 'translateX(' + Math.max(currentX, -70) + 'px)';
+    const dx = e.touches[0].clientX - startX;
+    el._swipeX = dx;
+    if (dx < -10) {
+      el.style.transform = 'translateX(' + Math.max(dx, -70) + 'px)';
+    } else {
+      el.style.transform = '';
     }
   }, {passive:true});
-  el.addEventListener('touchend', () => {
-    swiping = false;
-    if (currentX < -50) {
-      // Quick complete
-      const j = jobs.find(x => x.id === jobId);
-      if (j && j.status !== 'complete') {
-        const prevActive = activeJobId;
-        activeJobId = jobId;
-        setStatus('complete');
-        activeJobId = prevActive;
-        showToast('✓ ' + (j.data.customerName||'Job') + ' marked complete', 'success');
-        renderMonthCal();
-        renderDayTimeline(calSelectedDate);
-      }
+  // No touchend here — handled by addDragMoveToEvent
+}
+
+function _finishSwipeComplete(el, jobId) {
+  el.style.transform = '';
+  if ((el._swipeX || 0) < -50) {
+    const j = jobs.find(x => x.id === jobId);
+    if (j && j.status !== 'complete') {
+      const prevActive = activeJobId;
+      activeJobId = jobId;
+      setStatus('complete');
+      activeJobId = prevActive;
+      showToast('✓ ' + (j.data.customerName||j.scheduledTime||'Job') + ' marked complete', 'success');
+      renderMonthCal();
+      renderDayTimeline(calSelectedDate);
+      return true; // swipe completed
     }
-    el.style.transform = '';
-    currentX = 0;
-  });
+  }
+  el._swipeX = 0;
+  return false;
 }
 
 function addResizeToEvent(el, jobId, HOUR_HEIGHT, HOUR_START) {
@@ -4348,8 +4706,7 @@ function removeTruckItem(i) {
 
 // Run after init
 (function() {
-  // Tag today's jobs with today's date if missing
-  jobs.forEach(j => { if (!j.data.date) j.data.date = new Date().toISOString(); });
+  // Do NOT stamp today on unscheduled jobs — only show jobs on calendar if they have a real scheduledDate
   renderCal();
   document.getElementById('todayDateLabel').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
 })();
@@ -4614,32 +4971,20 @@ function doLogin() {
   const btn   = document.getElementById('loginBtn');
   const err   = document.getElementById('loginError');
   err.style.display = 'none';
+  if (!email || !pass) { showLoginError('Enter your email and password'); return; }
   btn.textContent = 'SIGNING IN...';
   btn.disabled = true;
-  if (typeof firebase === 'undefined') {
-    appReady = true;
-    const u = USERS[email];
-    if (u && pass === 'maxus12') { onLoginSuccess({ email, displayName: u.name }); }
-    else { showLoginError('Invalid email or password'); }
-    btn.textContent = 'SIGN IN'; btn.disabled = false;
-    return;
-  }
-  appReady = true;
   if (typeof firebase === 'undefined' || !firebase.auth) {
-    // Offline fallback
-    const u = USERS[email];
-    if (u && pass === 'maxus12') {
-      onLoginSuccess({ email, displayName: u.name });
-    } else {
-      showLoginError('Invalid email or password');
-      btn.textContent = 'SIGN IN'; btn.disabled = false;
-    }
+    showLoginError('Connection required to sign in');
+    btn.textContent = 'SIGN IN'; btn.disabled = false;
     return;
   }
   firebase.auth().signInWithEmailAndPassword(email, pass)
     .then(cred => onLoginSuccess(cred.user))
     .catch(e => {
-      const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials') ? 'Invalid email or password' : 'Sign in failed. Please try again.';
+      const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials')
+        ? 'Invalid email or password'
+        : 'Sign in failed — check your connection and try again.';
       showLoginError(msg);
       btn.textContent = 'SIGN IN'; btn.disabled = false;
     });
@@ -4784,17 +5129,14 @@ function initFirebaseAuth() {
   }
   try {
     const auth = firebase.auth();
-    // Sign out any cached session first, THEN listen for auth state
-    auth.signOut().catch(()=>{}).finally(() => {
-      auth.onAuthStateChanged(user => {
+    // Persist session — if already logged in, go straight to app
+    auth.onAuthStateChanged(user => {
       const ls = document.getElementById('loginScreen');
       if (user) {
-        // Keep login screen until routing is confirmed
         try {
           onLoginSuccess(user);
         } catch(e) {
           console.warn('Auth routing error:', e);
-          // Show login screen as fallback
           if (ls) ls.style.display = 'flex';
         }
       } else {
@@ -4804,7 +5146,6 @@ function initFirebaseAuth() {
         document.getElementById('callCenterApp').style.display = 'none';
       }
     });
-    });// end finally
   } catch(e) { console.warn('Auth init failed', e); }
 }
 // end initFirebaseAuth
@@ -4888,96 +5229,16 @@ let closerView = 'week';
 function initAppData() {
   // Load data or demo data
   if (!loadFromStorage()) {
-    const today = new Date().toISOString().split('T')[0];
-    const demoJobs = [
-      {
-        "id":2000001,"sent":false,"status":"inprogress",
-        "scheduledDate":today+"T08:00:00","scheduledTime":"8:00 AM","scheduledEndTime":"10:00 AM","scheduledDuration":120,
-        "data":{
-          "customerName":"John Martinez","address":"4521 W Camelback Rd, Phoenix, AZ 85031",
-          "phone":"(602) 555-0142","email":"jmartinez@gmail.com","cs":"CS-884421",
-          "masterCode":"1234","verbalCode":"ALPHA","notes":"Gate code: 1234. Dog in backyard.",
-          "arriveTime":"8:05 AM","finishTime":"",
-          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"4"},{"name":"2GIG WIRELESS MOTION w PET IMMUNITY","qty":"1"}],
-          "existing":[],"zones":["Front Door","Back Door","Garage","Motion"]
-        }
-      },
-      {
-        "id":2000002,"sent":false,"status":"pending",
-        "scheduledDate":today+"T10:00:00","scheduledTime":"10:00 AM","scheduledEndTime":"12:00 PM","scheduledDuration":120,
-        "data":{
-          "customerName":"Sarah Thompson","address":"1892 E Indian School Rd, Scottsdale, AZ 85016",
-          "phone":"(480) 555-0287","email":"sthompson@yahoo.com","cs":"CS-991032",
-          "notes":"Call before arriving.",
-          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"5"},{"name":"ADC-VDB750 VIDEO DOORBELL","qty":"1"}],
-          "existing":[],"zones":["Front Door","Side Gate","Back Door","Living Room","Kitchen","Office"]
-        }
-      },
-      {
-        "id":2000003,"sent":false,"status":"pending",
-        "scheduledDate":today+"T12:30:00","scheduledTime":"12:30 PM","scheduledEndTime":"2:30 PM","scheduledDuration":120,
-        "data":{
-          "customerName":"Mike Chen","address":"7740 N 32nd St, Phoenix, AZ 85020",
-          "phone":"(602) 555-0398","email":"mchen@hotmail.com","cs":"CS-773214",
-          "notes":"New construction. Contact Mike.",
-          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"3"},{"name":"ADC-VDB750 VIDEO DOORBELL","qty":"1"}],
-          "existing":[],"zones":["Front Door","Back Door","Garage"]
-        }
-      },
-      {
-        "id":2000004,"sent":false,"status":"pending",
-        "scheduledDate":today+"T14:30:00","scheduledTime":"2:30 PM","scheduledEndTime":"4:30 PM","scheduledDuration":120,
-        "data":{
-          "customerName":"Robert Gallegos","address":"3301 S Mill Ave, Tempe, AZ 85282",
-          "phone":"(480) 555-0451","email":"rgallegos@gmail.com","cs":"CS-662891",
-          "notes":"Has dog. Park on street.",
-          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"4"},{"name":"2GIG WIRELESS MOTION w PET IMMUNITY","qty":"2"},{"name":"ADC-VDB750 VIDEO DOORBELL","qty":"1"}],
-          "existing":[],"zones":["Front","Back","Side","Garage","Living Room","Office"]
-        }
-      },
-      {
-        "id":2000005,"sent":false,"status":"pending",
-        "scheduledDate":today+"T16:30:00","scheduledTime":"4:30 PM","scheduledEndTime":"6:30 PM","scheduledDuration":120,
-        "data":{
-          "customerName":"Amanda Foster","address":"9155 E Via de Ventura, Scottsdale, AZ 85258",
-          "phone":"(480) 555-0512","email":"afoster@outlook.com","cs":"CS-554478",
-          "notes":"Gate code 4455. Call when arriving.",
-          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"4"},{"name":"2GIG WIRELESS MOTION w PET IMMUNITY","qty":"1"},{"name":"ADC-VDB750 VIDEO DOORBELL","qty":"1"}],
-          "existing":[],"zones":["Front Door","Back Door","Garage","Master Bedroom"]
-        }
-      }
-    ];
-    jobs = demoJobs; jobCounter = 2000005; activeJobId = 2000001;
-    const demoCusts = [
-      {"id":1000001,"name":"John Martinez","address":"4521 W Camelback Rd, Phoenix, AZ 85031","phone":"(602) 555-0142","email":"jmartinez@gmail.com","cs":"CS-884421","notes":"Gate code: 1234. Dog in backyard."},
-      {"id":1000002,"name":"Sarah Thompson","address":"1892 E Indian School Rd, Scottsdale, AZ 85016","phone":"(480) 555-0287","email":"sthompson@yahoo.com","cs":"CS-991032","notes":"Call before arriving."},
-      {"id":1000003,"name":"Mike Chen","address":"7740 N 32nd St, Phoenix, AZ 85020","phone":"(602) 555-0398","email":"mchen@hotmail.com","cs":"CS-773214","notes":"New construction."},
-      {"id":1000004,"name":"Robert Gallegos","address":"3301 S Mill Ave, Tempe, AZ 85282","phone":"(480) 555-0451","email":"rgallegos@gmail.com","cs":"CS-662891","notes":"Has dog. Park on street."},
-      {"id":1000005,"name":"Amanda Foster","address":"9155 E Via de Ventura, Scottsdale, AZ 85258","phone":"(480) 555-0512","email":"afoster@outlook.com","cs":"CS-554478","notes":"Gate code 4455."}
-    ];
-    customers = demoCusts;
-    // Set truck stock to show depletion across the day:
-    // Cell radios: 2 on truck → jobs 1,2 use 1 each = runs out by job 3
-    // D/W contacts: 11 on truck → jobs use 4+5=9, leaving 2 → job 3 needs 3, job 4+ short
-    // Video doorbells: 2 on truck → jobs 2,3 use 1 each = runs out by job 4
-    // Motions: 2 on truck → job 4 needs 2 = last ones, job 5 short
-    const truckOverrides = {
-      '2GIG GC2 4G LTE CELL RADIO VERIZON': 2,
-      '2GIG WIRELESS THIN D/W CONTACT': 11,
-      'ADC-VDB750 VIDEO DOORBELL': 2,
-      '2GIG WIRELESS MOTION w PET IMMUNITY': 2
-    };
-    truck = truck.map(t => {
-      const override = truckOverrides[t.name];
-      return override !== undefined ? {...t, qty: override} : t;
-    });
-    localStorage.setItem('p22_truck', JSON.stringify(truck));
+    // Fresh install — start with no jobs, no demo data
+    jobs = []; activeJobId = null; jobCounter = 0;
     saveToStorage();
   }
   // Show tech app
   const ta = document.getElementById('techApp');
   if (ta) ta.style.display = 'block';
   renderTabs();
+  if (activeJobId) loadJob(activeJobId);
+  else renderEmptyJobState();
   renderMonthCal();
   updateTruckBadge();
   const lbl = document.getElementById('todayDateLabel');
@@ -5558,7 +5819,7 @@ function bookCCAppt() {
 </div>
 
 <!-- NAV BAR -->
-<button onclick="openGlobalSearch()" style="position:fixed;top:12px;right:16px;z-index:8998;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Search">🔍</button>
+<button id="globalSearchTrigger" onclick="openGlobalSearch()" style="position:fixed;top:12px;right:16px;z-index:8998;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Search">🔍</button>
 <nav class="crm-nav">
   <button class="nav-btn active" id="navToday" onclick="showScreen('today')"><span class="nav-icon">📅</span>Today</button>
   <button class="nav-btn" id="navJob" onclick="showScreen('job')"><span class="nav-icon">📝</span>Job</button>
