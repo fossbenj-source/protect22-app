@@ -4027,6 +4027,27 @@ document.addEventListener('keydown', e => {
 
 // ── Init ─────────────────────────────────────────────────
 // ── Init ─────────────────────────────────────────────────
+// ── Firebase Auth Init ───────────────────────────────────
+function initFirebaseAuth() {
+  if (typeof firebase === 'undefined') return;
+  try {
+    const auth = firebase.auth();
+    auth.onAuthStateChanged(user => {
+      const ls = document.getElementById('loginScreen');
+      if (user) {
+        if (ls) ls.style.display = 'none';
+        onLoginSuccess(user);
+      } else {
+        if (ls) ls.style.display = 'flex';
+        document.getElementById('techApp').style.display = 'none';
+        document.getElementById('closerApp').style.display = 'none';
+        document.getElementById('callCenterApp').style.display = 'none';
+      }
+    });
+  } catch(e) { console.warn('Auth init failed', e); }
+}
+// end initFirebaseAuth
+
 document.addEventListener('DOMContentLoaded', function() {
 
 try { document.getElementById('dateBadge').textContent=new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}); } catch(e) {}
@@ -4110,6 +4131,7 @@ window.onFirebaseJobs = function(data) {
   }
 };
 
+  initFirebaseAuth();
 }); // end DOMContentLoaded
 </script>
 
@@ -4993,24 +5015,6 @@ window.onFirebaseJobs = function(data) {
 </body>
 </html><div id="techApp" style="display:none;">
 
-// ── Firebase Auth Init ───────────────────────────────────
-if (typeof firebase !== 'undefined') {
-  try {
-    const auth = firebase.auth();
-    auth.onAuthStateChanged(user => {
-      const ls = document.getElementById('loginScreen');
-      if (user) {
-        if (ls) ls.style.display = 'none';
-        onLoginSuccess(user);
-      } else {
-        if (ls) ls.style.display = 'flex';
-        document.getElementById('techApp').style.display = 'none';
-        document.getElementById('closerApp').style.display = 'none';
-        document.getElementById('callCenterApp').style.display = 'none';
-      }
-    });
-  } catch(e) { console.warn('Auth init failed', e); }
-}
 
 // ── initAppData (replaces old DOMContentLoaded init) ─────
 function initAppData() {
