@@ -1525,12 +1525,17 @@ function loadJob(id) {
   document.getElementById('phone').value = d.phone || '';
   document.getElementById('confirmation').value = d.confirmation || '';
   // Re-apply lock state for fields that were locked when last saved
-  if (d.lockedFields && d.lockedFields.length) {
-    d.lockedFields.forEach(fid => {
-      const el = document.getElementById(fid);
-      if (el && el.value.trim()) lockField(fid);
-    });
-  }
+  // If lockedFields doesn't exist yet (job never opened on job screen), auto-lock any filled fields
+  const fieldsToLock = (d.lockedFields && d.lockedFields.length)
+    ? d.lockedFields
+    : _lockable.filter(fid => {
+        const el = document.getElementById(fid);
+        return el && el.value.trim();
+      });
+  fieldsToLock.forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el && el.value.trim()) lockField(fid);
+  });
   // Show scheduled time from calendar
   const banner = document.getElementById('scheduledBanner');
   const label = document.getElementById('scheduledTimeLabel');
@@ -3943,7 +3948,6 @@ let calSelectedDate = new Date();
 
 function setCalView(v) {
   calView = v;
-  // calBtnWeek = Week button, calBtnMonth = Day button (repurposed)
   document.getElementById('calBtnWeek').className = 'cal-view-btn' + (v==='week'?' active':'');
   document.getElementById('calBtnMonth').className = 'cal-view-btn' + (v==='day'?' active':'');
   if (v==='week') {
@@ -3953,6 +3957,8 @@ function setCalView(v) {
   } else if (v==='day') {
     document.getElementById('weekCalSection').style.display = 'none';
     document.getElementById('dayTimelineSection').style.display = 'block';
+    // Always re-render day timeline fresh from job data
+    if (!calSelectedDate) calSelectedDate = new Date();
     renderDayTimeline(calSelectedDate);
     setTimeout(() => document.getElementById('dayTimelineSection').scrollIntoView({behavior:'smooth', block:'start'}), 50);
   } else {
@@ -3991,7 +3997,11 @@ function getJobsForDate(d) {
 
 function renderCal() {
   renderMonthCal();
+  // Always re-render the active view
   if (calView === 'week') renderWeekTimeline();
+  if (calView === 'day' && calSelectedDate) renderDayTimeline(calSelectedDate);
+  // Also update today stats in case job data changed
+  if (typeof updateTodayStats === 'function') updateTodayStats();
 }
 
 function renderMonthCal() {
@@ -4145,21 +4155,20 @@ function renderDayTimeline(d) {
   // Wire events — touch and mouse handled separately to prevent double-fire
   const HOUR_H = 60, HOUR_S = 6;
   const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  // The actual events column is the position:relative div inside the timeline
+  const eventsCol = body.querySelector('.timeline-wrap > div > div:nth-child(2)');
   dayJobs.forEach(j => {
     const el = body.querySelector('#tevt_'+j.id);
     if (el) {
       if (isTouchDevice) {
-        // Touch: addDragMoveToEvent's touchend fires showJobContextMenu on tap.
-        // No click listener — it double-fires on mobile after touchend.
         addSwipeToComplete(el, j.id);
-        addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, body);
+        addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, eventsCol || body);
       } else {
-        // Desktop: click is reliable, drag uses mousemove/mouseup.
         el.addEventListener('click', () => {
           if (el._wasDragged) return;
           showJobContextMenu(j.id, el);
         });
-        addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, body);
+        addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, eventsCol || body);
       }
       addResizeToEvent(el, j.id, HOUR_H, HOUR_S);
     }
@@ -5160,11 +5169,10 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     startY = clientY;
     startX = clientX;
     startTop = parseInt(el.style.top) || 0;
-    // Only track Y offset — X stays fixed so block never jumps sideways
     const rect = el.getBoundingClientRect();
     grabOffsetY = clientY - rect.top;
-    grabOffsetX = clientX - rect.left; // kept for week column detection only
-    ghostOrigLeft = rect.left;         // ghost X is locked to element's original left
+    grabOffsetX = clientX - rect.left;
+    ghostOrigLeft = rect.left;
     dragging = false; moved = false;
   }
 
@@ -5179,11 +5187,11 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       origParent = el.parentElement;
       const rect = el.getBoundingClientRect();
       ghostEl = el.cloneNode(true);
-      ghostEl.style.cssText = el.style.cssText;
+      ghostEl.style.cssText = '';
       ghostEl.style.position = 'fixed';
       ghostEl.style.width = rect.width + 'px';
       ghostEl.style.height = rect.height + 'px';
-      ghostEl.style.left = ghostOrigLeft + 'px'; // locked — no X jump
+      ghostEl.style.left = ghostOrigLeft + 'px';
       ghostEl.style.top = rect.top + 'px';
       ghostEl.style.zIndex = '99999';
       ghostEl.style.opacity = '0.85';
@@ -5191,34 +5199,18 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       ghostEl.style.transition = 'none';
       ghostEl.style.borderRadius = '6px';
       ghostEl.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
+      ghostEl.style.background = el.style.background || 'var(--panel)';
+      ghostEl.style.border = el.style.border || '1px solid var(--accent)';
+      ghostEl.style.padding = '4px 8px';
+      ghostEl.style.color = 'inherit';
       document.body.appendChild(ghostEl);
-      el.style.opacity = '0';
+      el.style.opacity = '0.3';
     }
     if (!dragging) return;
     moved = true;
-    // Ghost only moves vertically — X stays locked to column
+    // Only move the ghost — don't touch el.style.top
     if (ghostEl) {
       ghostEl.style.top = (clientY - grabOffsetY) + 'px';
-    }
-    // Calculate el.style.top accounting for scroll offset of the timeline container
-    const container = containerEl || el.parentElement;
-    const scrollWrap = container.closest('.timeline-wrap');
-    const scrollTop = scrollWrap ? scrollWrap.scrollTop : 0;
-    const parentRect = container.getBoundingClientRect();
-    const elTop = (clientY - grabOffsetY) - parentRect.top + scrollTop;
-    el.style.top = Math.max(0, elTop) + 'px';
-    // Update ghost label with snapped time (week view)
-    const colInfo = getWeekColAtX(clientX);
-    if (colInfo) {
-      const colRect = colInfo.col.getBoundingClientRect();
-      const colScrollWrap = colInfo.col.closest('.timeline-wrap');
-      const colScrollTop = colScrollWrap ? colScrollWrap.scrollTop : 0;
-      const elTopInCol = (clientY - grabOffsetY) - colRect.top + colScrollTop;
-      const { time } = getTimeFromTop(Math.max(0, elTopInCol));
-      if (ghostEl) {
-        const nameEl = ghostEl.querySelector('.timeline-event-name');
-        if (nameEl) nameEl.textContent = time;
-      }
     }
   }
 
@@ -5227,50 +5219,129 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     document.body.style.webkitUserSelect = '';
     el.classList.remove('dragging');
     el.style.opacity = '';
-    if (ghostEl) { ghostEl.remove(); ghostEl = null; }
     const wasMoved = moved && dragging;
     dragging = false; moved = false;
-    if (!wasMoved) return;
+
+    if (!wasMoved) {
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+      return;
+    }
     el._wasDragged = true;
     setTimeout(() => { el._wasDragged = false; }, 300);
 
     const j = jobs.find(x => x.id === jobId);
-    if (!j) return;
+    if (!j) {
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+      return;
+    }
 
-    // Check if we're in week view (has week columns) or day view
+    // Calculate drop time from ghost's final viewport position relative to the container
+    let newTime, newDateISO, newDateLabel;
     const colInfo = getWeekColAtX(clientX);
+    // Ghost top edge in viewport
+    const ghostTop = clientY - grabOffsetY;
 
     if (colInfo && colInfo.col.getAttribute('data-date')) {
-      // WEEK VIEW DROP — account for scroll offset within timeline container
+      // WEEK VIEW — use column rect
       const colRect = colInfo.col.getBoundingClientRect();
       const colScrollWrap = colInfo.col.closest('.timeline-wrap');
       const colScrollTop = colScrollWrap ? colScrollWrap.scrollTop : 0;
-      const elTopInCol = (clientY - grabOffsetY) - colRect.top + colScrollTop;
-      const { time } = getTimeFromTop(Math.max(0, elTopInCol));
+      const topInCol = ghostTop - colRect.top + colScrollTop;
+      const result = getTimeFromTop(Math.max(0, topInCol));
+      newTime = result.time;
       const dateStr = colInfo.col.getAttribute('data-date');
-      const newDate = new Date(dateStr + 'T12:00:00');
-      j.scheduledDate = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate()).toISOString();
-      j.data.date = j.scheduledDate;
-      j.scheduledTime = time;
-      j.scheduledEndTime = addMinutesToTime(time, j.scheduledDuration || 120);
-      saveToStorage();
-      renderMonthCal();
-      renderWeekTimeline();
-      showToast('📅 Moved to ' + colInfo.col.getAttribute('data-date-label') + ' at ' + time, 'success');
+      const nd = new Date(dateStr + 'T12:00:00');
+      newDateISO = new Date(nd.getFullYear(), nd.getMonth(), nd.getDate()).toISOString();
+      newDateLabel = colInfo.col.getAttribute('data-date-label') || dateStr;
     } else {
-      // DAY VIEW DROP — use el.style.top which was set during drag with scroll offset
-      const currentTop = parseInt(el.style.top) || 0;
-      const { time, snappedMins } = getTimeFromTop(currentTop);
-      const snappedTop = (snappedMins / 60) * HOUR_HEIGHT;
-      el.style.top = snappedTop + 'px';
-      j.scheduledTime = time;
-      j.scheduledEndTime = addMinutesToTime(time, j.scheduledDuration || 120);
+      // DAY VIEW — use containerEl rect
+      const container = containerEl || el.parentElement;
+      const containerRect = container.getBoundingClientRect();
+      const scrollWrap = container.closest('.timeline-wrap');
+      const scrollTop = scrollWrap ? scrollWrap.scrollTop : 0;
+      const topInContainer = ghostTop - containerRect.top + scrollTop;
+      const result = getTimeFromTop(Math.max(0, topInContainer));
+      newTime = result.time;
+      newDateISO = null;
+      newDateLabel = null;
+    }
+
+    // Remove ghost
+    if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+
+    // Show confirmation popup
+    showMoveConfirm(j, newTime, newDateISO, newDateLabel, colInfo);
+  }
+
+  // Confirmation popup for drag-drop moves
+  function showMoveConfirm(j, newTime, newDateISO, newDateLabel, colInfo) {
+    const existing = document.getElementById('moveConfirmOverlay');
+    if (existing) existing.remove();
+
+    const oldTime = j.scheduledTime || '—';
+    const customerName = j.data.customerName || 'This job';
+    const dateInfo = newDateLabel ? ' on ' + newDateLabel : '';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'moveConfirmOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:70000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
+    overlay.onclick = e => { if (e.target === overlay) { cancelMove(); } };
+
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+
+    sheet.innerHTML =
+      '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">📅 CONFIRM MOVE</div>' +
+      '<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">' + esc(customerName) + '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
+        '<div style="flex:1;text-align:center;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;">' +
+          '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">FROM</div>' +
+          '<div style="font-family:Share Tech Mono,monospace;font-size:16px;color:var(--muted);">' + esc(oldTime) + '</div>' +
+        '</div>' +
+        '<div style="font-size:18px;color:var(--accent);">→</div>' +
+        '<div style="flex:1;text-align:center;padding:10px;background:rgba(0,212,255,0.08);border:1px solid var(--accent);border-radius:8px;">' +
+          '<div style="font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">TO</div>' +
+          '<div style="font-family:Share Tech Mono,monospace;font-size:16px;color:var(--accent);font-weight:bold;">' + esc(newTime) + esc(dateInfo) + '</div>' +
+        '</div>' +
+      '</div>';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.style.cssText = 'width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-bottom:10px;';
+    saveBtn.textContent = '✓ SAVE CHANGES';
+    saveBtn.onclick = () => {
+      overlay.remove();
+      // Apply the move
+      j.scheduledTime = newTime;
+      j.scheduledEndTime = addMinutesToTime(newTime, j.scheduledDuration || 120);
+      if (newDateISO) {
+        j.scheduledDate = newDateISO;
+        j.data.date = newDateISO;
+      }
       if (j.scheduledDate) j.data.date = j.scheduledDate;
       saveToStorage();
       renderMonthCal();
-      renderDayTimeline(calSelectedDate);
-      showToast('📅 Moved to ' + time, 'success');
+      if (colInfo) { renderWeekTimeline(); }
+      else { renderDayTimeline(calSelectedDate); }
+      showToast('✓ Moved to ' + newTime + (newDateISO && newDateLabel ? ' on ' + newDateLabel : ''), 'success');
+    };
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.style.cssText = 'width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:12px;cursor:pointer;';
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.onclick = () => { cancelMove(); };
+
+    function cancelMove() {
+      overlay.remove();
+      // Revert — re-render timeline to original positions
+      renderMonthCal();
+      if (colInfo) { renderWeekTimeline(); }
+      else { renderDayTimeline(calSelectedDate); }
     }
+
+    sheet.appendChild(saveBtn);
+    sheet.appendChild(cancelBtn);
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
   }
 
   // ── Touch — long-press to drag, tap for menu, normal scroll otherwise ──
@@ -5840,6 +5911,7 @@ function confirmScheduleJob() {
       renderTabs();
       loadJob(existingJob.id);
       closeScheduleModal();
+      calSelectedDate = new Date(existingJob.scheduledDate);
       renderCal();
       showToast('✓ Scheduled for ' + time, 'success');
       return;
@@ -5850,6 +5922,8 @@ function confirmScheduleJob() {
   saveToStorage();
   renderTabs();
   closeScheduleModal();
+  // Set calendar to show the scheduled date
+  calSelectedDate = new Date(j.scheduledDate);
   renderCal();
   showToast('✓ Job scheduled for ' + time, 'success');
 }
@@ -5882,7 +5956,11 @@ function showScreen(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('screen' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   document.getElementById('nav' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
-  if (name === 'today') { renderMonthCal(); if(typeof renderDayBrief==='function') renderDayBrief(); }
+  if (name === 'today') {
+    updateTodayStats();
+    renderCal(); // Refreshes month, week, AND day views
+  }
+  if (name === 'job') { renderTabs(); if (activeJobId) loadJob(activeJobId); }
   if (name === 'history') renderHistory();
   if (name === 'customers') renderCustomers();
   if (name === 'settings') loadSettingsScreen();
@@ -6727,6 +6805,14 @@ initFirebaseAuth();
 appReady = true;
 if (pendingUser) { currentUser = pendingUser; pendingUser = null; routeUser(); }
 
+// Auto-refresh when returning to the app (tab switch, app switch on iOS)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentScreen === 'today') {
+    renderCal();
+    updateTodayStats();
+  }
+});
+
 }); // end DOMContentLoaded
 
 // ── Closer Calendar State ────────────────────────────────
@@ -6792,6 +6878,11 @@ function initAppData() {
       if (activeJobId) loadJob(activeJobId);
       else renderEmptyJobState();
       renderMonthCal();
+      // Refresh calendar views with updated data
+      if (currentScreen === 'today') {
+        renderCal();
+        updateTodayStats();
+      }
       // Persist merged result back
       try {
         localStorage.setItem('p22_jobs', JSON.stringify(jobs));
