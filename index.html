@@ -3955,7 +3955,8 @@ function doLogin() {
   firebase.auth().signInWithEmailAndPassword(email, pass)
     .then(cred => onLoginSuccess(cred.user))
     .catch(e => {
-      showLoginError(e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' ? 'Invalid email or password' : e.message);
+      const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials') ? 'Invalid email or password' : 'Sign in failed. Please try again.';
+      showLoginError(msg);
       btn.textContent = 'SIGN IN'; btn.disabled = false;
     });
 }
@@ -4003,16 +4004,21 @@ function doLogout() {
 }
 
 function initTechApp() {
-  // Show tech nav and screens
-  document.getElementById('techApp').style.display = 'block';
-  document.getElementById('closerApp').style.display = 'none';
-  document.getElementById('callCenterApp').style.display = 'none';
-  // Update header with user name
+  const ta = document.getElementById('techApp');
+  const ca = document.getElementById('closerApp');
+  const cc = document.getElementById('callCenterApp');
+  if (!ta) { setTimeout(initTechApp, 100); return; }
+  ta.style.display = 'block';
+  if (ca) ca.style.display = 'none';
+  if (cc) cc.style.display = 'none';
   const u = USERS[currentUser?.email] || {};
   const lbl = document.getElementById('todayDateLabel');
   if (lbl) lbl.textContent = (u.name||'Tech').toUpperCase() + ' · ' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  // Run original init
-  initAppData();
+  if (typeof initAppData === 'function') {
+    initAppData();
+  } else {
+    setTimeout(initTechApp, 150);
+  }
 }
 
 function initCloserView() {
