@@ -107,7 +107,6 @@
   .status-btn:hover{border-color:var(--accent);color:var(--accent);}
   .status-btn.active-pending{border-color:var(--yellow);color:var(--yellow);background:rgba(255,214,0,0.08);}
   .status-btn.active-complete{border-color:var(--green);color:var(--green);background:rgba(0,230,118,0.08);}
-  .status-btn.active-complete{border-color:var(--green);color:var(--green);background:rgba(0,230,118,0.08);}
 
   /* TIME TRACKER */
   .time-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
@@ -191,6 +190,22 @@
   .btn-summary:hover{background:rgba(255,107,43,0.08);}
   .btn-clear{width:100%;background:none;border:1px solid rgba(255,68,68,0.3);color:rgba(255,68,68,0.7);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
   .btn-clear:hover{border-color:var(--red);color:var(--red);background:rgba(255,68,68,0.05);}
+
+
+  /* ACCESSIBILITY + VALIDATION ENHANCEMENTS */
+  .field-error{display:none;margin-top:6px;font-size:12px;line-height:1.35;color:var(--red);}
+  .field-error.show{display:block;}
+  .input-error{border-color:var(--red)!important;box-shadow:0 0 0 3px rgba(255,68,68,0.10)!important;}
+  .input-valid{border-color:rgba(0,230,118,0.35)!important;}
+  .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;}
+  button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+  .nav-btn{min-height:56px;font-size:10px;}
+  .status-btn,.time-btn,.btn-add,.btn-submit,.btn-summary,.btn-clear{min-height:40px;}
+  .btn-copy,.btn-paste,.btn-call,.btn-edit,.btn-maps{min-width:34px;min-height:34px;}
+  .field-hint{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.35;}
 
   /* TOAST */
   .toast{position:fixed;bottom:24px;right:16px;padding:12px 18px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:1px;transform:translateY(80px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:99999;pointer-events:none;max-width:300px;}
@@ -768,7 +783,7 @@
         <div style="font-family:'Share Tech Mono',monospace;font-size:16px;color:var(--accent);letter-spacing:2px;">PROTECT22</div>
         <div style="font-size:10px;color:var(--muted);letter-spacing:1px;" id="todayDateLabel"></div>
       </div>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;"><div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:5px 10px;" id="syncStatus">⬤ Local</div><button onclick="doLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 8px;font-size:10px;cursor:pointer;font-family:Share Tech Mono,monospace;">OUT</button></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;"><button onclick="refreshData()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer;" title="Refresh data">↻</button><div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:5px 10px;" id="syncStatus">⬤ Local</div><button onclick="doLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 8px;font-size:10px;cursor:pointer;font-family:Share Tech Mono,monospace;">OUT</button></div>
     </div>
 
     <!-- Day Brief — smart morning summary, only shows on today with jobs -->
@@ -898,11 +913,11 @@
         <div style="display:flex;gap:8px;margin-top:8px;">
           <div style="flex:1;">
             <label style="font-size:9px;margin-bottom:3px;">ARRIVE TIME</label>
-            <input type="text" id="arriveInput" placeholder="e.g. 9:30 AM" oninput="editTime('arrive')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
+            <input type="text" id="arriveInput" placeholder="e.g. 9:30 AM" oninput="editTime('arrive')" onblur="editTime('arrive')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
           </div>
           <div style="flex:1;">
             <label style="font-size:9px;margin-bottom:3px;">FINISH TIME</label>
-            <input type="text" id="finishInput" placeholder="e.g. 11:45 AM" oninput="editTime('finish')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
+            <input type="text" id="finishInput" placeholder="e.g. 11:45 AM" oninput="editTime('finish')" onblur="editTime('finish')" style="font-family:'Share Tech Mono',monospace;font-size:14px;">
           </div>
         </div>
       </div>
@@ -917,7 +932,7 @@
       <div class="fee-note">Standard Protect22 install</div>
     </div>
     <div style="text-align:right;">
-      <div class="fee-amount">$150</div>
+      <div class="fee-amount" id="feeAmountDisplay">$150</div>
       <div class="fee-note">flat rate</div>
     </div>
   </div>
@@ -1073,6 +1088,11 @@
 <script>
 emailjs.init("A1vvWPOF9gjT480_A");
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyMxJeWLlp5GWa8rpCqbUWc-fLXd4xXdfGHZQ0oUeCfFH5Fb7lQjvt1iadUZALPWlQL/exec";
+const INSTALL_FEE = 150; // ── Central fee constant ── change once, updates everywhere
+const DEFAULT_EMAIL_RECIPIENT = 'bfoss@bridgepointservice.com';
+function getEmailRecipient() {
+  return localStorage.getItem('p22_emailRecipient') || DEFAULT_EMAIL_RECIPIENT;
+}
 
 // ── Equipment ──────────────────────────────────────────────
 const EQUIPMENT = [
@@ -1198,6 +1218,14 @@ const EQUIPMENT = [
 let jobs = [], activeJobId = null, jobCounter = 0;
 let comboCount = 0, openDropdown = null;
 
+// ── XSS sanitizer — escapes HTML entities in user data before innerHTML ──
+function esc(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 function blankJob() {
   return {
     id: ++jobCounter,
@@ -1233,9 +1261,11 @@ function switchJob(id) {
 
 function deleteJob(id, e) {
   if (e) e.stopPropagation();
+  const deleted = jobs.find(j => j.id === id);
+  if (!deleted) return;
+  const deletedIndex = jobs.indexOf(deleted);
   jobs = jobs.filter(j => j.id !== id);
   if (jobs.length === 0) {
-    // Truly empty — clear the form and show empty state
     activeJobId = null;
     renderTabs();
     renderEmptyJobState();
@@ -1246,7 +1276,16 @@ function deleteJob(id, e) {
   }
   saveToStorage();
   renderMonthCal();
-  showToast('Job removed', 'info');
+  showUndoToast('Job removed', () => {
+    // Undo — restore the job at its original position
+    jobs.splice(deletedIndex, 0, deleted);
+    activeJobId = deleted.id;
+    renderTabs();
+    loadJob(activeJobId);
+    saveToStorage();
+    renderMonthCal();
+    showToast('✓ Job restored', 'success');
+  });
 }
 
 function renderTabs() {
@@ -1754,6 +1793,9 @@ function autoSave() {
 }
 
 function saveToStorage() {
+  // Stamp every job with lastModified for sync conflict resolution
+  const now = Date.now();
+  jobs.forEach(j => { j.lastModified = now; });
   try {
     localStorage.setItem('p22_jobs', JSON.stringify(jobs));
     localStorage.setItem('p22_activeJobId', activeJobId);
@@ -1763,7 +1805,7 @@ function saveToStorage() {
   if (window.fbSet) {
     window.fbSet('jobs', JSON.parse(JSON.stringify(jobs)))
       .catch(e => console.warn('Firebase save failed:', e));
-    window.fbSet('meta', { activeJobId, jobCounter })
+    window.fbSet('meta', { activeJobId, jobCounter, lastModified: now })
       .catch(e => {});
   }
 }
@@ -1786,6 +1828,27 @@ function loadFromStorage() {
     }
   } catch(e) { console.warn('Storage load failed:', e); }
   return false;
+}
+
+// ── Manual Refresh ────────────────────────────────────────
+function refreshData() {
+  const btn = document.querySelector('[onclick="refreshData()"]');
+  if (btn) { btn.textContent = '⟳'; btn.disabled = true; }
+  // Re-read localStorage
+  loadFromStorage();
+  // Re-render everything
+  renderTabs();
+  if (activeJobId) loadJob(activeJobId);
+  else renderEmptyJobState();
+  renderMonthCal();
+  updateTodayStats();
+  if (typeof renderTruck === 'function') renderTruck();
+  if (typeof updateTruckBadge === 'function') updateTruckBadge();
+  // Update fee display
+  const feeEl = document.getElementById('feeAmountDisplay');
+  if (feeEl) feeEl.textContent = '$' + INSTALL_FEE;
+  showToast('✓ Data refreshed', 'success');
+  if (btn) { setTimeout(() => { btn.textContent = '↻'; btn.disabled = false; }, 1000); }
 }
 
 // ── Status ─────────────────────────────────────────────────
@@ -2144,7 +2207,7 @@ function enterReschedulePlacementMode(sourceJob) {
   banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9000;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;padding:12px 16px;display:flex;align-items:center;gap:10px;font-family:Share Tech Mono,monospace;font-size:11px;letter-spacing:1px;';
   const hasDate = !!(sourceJob.scheduledDate || sourceJob.scheduledTime);
   const action = hasDate ? 'RESCHEDULE' : 'SCHEDULE';
-  banner.innerHTML = '<span style="font-size:16px;">📅</span><span style="flex:1;">TAP ANY SLOT TO ' + action + ': ' + (sourceJob.data.customerName||'JOB').toUpperCase() + '</span>';
+  banner.innerHTML = '<span style="font-size:16px;">📅</span><span style="flex:1;">TAP ANY SLOT TO ' + action + ': ' + esc((sourceJob.data.customerName||'JOB').toUpperCase()) + '</span>';
   const cancelReschedBtn = document.createElement('button');
   cancelReschedBtn.textContent = '✕ Cancel';
   cancelReschedBtn.style.cssText = 'background:rgba(0,0,0,0.2);border:none;color:#000;border-radius:4px;padding:4px 8px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;';
@@ -2377,6 +2440,42 @@ function finishComplete(j, finishTime) {
   renderTabs();
   saveToStorage();
   renderMonthCal();
+  // Auto-advance: find next pending job for today and offer to open it
+  offerNextJob(j.id);
+}
+
+function offerNextJob(completedJobId) {
+  const today = new Date().toDateString();
+  const todayJobs = jobs.filter(jj => {
+    const sd = jj.scheduledDate;
+    return sd && new Date(sd).toDateString() === today && jj.id !== completedJobId && (jj.status === 'pending' || jj.status === 'inprogress');
+  }).sort((a,b) => {
+    const ta = timeToMinutes(a.scheduledTime) || 0;
+    const tb = timeToMinutes(b.scheduledTime) || 0;
+    return ta - tb;
+  });
+  if (todayJobs.length === 0) return;
+  const next = todayJobs[0];
+  const name = next.data.customerName || 'Job ' + next.id;
+  const time = next.scheduledTime || '';
+  // Show a persistent toast with tap-to-open
+  setTimeout(() => {
+    const t = document.getElementById('toast');
+    t.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = 'Next: ' + name + (time ? ' at ' + time : '') + '  ';
+    const btn = document.createElement('span');
+    btn.textContent = '→ OPEN';
+    btn.style.cssText = 'text-decoration:underline;cursor:pointer;font-weight:bold;margin-left:8px;';
+    t.appendChild(span);
+    t.appendChild(btn);
+    t.className = 'toast success show';
+    t.style.pointerEvents = 'auto';
+    t.style.cursor = 'pointer';
+    const dismiss = () => { t.classList.remove('show'); t.style.pointerEvents = 'none'; };
+    btn.onclick = (e) => { e.stopPropagation(); dismiss(); switchJob(next.id); showScreen('job'); };
+    setTimeout(dismiss, 8000);
+  }, 600);
 }
 
 function quickReschedule(daysAhead) {
@@ -2388,7 +2487,6 @@ function quickReschedule(daysAhead) {
     j.data.notes = j.data.notes ? j.data.notes + ' | ' + notes : notes;
   }
   // Remove whichever modal is open
-  document.getElementById('cantFinishModal')?.remove();
   document.getElementById('cantFinishModal')?.remove();
   document.getElementById('finishModal')?.remove();
 
@@ -2428,15 +2526,40 @@ function quickReschedule(daysAhead) {
   showToast('📅 Rescheduled for ' + dayName, 'success');
 }
 
+// Normalize free-text time input into consistent "H:MM AM/PM" format
+function normalizeTimeInput(raw) {
+  if (!raw || !raw.trim()) return '';
+  let s = raw.trim().replace(/[^0-9apmAPM:]/g, '');
+  const digits = s.replace(/[^0-9]/g, '');
+  const hasAM = /am/i.test(s);
+  const hasPM = /pm/i.test(s);
+  if (!digits) return raw.trim();
+  let h, m;
+  if (digits.length <= 2) { h = parseInt(digits); m = 0; }
+  else if (digits.length === 3) { h = parseInt(digits[0]); m = parseInt(digits.slice(1)); }
+  else { h = parseInt(digits.slice(0,2)); m = parseInt(digits.slice(2,4)); }
+  if (isNaN(h) || h < 0 || h > 23 || isNaN(m) || m > 59) return raw.trim();
+  // Handle 24h input
+  if (h > 12 && !hasAM && !hasPM) { return (h-12) + ':' + String(m).padStart(2,'0') + ' PM'; }
+  if (h === 0) { return '12:' + String(m).padStart(2,'0') + ' AM'; }
+  let ampm = hasPM ? 'PM' : hasAM ? 'AM' : (h >= 7 && h <= 11 ? 'AM' : 'PM');
+  if (h > 12) h -= 12;
+  return h + ':' + String(m).padStart(2,'0') + ' ' + ampm;
+}
+
 function editTime(type) {
   const j = jobs.find(x => x.id === activeJobId);
   if (!j) return;
   if (type === 'arrive') {
-    const val = document.getElementById('arriveInput').value;
+    const input = document.getElementById('arriveInput');
+    const val = normalizeTimeInput(input.value);
+    if (val && val !== input.value) input.value = val;
     j.data.arriveTime = val;
     document.getElementById('btnArrive').className = 'time-btn' + (val ? ' stamped' : '');
   } else {
-    const val = document.getElementById('finishInput').value;
+    const input = document.getElementById('finishInput');
+    const val = normalizeTimeInput(input.value);
+    if (val && val !== input.value) input.value = val;
     j.data.finishTime = val;
     document.getElementById('btnFinish').className = 'time-btn' + (val ? ' stamped' : '');
   }
@@ -2483,10 +2606,24 @@ function openMaps(e) {
   const addr = document.getElementById('address').value.trim();
   if (!addr) { e.preventDefault(); showToast('Enter an address first', 'error'); return; }
   e.preventDefault();
-  window.location.href = 'maps://?q=' + encodeURIComponent(addr);
+  const encoded = encodeURIComponent(addr);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    window.location.href = 'maps://?q=' + encoded;
+  } else {
+    window.open('https://www.google.com/maps/search/?api=1&query=' + encoded, '_blank');
+  }
 }
 
 // ── Combobox ───────────────────────────────────────────────
+// Track recently used equipment for quick access
+let _recentEquipment = JSON.parse(localStorage.getItem('p22_recentEquip') || '[]');
+function trackRecentEquipment(name) {
+  if (!name) return;
+  _recentEquipment = [name, ..._recentEquipment.filter(e => e !== name)].slice(0, 10);
+  try { localStorage.setItem('p22_recentEquip', JSON.stringify(_recentEquipment)); } catch(e) {}
+}
+
 function createCombo(val) {
   const id = 'cb' + (++comboCount);
   const wrap = document.createElement('div'); wrap.className = 'combo-wrap';
@@ -2497,26 +2634,88 @@ function createCombo(val) {
   const arrow = document.createElement('span'); arrow.className='combo-arrow'; arrow.textContent='▾';
   const dd = document.createElement('div'); dd.className='combo-dropdown'; dd.id=id+'_dd';
   row.appendChild(input); row.appendChild(arrow); wrap.appendChild(row); wrap.appendChild(dd);
+  let highlightIdx = -1;
 
   function renderOptions(filter) {
     const q=(filter||'').toLowerCase();
-    const matches=q?EQUIPMENT.filter(e=>e.toLowerCase().includes(q)):EQUIPMENT;
+    let matches;
+    if (!q && _recentEquipment.length > 0) {
+      // Show recent items first, then full list
+      const recentSet = new Set(_recentEquipment);
+      matches = [..._recentEquipment, ...EQUIPMENT.filter(e => !recentSet.has(e))];
+    } else {
+      matches = q ? EQUIPMENT.filter(e=>e.toLowerCase().includes(q)) : EQUIPMENT;
+    }
     dd.innerHTML='';
+    highlightIdx = -1;
+    if (!q && _recentEquipment.length > 0) {
+      const hdr = document.createElement('div');
+      hdr.style.cssText = 'padding:4px 14px;font-family:Share Tech Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);';
+      hdr.textContent = 'RECENT';
+      dd.appendChild(hdr);
+    }
     if (!matches.length) {
       const d=document.createElement('div'); d.className='combo-option no-results';
       d.textContent='No matches — type custom value'; dd.appendChild(d);
     } else {
-      matches.forEach(item => {
+      matches.forEach((item, idx) => {
+        if (!q && _recentEquipment.length > 0 && idx === _recentEquipment.length) {
+          const sep = document.createElement('div');
+          sep.style.cssText = 'padding:4px 14px;font-family:Share Tech Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);border-top:1px solid var(--border);';
+          sep.textContent = 'ALL EQUIPMENT';
+          dd.appendChild(sep);
+        }
         const opt=document.createElement('div'); opt.className='combo-option'; opt.textContent=item;
-        opt.addEventListener('mousedown', e => { e.preventDefault(); input.value=item; dd.classList.remove('open'); openDropdown=null; autoSave(); });
+        opt.dataset.idx = idx;
+        opt.addEventListener('mousedown', e => { e.preventDefault(); input.value=item; dd.classList.remove('open'); openDropdown=null; trackRecentEquipment(item); autoSave(); });
         dd.appendChild(opt);
       });
     }
   }
+
+  function highlightOption(idx) {
+    const opts = dd.querySelectorAll('.combo-option:not(.no-results)');
+    opts.forEach(o => o.style.background = '');
+    if (idx >= 0 && idx < opts.length) {
+      opts[idx].style.background = 'var(--accent-dim)';
+      opts[idx].style.color = 'var(--accent)';
+      opts[idx].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
   function openDd() { if(openDropdown&&openDropdown!==dd) openDropdown.classList.remove('open'); renderOptions(input.value); dd.classList.add('open'); openDropdown=dd; }
   input.addEventListener('focus', openDd);
   input.addEventListener('input', () => { renderOptions(input.value); dd.classList.add('open'); openDropdown=dd; autoSave(); });
   input.addEventListener('blur', () => setTimeout(() => { dd.classList.remove('open'); if(openDropdown===dd) openDropdown=null; }, 160));
+
+  // Keyboard navigation
+  input.addEventListener('keydown', e => {
+    if (!dd.classList.contains('open')) return;
+    const opts = dd.querySelectorAll('.combo-option:not(.no-results)');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlightIdx = Math.min(highlightIdx + 1, opts.length - 1);
+      highlightOption(highlightIdx);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlightIdx = Math.max(highlightIdx - 1, 0);
+      highlightOption(highlightIdx);
+    } else if (e.key === 'Enter' && highlightIdx >= 0 && highlightIdx < opts.length) {
+      e.preventDefault();
+      const selected = opts[highlightIdx].textContent;
+      input.value = selected;
+      dd.classList.remove('open');
+      openDropdown = null;
+      highlightIdx = -1;
+      trackRecentEquipment(selected);
+      autoSave();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      dd.classList.remove('open');
+      openDropdown = null;
+      highlightIdx = -1;
+    }
+  });
   arrow.addEventListener('mousedown', e => { e.preventDefault(); !dd.classList.contains('open')?(input.focus(),openDd()):(dd.classList.remove('open'),openDropdown=null); });
   wrap.getValue = () => input.value.trim();
   return wrap;
@@ -2636,7 +2835,7 @@ function collectData() {
     installing: installing.length?installing.map((e,i)=>`${i+1}. ${e}`).join('\n'):'—',
     existing: existing.length?existing.map((e,i)=>`${i+1}. ${e}`).join('\n'):'—',
     zones: zones.length?zones.map((z,i)=>`${i+1}. ${z}`).join('\n'):'—',
-    fees: '$150 Install Fee',
+    fees: '$' + INSTALL_FEE + ' Install Fee',
     date: new Date().toLocaleString()
   };
 }
@@ -2678,7 +2877,7 @@ async function submitForm() {
   btn.disabled=true; btn.textContent='Sending...';
   try {
     await emailjs.send('service_ody8c3i','template_rzxkses',{
-      to_email:'bfoss@bridgepointservice.com',
+      to_email: getEmailRecipient(),
       customer_name:data.customer, install_date:data.date,
       installing:data.installing, existing_equipment:data.existing,
       cs_number:data.cs, customer_email:data.email,
@@ -2736,13 +2935,13 @@ async function sendDailySummary() {
         <td style="padding:10px 12px;vertical-align:top;"><span style="background:${j.status==='complete'?'#d1fae5':'#fef9c3'};color:${j.status==='complete'?'#065f46':'#854d0e'};padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700;">${status}</span></td>
         <td style="padding:10px 12px;color:#555;vertical-align:top;">${sent}</td>
         <td style="padding:10px 12px;color:#555;vertical-align:top;">${d.arriveTime||'—'} → ${d.finishTime||'—'}</td>
-        <td style="padding:10px 12px;color:#555;vertical-align:top;font-weight:700;color:#00a86b;">$150</td>
+        <td style="padding:10px 12px;color:#555;vertical-align:top;font-weight:700;color:#00a86b;">$${INSTALL_FEE}</td>
         <td style="padding:10px 12px;color:#555;vertical-align:top;max-width:200px;">${installing}</td>
         <td style="padding:10px 12px;color:#555;vertical-align:top;max-width:200px;">${existing}</td>
         <td style="padding:10px 12px;color:#555;vertical-align:top;">${zones}</td>
         <td style="padding:10px 12px;color:#777;font-style:italic;vertical-align:top;">${d.notes||'—'}</td>
       </tr>`;
-    total+=150;
+    total+=INSTALL_FEE;
   });
 
   const body = `
@@ -2790,7 +2989,7 @@ async function sendDailySummary() {
   body+=`${'='.repeat(50)}\nTOTAL JOBS: ${jobs.length} | TOTAL FEES: $${total}\n`;
   try {
     await emailjs.send('service_ody8c3i','template_rzxkses',{
-      to_email:'bfoss@bridgepointservice.com',
+      to_email: getEmailRecipient(),
       customer_name:'DAILY SUMMARY',
       install_date:date,
       installing:body,
@@ -2868,7 +3067,28 @@ function scheduleDailySummary() {
 function showToast(msg,type){
   const t=document.getElementById('toast');
   t.textContent=msg; t.className=`toast ${type} show`;
+  t.onclick = null;
   setTimeout(()=>t.classList.remove('show'),4000);
+}
+
+let _undoTimer = null;
+function showUndoToast(msg, undoFn) {
+  if (_undoTimer) clearTimeout(_undoTimer);
+  const t = document.getElementById('toast');
+  t.innerHTML = '';
+  const span = document.createElement('span');
+  span.textContent = msg + '  ';
+  const btn = document.createElement('span');
+  btn.textContent = 'UNDO';
+  btn.style.cssText = 'text-decoration:underline;cursor:pointer;font-weight:bold;margin-left:8px;';
+  t.appendChild(span);
+  t.appendChild(btn);
+  t.className = 'toast info show';
+  t.style.pointerEvents = 'auto';
+  t.style.cursor = 'pointer';
+  const dismiss = () => { t.classList.remove('show'); t.style.pointerEvents = 'none'; t.onclick = null; };
+  btn.onclick = (e) => { e.stopPropagation(); dismiss(); undoFn(); };
+  _undoTimer = setTimeout(dismiss, 6000);
 }
 
 
@@ -3020,7 +3240,6 @@ function openCustomerDetail(id) {
   // Action buttons
   const actions = document.createElement('div');
   actions.style.cssText = 'display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);';
-  actions.innerHTML =
   actions.innerHTML = '';
   const lb2 = document.createElement('button'); lb2.style.cssText='flex:1;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:12px 8px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;'; lb2.textContent='→ LOAD INTO JOB'; lb2.onclick=()=>{useCustomer(c.id);panel.remove();}; actions.appendChild(lb2);
   const sb2 = document.createElement('button'); sb2.style.cssText='flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:12px 8px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;'; sb2.textContent='📅 SCHEDULE'; sb2.onclick=()=>{scheduleForCustomer(c.id);panel.remove();}; actions.appendChild(sb2);
@@ -3111,9 +3330,19 @@ function useCustomer(id) {
 
 function deleteCustomer(id, e) {
   e.stopPropagation();
+  const deleted = customers.find(c => c.id === id);
+  const deletedIndex = customers.indexOf(deleted);
   customers = customers.filter(c => c.id !== id);
   saveCustomers();
   renderCustomers();
+  if (deleted) {
+    showUndoToast(deleted.name + ' deleted', () => {
+      customers.splice(deletedIndex, 0, deleted);
+      saveCustomers();
+      renderCustomers();
+      showToast('✓ ' + deleted.name + ' restored', 'success');
+    });
+  }
 }
 
 // Populate customer dropdown in schedule modal
@@ -3209,7 +3438,7 @@ function renderMonthCal() {
     let jobDots = dayJobs.slice(0,2).map(j => {
       const sc = getStatusClass(j.status);
       const label = j.data.customerName || j.scheduledTime || 'Unscheduled';
-      return '<div class="month-job-dot '+sc+'">'+label+'</div>';
+      return '<div class="month-job-dot '+sc+'">'+esc(label)+'</div>';
     }).join('');
     if (dayJobs.length > 2) jobDots += '<div class="month-job-dot">+' + (dayJobs.length-2) + ' more</div>';
     if (dayJobs.length > 0) {
@@ -3311,9 +3540,9 @@ function renderDayTimeline(d) {
       equipPills += '</div>';
     }
     html += '<div class="timeline-event '+sc+'" id="tevt_'+j.id+'" style="top:'+topPx+'px;height:'+heightPx+'px;z-index:5;">'+
-      '<div class="timeline-event-name" style="display:flex;align-items:center;gap:4px;">'+(hasWarning?'<span style="color:var(--red);font-size:10px;">⚠️</span>':'')+(j.data.customerName||j.scheduledTime||'No name')+'</div>'+
-      (heightPx>30?'<div class="timeline-event-time">'+(time||'')+(endT?' – '+endT:'')+'</div>':'')+
-      (heightPx>50&&addr?'<div class="timeline-event-addr">📍'+addr+'</div>':'')+
+      '<div class="timeline-event-name" style="display:flex;align-items:center;gap:4px;">'+(hasWarning?'<span style="color:var(--red);font-size:10px;">⚠️</span>':'')+esc(j.data.customerName||j.scheduledTime||'No name')+'</div>'+
+      (heightPx>30?'<div class="timeline-event-time">'+esc(time||'')+(endT?' – '+esc(endT):'')+'</div>':'')+
+      (heightPx>50&&addr?'<div class="timeline-event-addr">📍'+esc(addr)+'</div>':'')+
       (heightPx>55?equipPills:'')+
       (heightPx>80&&hasWarning&&missingLines?missingLines:'')+
       (heightPx>110&&jobNotes?'<div class="timeline-event-addr" style="opacity:0.6;font-style:italic;">📝'+jobNotes+'</div>':'')+
@@ -3433,8 +3662,8 @@ function renderWeekTimeline() {
       const wBorderColor = wStockStatus.hasCumulativeShortfall ? 'var(--red)' : installingItems2.length > 0 ? 'var(--green)' : '';
       const wBorderStyle = wBorderColor ? 'border-left:3px solid '+wBorderColor+';' : '';
       timeHtml+='<div class="timeline-event '+sc+'" id="wevt_'+j.id+'" style="top:'+topPx+'px;height:'+heightPx+'px;z-index:5;'+wBorderStyle+'">'+
-        '<div class="timeline-event-name">'+(j.data.customerName||j.scheduledTime||'No name')+(wStockStatus.hasCumulativeShortfall?' ⚠️':'')+'</div>'+
-        (heightPx>35?'<div class="timeline-event-time">'+(time||'')+(endT?' – '+endT:'')+'</div>':'')+
+        '<div class="timeline-event-name">'+esc(j.data.customerName||j.scheduledTime||'No name')+(wStockStatus.hasCumulativeShortfall?' ⚠️':'')+'</div>'+
+        (heightPx>35?'<div class="timeline-event-time">'+esc(time||'')+(endT?' – '+esc(endT):'')+'</div>':'')+
         (heightPx>55&&installingItems2.length>0?'<div class="timeline-event-addr" style="opacity:0.8;">🔧 '+installingItems2.slice(0,2).map(i=>typeof i==="object"?i.name:i).map(n=>n.split(" ").slice(-1)[0]).join(", ")+(installingItems2.length>2?" +":"")+'</div>':'')+
         '<div class="resize-handle" id="wrh_'+j.id+'" onclick="event.stopPropagation()"></div>'+
         '</div>';
@@ -3485,7 +3714,7 @@ function updateTodayStats() {
   const allJobs = jobs;
   document.getElementById('statTotal').textContent = allJobs.length;
   document.getElementById('statComplete').textContent = allJobs.filter(j=>j.status==='complete').length;
-  document.getElementById('statFees').textContent = '$' + allJobs.filter(j=>j.status==='complete').length * 150;
+  document.getElementById('statFees').textContent = '$' + allJobs.filter(j=>j.status==='complete').length * INSTALL_FEE;
   // Refresh the day brief card
   if (typeof renderDayBrief === 'function') renderDayBrief();
   const sync = document.getElementById('syncStatus');
@@ -3564,7 +3793,7 @@ function showJobsPanel(title, filteredJobs) {
       const date = (j.scheduledDate||j.data.date) ? new Date(j.scheduledDate||j.data.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;';
-      row.innerHTML = '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;color:var(--text);">'+(j.data.customerName||'Unnamed')+'</div><div style="font-size:11px;color:var(--muted);">'+date+(j.data.address?' · '+j.data.address.split(',')[0]:'')+'</div></div><span style="font-size:11px;color:'+sc+';white-space:nowrap;">'+(j.status||'pending')+'</span>';
+      row.innerHTML = '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;color:var(--text);">'+esc(j.data.customerName||'Unnamed')+'</div><div style="font-size:11px;color:var(--muted);">'+esc(date)+(j.data.address?' · '+esc(j.data.address.split(',')[0]):'')+'</div></div><span style="font-size:11px;color:'+sc+';white-space:nowrap;">'+(j.status||'pending')+'</span>';
       row.onclick = () => { switchJob(j.id); showScreen('job'); panel.remove(); };
       row.onmouseover = () => { row.style.background = 'var(--accent-dim)'; };
       row.onmouseout = () => { row.style.background = ''; };
@@ -3589,7 +3818,7 @@ function showCompletedJobsList() {
 
 function showFeesBreakdown() {
   const done = jobs.filter(j => j.status === 'complete');
-  const total = done.length * 150;
+  const total = done.length * INSTALL_FEE;
   showJobsPanel('FEES — $' + total + ' (' + done.length + ' complete)', done);
 }
 
@@ -4063,8 +4292,8 @@ function renderDayBrief() {
     html += '<div data-jobid="'+j.id+'" class="day-brief-job-row" style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;">';
     html += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--muted);width:16px;flex-shrink:0;">'+(idx+1)+'</span>';
     html += '<div style="flex:1;min-width:0;">';
-    html +=   '<div style="font-size:13px;font-weight:600;color:var(--text);">'+(j.data.customerName||'Unnamed')+'</div>';
-    html +=   '<div style="font-size:10px;color:var(--muted);">'+(j.scheduledTime||'?')+' · '+(j.data.address?j.data.address.split(',')[0]:'No address')+'</div>';
+    html +=   '<div style="font-size:13px;font-weight:600;color:var(--text);">'+esc(j.data.customerName||'Unnamed')+'</div>';
+    html +=   '<div style="font-size:10px;color:var(--muted);">'+esc(j.scheduledTime||'?')+' · '+esc(j.data.address?j.data.address.split(',')[0]:'No address')+'</div>';
     if (itemStr) html += '<div style="font-size:10px;color:var(--muted);margin-top:2px;">🔧 '+itemStr+'</div>';
     html += '</div>';
     html += '<span style="color:'+sc+';font-size:11px;">'+getStatusIcon(j.status)+'</span>';
@@ -4204,7 +4433,7 @@ function renderDailyEquipSummary(dayJobs, container, outsideTimeline) {
     // Job header
     const jobHdr = document.createElement('div');
     jobHdr.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:6px;margin-top:'+(jobIdx>0?'12px':'0')+';';
-    jobHdr.innerHTML = '<span style="font-size:10px;color:'+sc+';">●</span><span style="font-size:12px;font-weight:600;color:var(--text);">'+(j.data.customerName||j.scheduledTime||'Job '+(jobIdx+1))+'</span><span style="font-size:10px;color:var(--muted);">'+(j.scheduledTime||'')+'</span>';
+    jobHdr.innerHTML = '<span style="font-size:10px;color:'+sc+';">●</span><span style="font-size:12px;font-weight:600;color:var(--text);">'+esc(j.data.customerName||j.scheduledTime||'Job '+(jobIdx+1))+'</span><span style="font-size:10px;color:var(--muted);">'+esc(j.scheduledTime||'')+'</span>';
     summary.appendChild(jobHdr);
 
     // Equipment rows for this job
@@ -5062,12 +5291,18 @@ function renderHistory() {
     card.style.borderLeft = '3px solid ' + sc;
     const installing = j.data.installing ? j.data.installing.filter(Boolean).length : 0;
     const existing = j.data.existing ? j.data.existing.filter(e=>e&&(e.name||e)).length : 0;
+    const jobDate = j.scheduledDate || j.data.date;
+    const dateStr = jobDate ? new Date(jobDate).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '';
+    const timeStr = j.scheduledTime || j.data.arriveTime || '';
     card.innerHTML = `
-      <div class="history-card-name">${j.data.customerName || 'Unnamed Job'}</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="history-card-name" style="flex:1;">${esc(j.data.customerName || 'Unnamed Job')}</div>
+        ${dateStr ? `<div style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0;">${esc(dateStr)}${timeStr ? ' · '+esc(timeStr) : ''}</div>` : ''}
+      </div>
       <div class="history-card-meta">
-        ${j.data.address ? `📍 ${j.data.address.split(',')[0]}` : ''}
-        ${j.data.phone ? ` · ${j.data.phone}` : ''}
-        ${j.data.cs ? ` · CS: ${j.data.cs}` : ''}
+        ${j.data.address ? `📍 ${esc(j.data.address.split(',')[0])}` : ''}
+        ${j.data.phone ? ` · ${esc(j.data.phone)}` : ''}
+        ${j.data.cs ? ` · CS: ${esc(j.data.cs)}` : ''}
         <br>${installing} installing · ${existing} existing · <span style="color:${j.status==='complete'?'var(--green)':'var(--yellow)'};">${j.status||'pending'}</span>
         ${j.sent ? ' · <span style="color:var(--accent);">✉ Sent</span>' : ''}
       </div>`;
@@ -5403,7 +5638,7 @@ function runGlobalSearch() {
     matchJobs.forEach(j => {
       const item = document.createElement('div'); item.className='global-search-item';
       const sc = getStatusClass(j.status);
-      item.innerHTML = '<span class="gs-icon">'+getStatusIcon(j.status)+'</span><div><div class="global-search-item-name">'+(j.data.customerName||'Unnamed')+'</div><div class="global-search-item-meta">'+(j.data.address?j.data.address.split(',')[0]+' · ':'')+(j.data.cs?'CS: '+j.data.cs:'')+'</div></div>';
+      item.innerHTML = '<span class="gs-icon">'+getStatusIcon(j.status)+'</span><div><div class="global-search-item-name">'+esc(j.data.customerName||'Unnamed')+'</div><div class="global-search-item-meta">'+(j.data.address?esc(j.data.address.split(',')[0])+' · ':'')+(j.data.cs?'CS: '+esc(j.data.cs):'')+'</div></div>';
       item.onclick = () => { switchJob(j.id); showScreen('job'); closeGlobalSearch(); };
       results.appendChild(item);
     });
@@ -5413,7 +5648,7 @@ function runGlobalSearch() {
     const sec = document.createElement('div'); sec.className='global-search-section'; sec.textContent='CUSTOMERS'; results.appendChild(sec);
     matchCustomers.forEach(c => {
       const item = document.createElement('div'); item.className='global-search-item';
-      item.innerHTML = '<span class="gs-icon">👤</span><div><div class="global-search-item-name">'+c.name+'</div><div class="global-search-item-meta">'+(c.phone||'')+(c.address?' · '+c.address.split(',')[0]:'')+'</div></div>';
+      item.innerHTML = '<span class="gs-icon">👤</span><div><div class="global-search-item-name">'+esc(c.name)+'</div><div class="global-search-item-meta">'+esc(c.phone||'')+(c.address?' · '+esc(c.address.split(',')[0]):'')+'</div></div>';
       item.onclick = () => { showScreen('customers'); closeGlobalSearch(); };
       results.appendChild(item);
     });
@@ -5424,7 +5659,7 @@ function runGlobalSearch() {
     matchTruck.forEach(t => {
       const item = document.createElement('div'); item.className='global-search-item';
       const low = t.qty <= 2;
-      item.innerHTML = '<span class="gs-icon">🚛</span><div><div class="global-search-item-name">'+t.name+'</div><div class="global-search-item-meta" style="color:'+(low?'var(--red)':'var(--muted)')+';">Qty: '+t.qty+(low?' ⚠️ LOW':'')+'</div></div>';
+      item.innerHTML = '<span class="gs-icon">🚛</span><div><div class="global-search-item-name">'+esc(t.name)+'</div><div class="global-search-item-meta" style="color:'+(low?'var(--red)':'var(--muted)')+';">Qty: '+t.qty+(low?' ⚠️ LOW':'')+'</div></div>';
       item.onclick = () => { showScreen('truck'); closeGlobalSearch(); };
       results.appendChild(item);
     });
@@ -5496,19 +5731,50 @@ function doLogin() {
   // The Firebase compat SDK is loaded synchronously in <head> so firebase.auth
   // is always available by the time the user can interact with the page.
   if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
-    showLoginError('Firebase not loaded — check your connection and refresh');
+    // Firebase SDK couldn't load (offline, local file, blocked CDN)
+    // Offer offline mode so the app is still usable
+    showLoginError('Firebase not loaded — no internet or loaded from a local file.');
     btn.textContent = 'SIGN IN'; btn.disabled = false;
+    // Show an offline mode button so the app is still usable
+    if (!document.getElementById('offlineModeBtn')) {
+      const wrap = btn.parentElement;
+      const offBtn = document.createElement('button');
+      offBtn.id = 'offlineModeBtn';
+      offBtn.type = 'button';
+      offBtn.textContent = '⚡ CONTINUE OFFLINE';
+      offBtn.style.cssText = 'width:100%;background:none;border:1px solid var(--yellow);color:var(--yellow);border-radius:8px;padding:13px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:10px;';
+      offBtn.onclick = () => {
+        document.getElementById('loginScreen').style.display = 'none';
+        try { document.getElementById('failsafeCss').remove(); } catch(e) {}
+        try { document.getElementById('forceHidden').remove(); } catch(e) {}
+        currentRole = 'tech';
+        initAppData();
+      };
+      wrap.appendChild(offBtn);
+    }
     return;
   }
 
   firebase.auth().signInWithEmailAndPassword(email, pass)
     .then(() => {
       // onAuthStateChanged fires automatically and calls onLoginSuccess → routeUser
+      // Safety timeout: if auth state doesn't fire within 8s, reset the button
+      setTimeout(() => {
+        if (btn.disabled) {
+          btn.textContent = 'SIGN IN'; btn.disabled = false;
+          if (!currentUser) showLoginError('Sign in timed out — try again');
+        }
+      }, 8000);
     })
     .catch(e => {
-      const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials')
+      console.error('Login error:', e);
+      const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials' || e.code === 'auth/invalid-credential')
         ? 'Invalid email or password'
-        : 'Sign in failed — check your connection and try again.';
+        : e.code === 'auth/too-many-requests'
+        ? 'Too many attempts — wait a minute and try again'
+        : e.code === 'auth/network-request-failed'
+        ? 'Network error — check your connection'
+        : 'Sign in failed (' + (e.code||'unknown') + ')';
       showLoginError(msg);
       btn.textContent = 'SIGN IN'; btn.disabled = false;
     });
@@ -5530,6 +5796,8 @@ function onLoginSuccess(user) {
   const lb = document.getElementById('loginBtn');
   if (lb) { lb.textContent = 'SIGN IN'; lb.disabled = false; }
   if (ls) ls.style.display = 'none';
+  // Remove forceHidden so app views can show
+  const fh = document.getElementById('forceHidden'); if (fh) fh.remove();
   if (!appReady) {
     pendingUser = user;
     return;
@@ -5541,12 +5809,21 @@ function routeUser() {
   if (!currentUser) return;
   const role = (USERS[currentUser.email] || {}).role || 'tech';
   currentRole = role;
-  if (role === 'closer') {
-    initCloserView();
-  } else if (role === 'callcenter') {
-    initCallCenterView();
-  } else {
-    initTechApp();
+  try {
+    if (role === 'closer') {
+      initCloserView();
+    } else if (role === 'callcenter') {
+      initCallCenterView();
+    } else {
+      initTechApp();
+    }
+  } catch(e) {
+    console.error('routeUser error:', e);
+    // Fallback: just show the tech app directly
+    const fh = document.getElementById('forceHidden'); if(fh) fh.remove();
+    const ls = document.getElementById('loginScreen'); if(ls) ls.style.display = 'none';
+    const ta = document.getElementById('techApp'); if(ta) ta.style.display = 'block';
+    if (typeof initAppData === 'function') initAppData();
   }
 }
 
@@ -5703,7 +5980,7 @@ try {
       firebase.initializeApp(firebaseConfig);
     }
     const db = firebase.database();
-    try { db.enablePersistence({synchronizeTabs:false}).catch(()=>{}); } catch(e) {}
+    // Note: enablePersistence is a Firestore method, not RTDB. RTDB has built-in offline support.
     window.fbSet = (path, data) => db.ref(path).set(data).catch(()=>{});
     window.fbRemove = (path) => db.ref(path).remove().catch(()=>{});
     window.fbListen = (path, cb) => db.ref(path).on('value', snap => cb(snap.val()));
@@ -5772,17 +6049,49 @@ function initAppData() {
   updateTruckBadge();
   const lbl = document.getElementById('todayDateLabel');
   if (lbl) lbl.textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  updateTruckBadge();
   scheduleDailySummary();
   showScreen('today');
-  // Sync Firebase jobs if available
+  // Sync Firebase jobs if available — per-job merge using lastModified timestamps
   window.onFirebaseJobs = function(data) {
     if (!data) return;
-    const arr = Array.isArray(data) ? data : Object.values(data);
-    if (arr.length > jobs.length) {
-      jobs = arr;
-      if (!jobs.find(j => j.id === activeJobId)) activeJobId = jobs[jobs.length-1].id;
-      renderTabs(); loadJob(activeJobId); renderMonthCal();
+    const remote = Array.isArray(data) ? data : Object.values(data);
+    if (!remote.length) return;
+    // Build a map of local jobs by id
+    const localMap = new Map(jobs.map(j => [j.id, j]));
+    const remoteMap = new Map(remote.map(j => [j.id, j]));
+    const merged = [];
+    const allIds = new Set([...localMap.keys(), ...remoteMap.keys()]);
+    allIds.forEach(id => {
+      const local = localMap.get(id);
+      const rem = remoteMap.get(id);
+      if (local && !rem) {
+        // Only exists locally — keep it (was created offline or remote was deleted)
+        // If remote explicitly deleted (had it before), local wins for safety
+        merged.push(local);
+      } else if (rem && !local) {
+        // Only exists remotely — pull it in (created on another device)
+        merged.push(rem);
+      } else {
+        // Both exist — keep whichever was modified more recently
+        const localTime = local.lastModified || 0;
+        const remoteTime = rem.lastModified || 0;
+        merged.push(remoteTime > localTime ? rem : local);
+      }
+    });
+    // Sort by id to keep stable order
+    merged.sort((a,b) => a.id - b.id);
+    const changed = JSON.stringify(merged) !== JSON.stringify(jobs);
+    if (changed) {
+      jobs = merged;
+      if (!jobs.find(j => j.id === activeJobId)) activeJobId = jobs.length ? jobs[jobs.length-1].id : null;
+      renderTabs();
+      if (activeJobId) loadJob(activeJobId);
+      else renderEmptyJobState();
+      renderMonthCal();
+      // Persist merged result back
+      try {
+        localStorage.setItem('p22_jobs', JSON.stringify(jobs));
+      } catch(e) {}
     }
   };
 }
@@ -5829,7 +6138,7 @@ function renderCloserMonthCal() {
     const isToday = date.toDateString() === today.toDateString();
     const isSel = date.toDateString() === closerSelectedDate.toDateString();
     const dayAppts = closerAppts.filter(a => new Date(a.date).toDateString() === date.toDateString());
-    let dots = dayAppts.slice(0,2).map(a => '<div class="month-job-dot" style="border-color:#a855f7;color:#a855f7;background:rgba(168,85,247,0.1);">'+a.customerName+'</div>').join('');
+    let dots = dayAppts.slice(0,2).map(a => '<div class="month-job-dot" style="border-color:#a855f7;color:#a855f7;background:rgba(168,85,247,0.1);">'+esc(a.customerName)+'</div>').join('');
     if (dayAppts.length > 0) dots += '<div style="font-size:8px;color:var(--muted);margin-top:2px;">'+dayAppts.length+' appt'+(dayAppts.length>1?'s':'')+'</div>';
     html += '<div class="month-day'+(isToday?' today':'')+(isSel?' selected':'')+'" onclick="closerGoToDay(new Date('+y+','+m+','+d+'))"><div class="month-day-num">'+d+'</div>'+dots+'</div>';
   }
@@ -6135,6 +6444,229 @@ function bookCCAppt() {
   document.getElementById('ccApptNotes').value = '';
   showToast('&#10003; Appointment booked for closer!', 'success');
 }
+
+
+// ── UX / Validation Enhancements ──────────────────────────
+function normalizeNameValue(v) {
+  return String(v || '').replace(/\s+/g, ' ').trim();
+}
+function normalizeEmailValue(v) {
+  return String(v || '').trim().toLowerCase();
+}
+function normalizeAddressValue(v) {
+  return String(v || '').replace(/\s+/g, ' ').replace(/\s*,\s*/g, ', ').trim();
+}
+function normalizePhoneValue(v) {
+  const digits = String(v || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 10) return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+  return digits;
+}
+function isValidEmailValue(v) {
+  if (!String(v || '').trim()) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
+}
+function isValidPhoneValue(v) {
+  if (!String(v || '').trim()) return true;
+  const digits = String(v).replace(/\D/g, '');
+  return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
+}
+function normalizeTimeValue(v) {
+  let s = String(v || '').trim().toLowerCase();
+  if (!s) return '';
+  s = s.replace(/\./g, '').replace(/\s+/g, '');
+  const ampm = s.includes('pm') ? 'PM' : s.includes('am') ? 'AM' : '';
+  s = s.replace(/am|pm/g, '');
+  if (/^\d{1,2}$/.test(s)) {
+    let h = parseInt(s, 10);
+    if (h >= 1 && h <= 12) return `${h}:00 ${ampm || 'AM'}`;
+  }
+  if (/^\d{3,4}$/.test(s)) {
+    let raw = s.padStart(4, '0');
+    let h = parseInt(raw.slice(0,2), 10);
+    let m = parseInt(raw.slice(2), 10);
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      const isPm = ampm ? ampm === 'PM' : h >= 12;
+      let displayHour = h % 12; if (displayHour === 0) displayHour = 12;
+      return `${displayHour}:${String(m).padStart(2, '0')} ${isPm ? 'PM' : 'AM'}`;
+    }
+  }
+  const match = s.match(/^(\d{1,2})(?::?(\d{2}))?$/);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    let m = parseInt(match[2] || '0', 10);
+    if (h >= 1 && h <= 12 && m >= 0 && m <= 59) return `${h}:${String(m).padStart(2, '0')} ${ampm || 'AM'}`;
+    if (h >= 13 && h <= 23 && m >= 0 && m <= 59) {
+      let displayHour = h % 12; if (displayHour === 0) displayHour = 12;
+      return `${displayHour}:${String(m).padStart(2, '0')} PM`;
+    }
+  }
+  return String(v || '').trim();
+}
+function ensureFieldErrorNode(el) {
+  if (!el) return null;
+  let host = el.closest('.field') || el.parentElement;
+  if (!host) return null;
+  let error = host.querySelector('.field-error');
+  if (!error) {
+    error = document.createElement('div');
+    error.className = 'field-error';
+    host.appendChild(error);
+  }
+  return error;
+}
+function setFieldError(el, message) {
+  if (!el) return false;
+  const node = ensureFieldErrorNode(el);
+  if (node) {
+    node.textContent = message || '';
+    node.classList.toggle('show', !!message);
+  }
+  el.classList.toggle('input-error', !!message);
+  el.classList.toggle('input-valid', !message && !!String(el.value || '').trim());
+  if (message) el.setAttribute('aria-invalid', 'true');
+  else el.removeAttribute('aria-invalid');
+  return !message;
+}
+function applyStandardFieldFormatting(el) {
+  if (!el) return;
+  if (el.type === 'email' || /email/i.test(el.id)) el.value = normalizeEmailValue(el.value);
+  else if (el.type === 'tel' || /phone/i.test(el.id)) el.value = normalizePhoneValue(el.value);
+  else if (/name/i.test(el.id)) el.value = normalizeNameValue(el.value);
+  else if (/address|addr/i.test(el.id)) el.value = normalizeAddressValue(el.value);
+  else if (/time/i.test(el.id)) el.value = normalizeTimeValue(el.value);
+}
+function validateField(el) {
+  if (!el) return true;
+  const id = el.id || '';
+  const value = String(el.value || '').trim();
+  if ((el.type === 'email' || /email/i.test(id)) && value && !isValidEmailValue(value)) return setFieldError(el, 'Enter a valid email address.');
+  if ((el.type === 'tel' || /phone/i.test(id)) && value && !isValidPhoneValue(value)) return setFieldError(el, 'Enter a 10-digit phone number.');
+  if (/Time/i.test(id) && value) {
+    const normalized = normalizeTimeValue(value);
+    if (!/^(1[0-2]|[1-9]):[0-5][0-9]\s(AM|PM)$/.test(normalized)) return setFieldError(el, 'Use a time like 9:00 AM or 2:30 PM.');
+    el.value = normalized;
+  }
+  if ((id === 'customerName' || id === 'csApptName' || id === 'ccCustName') && value.length && value.length < 2) return setFieldError(el, 'Please enter the full customer name.');
+  return setFieldError(el, '');
+}
+function validateRequired(ids) {
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    applyStandardFieldFormatting(el);
+    if (!String(el.value || '').trim()) {
+      setFieldError(el, 'This field is required.');
+      el.focus();
+      return false;
+    }
+    if (!validateField(el)) {
+      el.focus();
+      return false;
+    }
+  }
+  return true;
+}
+function addFieldHint(el, text) {
+  if (!el || !text) return;
+  const host = el.closest('.field') || el.parentElement;
+  if (!host || host.querySelector('.field-hint')) return;
+  const hint = document.createElement('div');
+  hint.className = 'field-hint';
+  hint.textContent = text;
+  host.appendChild(hint);
+}
+function enhanceFormFields() {
+  const phoneIds = ['phone','csApptPhone','ccCustPhone'];
+  phoneIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.setAttribute('inputmode', 'tel');
+      el.setAttribute('autocomplete', 'tel');
+      addFieldHint(el, 'Tip: paste or type 10 digits and it will format automatically.');
+    }
+  });
+  const email = document.getElementById('email');
+  if (email) {
+    email.setAttribute('autocomplete', 'email');
+    addFieldHint(email, 'Optional, but must be a valid email if entered.');
+  }
+  ['schedTimeInput','csApptTime','ccApptTime'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) addFieldHint(el, 'Examples: 9, 930, 9:30, 2pm');
+  });
+}
+function enhanceAriaLabels() {
+  document.querySelectorAll('.btn-copy').forEach(btn => btn.setAttribute('aria-label', btn.getAttribute('aria-label') || 'Copy field value'));
+  document.querySelectorAll('.btn-paste').forEach(btn => btn.setAttribute('aria-label', btn.getAttribute('aria-label') || 'Paste into field'));
+  document.querySelectorAll('.btn-call').forEach(btn => btn.setAttribute('aria-label', btn.getAttribute('aria-label') || 'Call customer'));
+  document.querySelectorAll('.btn-edit').forEach(btn => btn.setAttribute('aria-label', btn.getAttribute('aria-label') || 'Unlock field for editing'));
+  document.querySelectorAll('.btn-maps').forEach(btn => btn.setAttribute('aria-label', btn.getAttribute('aria-label') || 'Open address in maps'));
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.setAttribute('aria-label', btn.textContent.trim()));
+  const searchBtn = document.getElementById('globalSearchTrigger');
+  if (searchBtn) searchBtn.setAttribute('aria-label', 'Open global search');
+}
+
+const _originalSaveCurrentJob = saveCurrentJob;
+saveCurrentJob = function() {
+  ['customerName','address','cs','email','phone','confirmation','masterCode','verbalCode','adtStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      applyStandardFieldFormatting(el);
+      validateField(el);
+    }
+  });
+  return _originalSaveCurrentJob.apply(this, arguments);
+};
+const _originalConfirmScheduleJob = confirmScheduleJob;
+confirmScheduleJob = function() {
+  const timeEl = document.getElementById('schedTimeInput');
+  if (timeEl) { applyStandardFieldFormatting(timeEl); validateField(timeEl); }
+  if (!validateRequired(['schedDate','schedTimeInput'])) return;
+  return _originalConfirmScheduleJob.apply(this, arguments);
+};
+const _originalSaveCloserAppt = saveCloserAppt;
+saveCloserAppt = function() {
+  ['csApptName','csApptPhone','csApptTime'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { applyStandardFieldFormatting(el); validateField(el); }
+  });
+  if (!validateRequired(['csApptName','csApptDate','csApptTime'])) return;
+  return _originalSaveCloserAppt.apply(this, arguments);
+};
+const _originalBookCCAppt = bookCCAppt;
+bookCCAppt = function() {
+  ['ccCustName','ccCustPhone','ccApptTime'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { applyStandardFieldFormatting(el); validateField(el); }
+  });
+  if (!validateRequired(['ccCustName','ccApptDate','ccApptTime'])) return;
+  return _originalBookCCAppt.apply(this, arguments);
+};
+
+document.addEventListener('input', function(e) {
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return;
+  if (el.type === 'tel' || /phone/i.test(el.id || '')) {
+    const start = el.selectionStart;
+    const oldLen = el.value.length;
+    el.value = normalizePhoneValue(el.value);
+    const delta = el.value.length - oldLen;
+    try { el.setSelectionRange((start || el.value.length) + delta, (start || el.value.length) + delta); } catch(err) {}
+  }
+  if (el.classList.contains('input-error')) validateField(el);
+});
+document.addEventListener('blur', function(e) {
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) return;
+  applyStandardFieldFormatting(el);
+  validateField(el);
+}, true);
+document.addEventListener('DOMContentLoaded', function() {
+  enhanceAriaLabels();
+  enhanceFormFields();
+});
 
 </script>
 </div><!-- end techApp -->
