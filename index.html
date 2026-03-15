@@ -1003,7 +1003,19 @@
       </div>
       <div class="field">
         <label>CS #</label>
-        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
+        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imei').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
+      </div>
+      <div class="field">
+        <label>IMEI / Serial #</label>
+        <div class="copy-row">
+          <input type="text" id="imei" onblur="lockIfFilled('imei')" placeholder="Scan or enter IMEI / serial" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}">
+          <label style="display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Scan barcode">
+            📷
+            <input type="file" accept="image/*" capture="environment" onchange="scanBarcode(event,'imei')" style="display:none;">
+          </label>
+          <button class="btn-copy" onclick="copyField('imei',this)" title="Copy IMEI">⎘</button>
+          <button class="btn-paste" onclick="pasteField('imei',this)" title="Paste IMEI">⏎</button>
+        </div>
       </div>
       <div class="field">
         <label>ADT Bot Status #</label>
@@ -1021,14 +1033,14 @@
   </div>
 
   <!-- Fee -->
-  <div class="fee-card">
+  <div class="fee-card" onclick="editJobFee()" style="cursor:pointer;">
     <div>
       <div class="fee-label">Install Fee</div>
-      <div class="fee-note">Standard Protect22 install</div>
+      <div class="fee-note" id="feeTypeNote">Standard Protect22 install</div>
     </div>
     <div style="text-align:right;">
       <div class="fee-amount" id="feeAmountDisplay">$150</div>
-      <div class="fee-note">flat rate</div>
+      <div class="fee-note">tap to edit</div>
     </div>
   </div>
 
@@ -1366,7 +1378,7 @@ function blankJob() {
     sent: false,
     status: 'pending',
     data: {
-      customerName:'', address:'', cs:'', email:'', phone:'', masterCode:'', verbalCode:'', adtStatus:'',
+      customerName:'', address:'', cs:'', email:'', phone:'', masterCode:'', verbalCode:'', adtStatus:'', imei:'',
       confirmation:'', notes:'', installing:[], existing:[], zones:[], userCodes:[],
       arriveTime:'', finishTime:'', jobType:'install', photos:[],
       serviceType:'', serviceIssue:'', serviceResolution:''
@@ -1525,7 +1537,7 @@ function closeJobsDropdown() {
 function renderEmptyJobState() {
   // Clear all form fields when no job is selected
   ['customerName','address','cs','email','phone','confirmation','notes',
-   'masterCode','verbalCode','adtStatus'].forEach(id => {
+   'masterCode','verbalCode','adtStatus','imei'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1555,6 +1567,7 @@ function saveCurrentJob() {
   d.masterCode = document.getElementById('masterCode') ? document.getElementById('masterCode').value : '';
   d.verbalCode = document.getElementById('verbalCode') ? document.getElementById('verbalCode').value : '';
   d.adtStatus = document.getElementById('adtStatus') ? document.getElementById('adtStatus').value : '';
+  d.imei = document.getElementById('imei') ? document.getElementById('imei').value : '';
   d.address = document.getElementById('address').value;
   d.cs = document.getElementById('cs').value;
   d.email = document.getElementById('email').value;
@@ -1569,7 +1582,7 @@ function saveCurrentJob() {
       qty: item.querySelector('.qty-input').value||'1',
       yes: false,
       no: false,
-      cell: item.querySelector('[data-cls="on-cell"]').classList.contains('on-cell')
+      cell: item.querySelector('[data-cls="on-cell"]')?.classList.contains('on-cell') || false
     }));
   d.zones = [...document.getElementById('zoneRows').querySelectorAll('input')].map(i => i.value);
   d.userCodes = getUserCodes();
@@ -1578,7 +1591,7 @@ function saveCurrentJob() {
   if (document.getElementById('serviceIssue')) d.serviceIssue = document.getElementById('serviceIssue').value;
   if (document.getElementById('serviceResolution')) d.serviceResolution = document.getElementById('serviceResolution').value;
   // Persist locked state so it survives navigation
-  const lockableFields = ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'];
+  const lockableFields = ['customerName','address','email','phone','cs','adtStatus','imei','confirmation','masterCode','verbalCode'];
   d.lockedFields = lockableFields.filter(fid => {
     const el = document.getElementById(fid);
     return el && el.readOnly;
@@ -1590,7 +1603,7 @@ function loadJob(id) {
   if (!j) return;
   const d = j.data;
   // Restore lock state — unlock all first, then re-lock whichever were saved as locked
-  const _lockable = ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'];
+  const _lockable = ['customerName','address','email','phone','cs','adtStatus','imei','confirmation','masterCode','verbalCode'];
   _lockable.forEach(fid => {
     const el = document.getElementById(fid);
     if (el) { el.readOnly = false; el.classList.remove('locked'); }
@@ -1604,6 +1617,7 @@ function loadJob(id) {
   if (document.getElementById('masterCode')) document.getElementById('masterCode').value = d.masterCode || '';
   if (document.getElementById('verbalCode')) document.getElementById('verbalCode').value = d.verbalCode || '';
   if(document.getElementById('adtStatus')) document.getElementById('adtStatus').value = d.adtStatus || '';
+  if(document.getElementById('imei')) document.getElementById('imei').value = d.imei || '';
   document.getElementById('address').value = d.address || ''; updateCrossStreet();
   document.getElementById('cs').value = d.cs || '';
   document.getElementById('email').value = d.email || '';
@@ -1694,6 +1708,7 @@ function loadJob(id) {
 
   // Job type
   updateJobTypeUI(d.jobType || 'install');
+  updateJobFeeDisplay();
   // Service fields
   if (document.getElementById('serviceType')) document.getElementById('serviceType').value = d.serviceType || '';
   if (document.getElementById('serviceIssue')) document.getElementById('serviceIssue').value = d.serviceIssue || '';
@@ -1925,7 +1940,7 @@ function updateCrossStreet() {
 
 // ── Smart button visibility: hide copy+paste when empty, show copy when has value ──
 function updatePasteVisibility() {
-  const fields = ['customerName','address','email','phone','cs','adtStatus','confirmation','masterCode','verbalCode'];
+  const fields = ['customerName','address','email','phone','cs','adtStatus','imei','confirmation','masterCode','verbalCode'];
   fields.forEach(fid => {
     const el = document.getElementById(fid);
     if (!el) return;
@@ -3257,12 +3272,16 @@ function addExistingRow(val, flags) {
       },50);
     }
   });
-  // Line 2: qty controls + remove
+  // Line 2: swap flag + qty + remove — all in one row
   const controlRow=document.createElement('div');
-  controlRow.style.cssText='display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:6px;';
-  const qtyLabel=document.createElement('span');
-  qtyLabel.style.cssText='font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-right:auto;';
-  qtyLabel.textContent='QTY';
+  controlRow.style.cssText='display:flex;align-items:center;gap:6px;margin-top:6px;';
+  // Swap flag inline
+  const swapBtn=document.createElement('button');
+  swapBtn.className='flag-btn'+(flags.cell?' on-cell':'');
+  swapBtn.setAttribute('data-cls','on-cell');
+  swapBtn.innerHTML='<span class="dot"></span> Swap';
+  swapBtn.style.cssText='font-size:10px;padding:4px 8px;margin-right:auto;';
+  swapBtn.onclick=()=>{toggleFlag(swapBtn,'on-cell');autoSave();};
   const qtyWrap=document.createElement('div'); qtyWrap.className='qty-wrap';
   const qtyMinus=document.createElement('button'); qtyMinus.className='qty-btn'; qtyMinus.textContent='−'; qtyMinus.type='button';
   const qtyInput=document.createElement('input'); qtyInput.type='text'; qtyInput.className='qty-input'; qtyInput.value=flags.qty||'1'; qtyInput.maxLength=3;
@@ -3273,13 +3292,8 @@ function addExistingRow(val, flags) {
   qtyWrap.appendChild(qtyMinus); qtyWrap.appendChild(qtyInput); qtyWrap.appendChild(qtyPlus);
   const rm=document.createElement('button'); rm.className='btn-remove'; rm.innerHTML='&times;';
   rm.onclick=()=>{item.remove();renumExisting();autoSave();};
-  controlRow.appendChild(qtyLabel); controlRow.appendChild(qtyWrap); controlRow.appendChild(rm);
-  // Line 3: flags
-  const fd=document.createElement('div'); fd.className='equip-flags';
-  fd.style.marginTop='8px';
-  fd.innerHTML=`
-    <button class="flag-btn ${flags.cell?'on-cell':''}" data-cls="on-cell" onclick="toggleFlag(this,'on-cell');autoSave()"><span class="dot"></span> Swapped for New</button>`;
-  item.appendChild(combo); item.appendChild(controlRow); item.appendChild(fd);
+  controlRow.appendChild(swapBtn); controlRow.appendChild(qtyWrap); controlRow.appendChild(rm);
+  item.appendChild(combo); item.appendChild(controlRow);
   c.appendChild(item); renumExisting();
 }
 
@@ -3405,7 +3419,7 @@ function collectData() {
     existing: existing.length?existing.map((e,i)=>`${i+1}. ${e}`).join('\n'):'—',
     zones: zones.length?zones.map((z,i)=>`${i+1}. ${z}`).join('\n'):'—',
     userCodes: (d.userCodes||[]).filter(u=>u.name||u.code).map((u,i)=>`User ${i+1}: ${u.name||'—'} = ${u.code||'—'}`).join('\n') || '—',
-    fees: '$' + INSTALL_FEE + ' Install Fee',
+    fees: '$' + getJobFee(j) + (j.data.jobType === 'service' ? ' Service Fee' : ' Install Fee'),
     date: new Date().toLocaleString()
   };
 }
@@ -3584,11 +3598,11 @@ function clearJobData() {
   j.data.customerName=''; j.data.address=''; j.data.cs='';
   j.data.email=''; j.data.phone=''; j.data.confirmation='';
   j.data.notes=''; j.data.zones=[]; j.data.arriveTime=''; j.data.finishTime='';
-  j.data.masterCode=''; j.data.verbalCode=''; j.data.adtStatus='';
+  j.data.masterCode=''; j.data.verbalCode=''; j.data.adtStatus=''; j.data.imei='';
   j.data.lockedFields = [];
   j.status='pending'; j.sent=false;
   // Unlock and clear all fields
-  const clearFields = ['customerName','address','cs','email','phone','confirmation','notes','masterCode','verbalCode','adtStatus'];
+  const clearFields = ['customerName','address','cs','email','phone','confirmation','notes','masterCode','verbalCode','adtStatus','imei'];
   clearFields.forEach(fid => {
     const el = document.getElementById(fid);
     if (el) { el.value = ''; el.readOnly = false; el.classList.remove('locked'); }
@@ -4409,7 +4423,7 @@ function updateTodayStats() {
   const allJobs = jobs;
   document.getElementById('statTotal').textContent = allJobs.length;
   document.getElementById('statComplete').textContent = allJobs.filter(j=>j.status==='complete').length;
-  document.getElementById('statFees').textContent = '$' + allJobs.filter(j=>j.status==='complete').length * INSTALL_FEE;
+  document.getElementById('statFees').textContent = '$' + allJobs.filter(j=>j.status==='complete').reduce((s,j) => s + getJobFee(j), 0);
   // Refresh the day brief card
   if (typeof renderDayBrief === 'function') renderDayBrief();
   // Refresh today's job cards
@@ -4569,8 +4583,85 @@ function showCompletedJobsList() {
 
 function showFeesBreakdown() {
   const done = jobs.filter(j => j.status === 'complete');
-  const total = done.length * INSTALL_FEE;
+  const total = done.reduce((s,j) => s + getJobFee(j), 0);
   showJobsPanel('FEES — $' + total + ' (' + done.length + ' complete)', done);
+}
+
+// ══════════════════════════════════════════════════════════
+// FEATURE: Per-Job Fee Edit
+// ══════════════════════════════════════════════════════════
+function editJobFee() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  const existing = document.getElementById('feeEditOverlay');
+  if (existing) existing.remove();
+
+  const currentFee = j.data.jobFee !== undefined ? j.data.jobFee : INSTALL_FEE;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'feeEditOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+
+  sheet.innerHTML =
+    '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">💰 EDIT FEE</div>' +
+    '<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Set the fee for this specific job. Default is $' + INSTALL_FEE + '.</div>';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.inputMode = 'numeric';
+  input.value = currentFee;
+  input.style.cssText = 'width:100%;background:var(--input-bg);border:1px solid var(--accent);border-radius:8px;color:var(--accent);font-family:Share Tech Mono,monospace;font-size:28px;letter-spacing:4px;text-align:center;padding:14px;outline:none;margin-bottom:12px;';
+  sheet.appendChild(input);
+
+  // Quick presets
+  const presets = document.createElement('div');
+  presets.style.cssText = 'display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;';
+  [0, 75, 100, 150, 200, 250, 300].forEach(amt => {
+    const btn = document.createElement('button');
+    btn.style.cssText = 'flex:1;min-width:50px;background:' + (amt === currentFee ? 'var(--accent-dim)' : 'none') + ';border:1px solid ' + (amt === currentFee ? 'var(--accent)' : 'var(--border)') + ';color:' + (amt === 0 ? 'var(--green)' : 'var(--text)') + ';border-radius:6px;padding:8px;font-family:Share Tech Mono,monospace;font-size:12px;cursor:pointer;';
+    btn.textContent = amt === 0 ? 'FREE' : '$' + amt;
+    btn.onclick = () => { input.value = amt; };
+    presets.appendChild(btn);
+  });
+  sheet.appendChild(presets);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.style.cssText = 'width:100%;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;touch-action:manipulation;';
+  saveBtn.textContent = '✓ SAVE FEE';
+  saveBtn.onclick = () => {
+    const val = parseInt(input.value) || 0;
+    j.data.jobFee = val;
+    updateJobFeeDisplay();
+    debouncedAutoSave();
+    overlay.remove();
+    showToast('💰 Fee set to $' + val, 'success');
+  };
+  sheet.appendChild(saveBtn);
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+  setTimeout(() => { input.focus(); input.select(); }, 100);
+}
+
+function updateJobFeeDisplay() {
+  const j = jobs.find(x => x.id === activeJobId);
+  const feeEl = document.getElementById('feeAmountDisplay');
+  const noteEl = document.getElementById('feeTypeNote');
+  if (!feeEl) return;
+  const fee = j && j.data.jobFee !== undefined ? j.data.jobFee : INSTALL_FEE;
+  feeEl.textContent = '$' + fee;
+  if (noteEl) {
+    if (fee === 0) noteEl.textContent = 'No charge';
+    else if (j && j.data.jobFee !== undefined && j.data.jobFee !== INSTALL_FEE) noteEl.textContent = 'Custom fee for this job';
+    else noteEl.textContent = 'Standard Protect22 install';
+  }
+}
+
+function getJobFee(j) {
+  return j && j.data.jobFee !== undefined ? j.data.jobFee : INSTALL_FEE;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4597,6 +4688,143 @@ function updateJobTypeUI(type) {
   serviceBtn.style.borderColor = type === 'service' ? 'var(--orange)' : 'var(--border)';
   serviceBtn.style.color = type === 'service' ? 'var(--orange)' : '';
   if (serviceCard) serviceCard.style.display = type === 'service' ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════════════════════
+// FEATURE: Barcode/IMEI Scanner — Live Camera Viewfinder
+// ══════════════════════════════════════════════════════════
+function scanBarcode(event, fieldId) {
+  // Ignore the file input — we'll use live camera instead
+  if (event && event.target) event.target.value = '';
+  openLiveScanner(fieldId);
+}
+
+function openLiveScanner(fieldId) {
+  const existing = document.getElementById('scannerOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'scannerOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:80000;background:#000;display:flex;flex-direction:column;';
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;';
+  hdr.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;">📷 SCAN BARCODE</div>';
+  const closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:6px 14px;font-family:Share Tech Mono,monospace;font-size:12px;cursor:pointer;';
+  closeBtn.textContent = '✕ CLOSE';
+  closeBtn.onclick = () => stopScanner(overlay);
+  hdr.appendChild(closeBtn);
+  overlay.appendChild(hdr);
+
+  // Video viewfinder
+  const videoWrap = document.createElement('div');
+  videoWrap.style.cssText = 'flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;';
+  const video = document.createElement('video');
+  video.id = 'scannerVideo';
+  video.setAttribute('playsinline', '');
+  video.setAttribute('autoplay', '');
+  video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+  videoWrap.appendChild(video);
+
+  // Scan crosshair overlay
+  const crosshair = document.createElement('div');
+  crosshair.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;';
+  crosshair.innerHTML = '<div style="width:75%;max-width:300px;height:80px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,0.4);"></div>';
+  videoWrap.appendChild(crosshair);
+
+  // Scanning indicator
+  const indicator = document.createElement('div');
+  indicator.id = 'scanIndicator';
+  indicator.style.cssText = 'position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);letter-spacing:1px;background:rgba(0,0,0,0.6);padding:6px 16px;border-radius:20px;';
+  indicator.textContent = 'Point at barcode...';
+  videoWrap.appendChild(indicator);
+
+  overlay.appendChild(videoWrap);
+
+  // Manual entry fallback at bottom
+  const footer = document.createElement('div');
+  footer.style.cssText = 'padding:12px 16px;flex-shrink:0;background:var(--panel);';
+  const manualRow = document.createElement('div');
+  manualRow.style.cssText = 'display:flex;gap:8px;';
+  const manualInput = document.createElement('input');
+  manualInput.type = 'text';
+  manualInput.id = 'scanManualInput';
+  manualInput.placeholder = 'Or type manually...';
+  manualInput.style.cssText = 'flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:Share Tech Mono,monospace;font-size:16px;letter-spacing:1px;padding:12px;outline:none;';
+  const manualSave = document.createElement('button');
+  manualSave.style.cssText = 'background:var(--accent);color:#000;border:none;border-radius:8px;padding:12px 20px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;white-space:nowrap;';
+  manualSave.textContent = 'SAVE';
+  manualSave.onclick = () => {
+    const val = manualInput.value.trim();
+    if (val) {
+      const el = document.getElementById(fieldId);
+      if (el) { el.value = val; debouncedAutoSave(); }
+      showToast('✓ Saved: ' + val, 'success');
+    }
+    stopScanner(overlay);
+  };
+  manualRow.appendChild(manualInput);
+  manualRow.appendChild(manualSave);
+  footer.appendChild(manualRow);
+  overlay.appendChild(footer);
+
+  document.body.appendChild(overlay);
+
+  // Start camera
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+  }).then(stream => {
+    video.srcObject = stream;
+    video.play();
+    // Start scanning frames if BarcodeDetector available
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['code_128','code_39','ean_13','ean_8','qr_code','itf','codabar','upc_a','upc_e'] });
+      let scanning = true;
+      overlay._stopScan = () => { scanning = false; };
+
+      const scanFrame = () => {
+        if (!scanning || !video.srcObject) return;
+        if (video.readyState >= 2) {
+          detector.detect(video).then(barcodes => {
+            if (barcodes.length > 0 && scanning) {
+              scanning = false;
+              const val = barcodes[0].rawValue;
+              const el = document.getElementById(fieldId);
+              if (el) { el.value = val; debouncedAutoSave(); }
+              showToast('✓ Scanned: ' + val, 'success');
+              stopScanner(overlay);
+              return;
+            }
+          }).catch(() => {});
+        }
+        if (scanning) requestAnimationFrame(scanFrame);
+      };
+      requestAnimationFrame(scanFrame);
+    } else {
+      const ind = document.getElementById('scanIndicator');
+      if (ind) ind.textContent = 'Auto-scan not supported — type manually below';
+    }
+  }).catch(err => {
+    console.warn('Camera error:', err);
+    const ind = document.getElementById('scanIndicator');
+    if (ind) { ind.textContent = 'Camera unavailable — type manually below'; ind.style.color = 'var(--red)'; }
+  });
+}
+
+function stopScanner(overlay) {
+  if (!overlay) overlay = document.getElementById('scannerOverlay');
+  if (!overlay) return;
+  // Stop scanning
+  if (overlay._stopScan) overlay._stopScan();
+  // Stop camera stream
+  const video = overlay.querySelector('video');
+  if (video && video.srcObject) {
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+  }
+  overlay.remove();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4797,7 +5025,7 @@ function generateInvoice() {
   const installing = (d.installing || []).filter(i => i && (typeof i==='object' ? i.name : i));
   const zones = (d.zones || []).filter(Boolean);
   const date = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
-  const fee = INSTALL_FEE;
+  const fee = getJobFee(j);
   const jobType = d.jobType === 'service' ? 'Service' : 'Installation';
 
   let itemsHtml = '';
@@ -4905,7 +5133,7 @@ function showReportsDashboard() {
     const ws = new Date(now); ws.setDate(now.getDate() - now.getDay() - (w*7)); ws.setHours(0,0,0,0);
     const we = new Date(ws); we.setDate(ws.getDate() + 7);
     const wJobs = completed.filter(j => j.scheduledDate && new Date(j.scheduledDate) >= ws && new Date(j.scheduledDate) < we);
-    weeklyRev.push({ label: ws.toLocaleDateString('en-US',{month:'short',day:'numeric'}), jobs: wJobs.length, rev: wJobs.length * INSTALL_FEE });
+    weeklyRev.push({ label: ws.toLocaleDateString('en-US',{month:'short',day:'numeric'}), jobs: wJobs.length, rev: wJobs.reduce((s,j) => s + getJobFee(j), 0) });
   }
   const maxRev = Math.max(1, ...weeklyRev.map(w => w.rev));
 
@@ -4917,7 +5145,7 @@ function showReportsDashboard() {
   // Summary cards
   h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">';
   h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--accent);font-weight:bold;">' + weekJobs.length + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">This Week</div></div>';
-  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--green);font-weight:bold;">$' + (monthJobs.length * INSTALL_FEE) + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">This Month Revenue</div></div>';
+  h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--green);font-weight:bold;">$' + monthJobs.reduce((s,j) => s + getJobFee(j), 0) + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">This Month Revenue</div></div>';
   h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--text);font-weight:bold;">' + (avgTime > 0 ? Math.floor(avgTime/60) + 'h ' + (avgTime%60) + 'm' : '—') + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">Avg Time on Site</div></div>';
   h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--text);font-weight:bold;">' + completed.length + '</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">Total Completed</div></div>';
   h += '</div>';
@@ -4963,8 +5191,8 @@ function showReportsDashboard() {
   h += '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;">';
   h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:8px;">MONTH COMPARISON</div>';
   h += '<div style="display:flex;gap:12px;">';
-  h += '<div style="flex:1;text-align:center;padding:8px;background:var(--panel);border-radius:6px;"><div style="font-size:9px;color:var(--muted);margin-bottom:4px;">THIS MONTH</div><div style="font-size:18px;font-weight:bold;color:var(--green);">' + monthJobs.length + ' jobs</div><div style="font-size:12px;color:var(--green);">$' + (monthJobs.length * INSTALL_FEE) + '</div></div>';
-  h += '<div style="flex:1;text-align:center;padding:8px;background:var(--panel);border-radius:6px;"><div style="font-size:9px;color:var(--muted);margin-bottom:4px;">LAST MONTH</div><div style="font-size:18px;font-weight:bold;color:var(--muted);">' + lastMonthJobs.length + ' jobs</div><div style="font-size:12px;color:var(--muted);">$' + (lastMonthJobs.length * INSTALL_FEE) + '</div></div>';
+  h += '<div style="flex:1;text-align:center;padding:8px;background:var(--panel);border-radius:6px;"><div style="font-size:9px;color:var(--muted);margin-bottom:4px;">THIS MONTH</div><div style="font-size:18px;font-weight:bold;color:var(--green);">' + monthJobs.length + ' jobs</div><div style="font-size:12px;color:var(--green);">$' + monthJobs.reduce((s,j) => s + getJobFee(j), 0) + '</div></div>';
+  h += '<div style="flex:1;text-align:center;padding:8px;background:var(--panel);border-radius:6px;"><div style="font-size:9px;color:var(--muted);margin-bottom:4px;">LAST MONTH</div><div style="font-size:18px;font-weight:bold;color:var(--muted);">' + lastMonthJobs.length + ' jobs</div><div style="font-size:12px;color:var(--muted);">$' + lastMonthJobs.reduce((s,j) => s + getJobFee(j), 0) + '</div></div>';
   h += '</div></div>';
 
   sheet.innerHTML = h;
@@ -7999,7 +8227,7 @@ function enhanceAriaLabels() {
 
 const _originalSaveCurrentJob = saveCurrentJob;
 saveCurrentJob = function() {
-  ['customerName','address','cs','email','phone','confirmation','masterCode','verbalCode','adtStatus'].forEach(id => {
+  ['customerName','address','cs','email','phone','confirmation','masterCode','verbalCode','adtStatus','imei'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       applyStandardFieldFormatting(el);
