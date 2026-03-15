@@ -357,9 +357,9 @@
   .day-job-name{font-weight:700;font-size:13px;color:var(--text);}
   .day-job-addr{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   /* Schedule modal */
-  .modal-overlay{display:none;position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.7);align-items:flex-end;}
+  .modal-overlay{display:none;position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.7);align-items:flex-end;-webkit-overflow-scrolling:none;overflow:hidden;touch-action:none;}
   .modal-overlay.open{display:flex;}
-  .modal-sheet{background:var(--panel);border-radius:16px 16px 0 0;padding:20px 16px;width:100%;max-width:780px;margin:0 auto;max-height:85vh;overflow-y:auto;}
+  .modal-sheet{background:var(--panel);border-radius:16px 16px 0 0;padding:20px 16px;width:100%;max-width:780px;margin:0 auto;max-height:85vh;overflow-y:auto;overflow-x:hidden;position:relative;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
   .modal-title{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
   .modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
   .time-picker{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
@@ -676,10 +676,11 @@
   <!-- Scheduled banner -->
   <div id="scheduledBanner" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;margin-bottom:8px;align-items:center;gap:8px;">
     <span style="font-size:14px;">📅</span>
-    <div>
+    <div style="flex:1;">
       <div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;">Scheduled</div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--accent);" id="scheduledTimeLabel">—</div>
     </div>
+    <button onclick="rescheduleCurrentJob()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📅 MOVE</button>
   </div>
 
   <!-- Status + Time -->
@@ -690,8 +691,8 @@
         <label>Status</label>
         <div class="status-row" style="gap:8px;">
           <button class="status-btn" id="btnInProgress" onclick="setStatus('inprogress')" style="flex:1;">🔧 In Progress</button>
-          <button class="status-btn" id="btnComplete" onclick="setStatus('complete')" style="flex:1;">✓ Complete</button>
-          <button class="status-btn" id="btnCantFinish" onclick="triggerCantFinish()" style="flex:1;">⚠️ Couldn't Finish</button>
+          <button class="status-btn" id="btnComplete" onclick="tapComplete()" style="flex:1;">✓ Complete</button>
+          <button class="status-btn" id="btnCantFinish" onclick="tapCantFinish()" style="flex:1;">⚠️ Couldn't Finish</button>
         </div>
       </div>
       <div class="field">
@@ -1453,10 +1454,15 @@ function loadFromStorage() {
     const saved = localStorage.getItem('p22_jobs');
     const savedId = localStorage.getItem('p22_activeJobId');
     const savedCounter = localStorage.getItem('p22_jobCounter');
+    const savedCustomers = localStorage.getItem('p22_customers');
     if (saved) {
       jobs = JSON.parse(saved);
       jobCounter = parseInt(savedCounter) || jobs.length;
       activeJobId = parseInt(savedId) || jobs[0].id;
+      if (savedCustomers) {
+        const parsed = JSON.parse(savedCustomers);
+        if (parsed && parsed.length > 0) customers = parsed;
+      }
       return true;
     }
   } catch(e) { console.warn('Storage load failed:', e); }
@@ -1519,8 +1525,8 @@ function stampTime(type) {
       showToast('🔧 Status set to In Progress', 'info');
     }
   } else {
-    // Finish button — ask what happened
-    showFinishModal(j, t);
+    // Finish button — show choice
+    showFinishChoice(j, t);
     return;
   }
   updateTimeDisplay(j.data.arriveTime, j.data.finishTime);
@@ -1528,72 +1534,355 @@ function stampTime(type) {
 }
 
 function triggerCantFinish() {
-  const j = jobs.find(x => x.id === activeJobId);
-  if (!j) return;
-  const t = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
-  showFinishModal(j, t);
-  // Pre-select couldn't finish
-  setTimeout(() => {
-    const btn = document.getElementById('fmCantFinish');
-    if (btn) btn.click();
-  }, 100);
+  tapCantFinish();
 }
 
-function showFinishModal(j, t) {
-  // Remove existing modal
+// Called when Finished button is tapped - simple two-option sheet
+function showFinishChoice(j, t) {
   const existing = document.getElementById('finishModal');
   if (existing) existing.remove();
-
   const overlay = document.createElement('div');
   overlay.id = 'finishModal';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
-
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
   const sheet = document.createElement('div');
   sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;';
-
-  sheet.innerHTML =
-    '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">🏁 JOB FINISHED?</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
-      '<button id="fmComplete" style="flex:1;background:rgba(0,230,118,0.1);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;letter-spacing:1px;">✓ COMPLETE</button>' +
-      '<button id="fmCantFinish" style="flex:1;background:rgba(255,68,68,0.1);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;letter-spacing:1px;">⚠️ COULDNT FINISH</button>' +
-    '</div>' +
-    '<div id="fmRescheduleSection" style="display:none;">' +
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:0.5px;">What happened? (optional)</div>' +
-      '<textarea id="fmNotes" placeholder="e.g. Missing equipment, customer not home, ran out of time..." style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:14px;padding:10px;outline:none;resize:none;min-height:80px;margin-bottom:10px;"></textarea>' +
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Reschedule for:</div>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
-        '<button class="reschedule-quick" onclick="quickReschedule(1)" style="flex:1;min-width:80px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:8px;font-size:11px;font-family:Share Tech Mono,monospace;cursor:pointer;">Tomorrow</button>' +
-        '<button class="reschedule-quick" onclick="quickReschedule(2)" style="flex:1;min-width:80px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:8px;font-size:11px;font-family:Share Tech Mono,monospace;cursor:pointer;">+2 Days</button>' +
-        '<button class="reschedule-quick" onclick="quickReschedule(7)" style="flex:1;min-width:80px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:8px;font-size:11px;font-family:Share Tech Mono,monospace;cursor:pointer;">Next Week</button>' +
-        '<button class="reschedule-quick" onclick="quickReschedule(0)" style="flex:1;min-width:80px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:8px;font-size:11px;font-family:Share Tech Mono,monospace;cursor:pointer;">Pick Date</button>' +
-      '</div>' +
-    '</div>' +
-    '<button id="fmCancel" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;">Cancel</button>';
-
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;';
+  hdr.textContent = '🏁 HOW DID IT GO?';
+  sheet.appendChild(hdr);
+  // Complete button
+  const completeBtn = document.createElement('button');
+  completeBtn.style.cssText = 'width:100%;background:rgba(0,230,118,0.1);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;cursor:pointer;letter-spacing:1px;margin-bottom:10px;display:block;';
+  completeBtn.textContent = '✓ COMPLETE';
+  completeBtn.onclick = () => { overlay.remove(); showDeductConfirmModal(j, t); };
+  sheet.appendChild(completeBtn);
+  // Couldn't Finish button
+  const cantBtn = document.createElement('button');
+  cantBtn.style.cssText = 'width:100%;background:rgba(255,68,68,0.1);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;cursor:pointer;letter-spacing:1px;margin-bottom:10px;display:block;';
+  cantBtn.textContent = "⚠️ COULDN'T FINISH";
+  cantBtn.onclick = () => { overlay.remove(); showCantFinishSheet(j, t); };
+  sheet.appendChild(cantBtn);
+  // Cancel
+  const cancelBtn = document.createElement('button');
+  cancelBtn.style.cssText = 'width:100%;background:none;border:none;color:var(--muted);padding:10px;font-size:12px;cursor:pointer;';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = () => overlay.remove();
+  sheet.appendChild(cancelBtn);
   overlay.appendChild(sheet);
   document.body.appendChild(overlay);
+}
+
+// Full couldn't finish sheet with notes + reschedule
+function showCantFinishSheet(j, t) {
+  const existing = document.getElementById('cantFinishModal');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'cantFinishModal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
   overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
-  setTimeout(() => {
-    const cancelBtn = sheet.querySelector('#fmCancel');
-    if (cancelBtn) cancelBtn.onclick = () => overlay.remove();
-  }, 10);
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;max-height:85vh;overflow-y:auto;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+  // Header
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:12px;color:var(--red);letter-spacing:2px;margin-bottom:4px;';
+  hdr.textContent = "⚠️ COULDN'T FINISH";
+  const sub = document.createElement('div');
+  sub.style.cssText = 'font-size:12px;color:var(--muted);margin-bottom:14px;';
+  sub.textContent = j.data.customerName || 'Job';
+  sheet.appendChild(hdr); sheet.appendChild(sub);
 
-  // Complete button — show deduction confirmation
-  sheet.querySelector('#fmComplete').onclick = () => {
+  // Equipment deduction section - what WAS installed
+  const installing = (j.data.installing || []).filter(i => i && (typeof i==='object'?i.name:i));
+  const cfItemData = [];
+  if (installing.length > 0) {
+    const equipHdr = document.createElement('div');
+    equipHdr.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:8px;';
+    equipHdr.textContent = 'WHAT WAS INSTALLED? (deduct from truck)';
+    sheet.appendChild(equipHdr);
+    const colHdr = document.createElement('div');
+    colHdr.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px;gap:8px;font-family:Share Tech Mono,monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;';
+    colHdr.innerHTML = '<span>ITEM</span><span style="text-align:center">PLANNED</span><span style="text-align:center">USED</span>';
+    sheet.appendChild(colHdr);
+    installing.forEach(item => {
+      const name = typeof item==='object' ? item.name : item;
+      const planned = parseInt(typeof item==='object' ? item.qty : '1') || 1;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);';
+      const nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:11px;color:var(--text);';
+      nameEl.textContent = name;
+      const plannedEl = document.createElement('div');
+      plannedEl.style.cssText = 'text-align:center;font-family:Share Tech Mono,monospace;font-size:12px;color:var(--muted);';
+      plannedEl.textContent = planned;
+      const usedWrap = document.createElement('div');
+      usedWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:3px;';
+      const minusBtn = document.createElement('button');
+      minusBtn.className='qty-btn'; minusBtn.textContent='−'; minusBtn.type='button';
+      const usedInput = document.createElement('input');
+      usedInput.type='text'; usedInput.className='qty-input'; usedInput.value='0'; usedInput.maxLength=3;
+      const plusBtn = document.createElement('button');
+      plusBtn.className='qty-btn'; plusBtn.textContent='+'; plusBtn.type='button';
+      minusBtn.onclick=()=>{const v=parseInt(usedInput.value)||0;if(v>0)usedInput.value=v-1;};
+      plusBtn.onclick=()=>{const v=parseInt(usedInput.value)||0;usedInput.value=Math.min(v+1,planned);};
+      usedWrap.appendChild(minusBtn);usedWrap.appendChild(usedInput);usedWrap.appendChild(plusBtn);
+      row.appendChild(nameEl);row.appendChild(plannedEl);row.appendChild(usedWrap);
+      sheet.appendChild(row);
+      cfItemData.push({name, usedInput});
+    });
+    // Store reference on sheet for later
+    sheet._cfItemData = cfItemData;
+    const divider = document.createElement('div');
+    divider.style.cssText = 'height:1px;background:var(--border);margin:14px 0;';
+    sheet.appendChild(divider);
+  }
+
+  // Notes
+  const notesLabel = document.createElement('div');
+  notesLabel.style.cssText = 'font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase;';
+  notesLabel.textContent = 'What happened?';
+  const notesInput = document.createElement('textarea');
+  notesInput.id = 'cfNotes';
+  notesInput.placeholder = 'Missing equipment, customer not home, ran out of time...';
+  notesInput.style.cssText = 'width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:14px;padding:10px;outline:none;resize:none;min-height:70px;margin-bottom:16px;box-sizing:border-box;';
+  notesInput.value = j.data.notes && j.data.notes !== '—' ? j.data.notes : '';
+  sheet.appendChild(notesLabel); sheet.appendChild(notesInput);
+  // Reschedule section
+  const reschedLabel = document.createElement('div');
+  reschedLabel.style.cssText = 'font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;';
+  reschedLabel.textContent = 'Reschedule for:';
+  sheet.appendChild(reschedLabel);
+  // Quick reschedule buttons
+  const quickRow = document.createElement('div');
+  quickRow.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;';
+  const quickOpts = [
+    {label:'📅 Tomorrow', days:1},
+    {label:'📅 +2 Days', days:2},
+    {label:'📅 Next Week', days:7},
+  ];
+  quickOpts.forEach(o => {
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;text-align:center;';
+    btn.textContent = o.label;
+    btn.onclick = () => {
+      const notes = document.getElementById('cfNotes')?.value.trim();
+      const itemData = sheet._cfItemData || [];
+      overlay.remove();
+      finishCantFinish(j, t, notes, o.days, itemData);
+    };
+    quickRow.appendChild(btn);
+  });
+  sheet.appendChild(quickRow);
+  // Place on calendar button
+  const schedBtn = document.createElement('button');
+  schedBtn.style.cssText = 'width:100%;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:8px;padding:13px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-bottom:10px;';
+  schedBtn.textContent = '📅 PLACE ON CALENDAR';
+  schedBtn.onclick = () => {
+    const notes = document.getElementById('cfNotes')?.value.trim();
+    const itemData = sheet._cfItemData || [];
+    // Deduct partial installs and update installing list for new job
+    if (itemData.length > 0) {
+      const remainingItems = [];
+      itemData.forEach(({name, usedInput}) => {
+        const used = parseInt(usedInput.value) || 0;
+        const origItem = j.data.installing ? j.data.installing.find(i => {
+          const iName = typeof i === 'object' ? i.name : i;
+          return iName && iName.toLowerCase() === name.toLowerCase();
+        }) : null;
+        const plannedQty = origItem ? (parseInt(typeof origItem==='object' ? origItem.qty : '1') || 1) : 1;
+        const remaining = plannedQty - used;
+        if (used > 0) {
+          const truckItem = truck.find(ti => ti.name.toLowerCase() === name.toLowerCase());
+          if (truckItem) truckItem.qty = Math.max(0, truckItem.qty - used);
+        }
+        if (remaining > 0) {
+          remainingItems.push(
+            typeof origItem === 'object'
+              ? {...origItem, qty: String(remaining)}
+              : {name, qty: String(remaining)}
+          );
+        }
+      });
+      j.data.installing = remainingItems;
+      saveTruck();
+    }
     overlay.remove();
-    showDeductConfirmModal(j, t);
-  };
-
-  // Couldn't Finish button
-  sheet.querySelector('#fmCantFinish').onclick = () => {
+    // Save cant finish status first
     j.data.finishTime = t;
-    const input = document.getElementById('finishInput');
-    if(input) { input.value = t; }
+    const inp = document.getElementById('finishInput');
+    if(inp) inp.value = t;
+    if (notes) j.data.notes = j.data.notes ? j.data.notes + ' | ' + notes : notes;
     updateTimeDisplay(j.data.arriveTime, t);
     setStatus('cantfinish');
     saveToStorage();
-    sheet.querySelector('#fmRescheduleSection').style.display = 'block';
+    // Enter reschedule placement mode and go to calendar
+    enterReschedulePlacementMode(j);
   };
+  sheet.appendChild(schedBtn);
+  // Save without rescheduling
+  const saveOnlyBtn = document.createElement('button');
+  saveOnlyBtn.style.cssText = 'width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;margin-bottom:8px;';
+  saveOnlyBtn.textContent = 'SAVE WITHOUT RESCHEDULING';
+  saveOnlyBtn.onclick = () => {
+    const notes = document.getElementById('cfNotes')?.value.trim();
+    const itemData = sheet._cfItemData || [];
+    overlay.remove();
+    finishCantFinish(j, t, notes, null, itemData);
+  };
+  sheet.appendChild(saveOnlyBtn);
+  const cancelBtn = document.createElement('button');
+  cancelBtn.style.cssText = 'width:100%;background:none;border:none;color:var(--muted);padding:8px;font-size:12px;cursor:pointer;';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = () => overlay.remove();
+  sheet.appendChild(cancelBtn);
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+function finishCantFinish(j, t, notes, daysAhead, cfItemData) {
+  // Deduct what was actually installed and update job's installing list
+  if (cfItemData && cfItemData.length > 0) {
+    const remainingInstalling = [];
+    cfItemData.forEach(({name, usedInput}) => {
+      const used = parseInt(usedInput.value) || 0;
+      // Find the original item in installing list
+      const origItem = j.data.installing ? j.data.installing.find(i => {
+        const iName = typeof i === 'object' ? i.name : i;
+        return iName && iName.toLowerCase() === name.toLowerCase();
+      }) : null;
+      const plannedQty = origItem ? (parseInt(typeof origItem==='object' ? origItem.qty : '1') || 1) : 1;
+      const remaining = plannedQty - used;
+      // Deduct from truck
+      if (used > 0) {
+        const truckItem = truck.find(ti => ti.name.toLowerCase() === name.toLowerCase());
+        if (truckItem) truckItem.qty = Math.max(0, truckItem.qty - used);
+      }
+      // Keep item on list only if there's still qty remaining to install
+      if (remaining > 0) {
+        remainingInstalling.push(
+          typeof origItem === 'object' 
+            ? {...origItem, qty: String(remaining)}
+            : {name, qty: String(remaining)}
+        );
+      }
+    });
+    // Update the job's installing list to only what's left
+    j.data.installing = remainingInstalling;
+    // Also add a note about what was partially installed
+    const installedItems = cfItemData
+      .filter(({usedInput}) => parseInt(usedInput.value) > 0)
+      .map(({name, usedInput}) => name + ' (x' + usedInput.value + ')')
+      .join(', ');
+    if (installedItems) {
+      const partialNote = 'Partially installed: ' + installedItems;
+      j.data.notes = j.data.notes ? j.data.notes + ' | ' + partialNote : partialNote;
+    }
+    saveTruck();
+    renderTruck();
+  }
+  // Set status and save notes
+  j.data.finishTime = t;
+  const input = document.getElementById('finishInput');
+  if(input) input.value = t;
+  if (notes) j.data.notes = j.data.notes ? j.data.notes + ' | ' + notes : notes;
+  updateTimeDisplay(j.data.arriveTime, t);
+  setStatus('cantfinish');
+  saveToStorage();
+  // Reschedule if days specified
+  if (daysAhead) quickReschedule(daysAhead);
+  else { renderMonthCal(); showToast("⚠️ Marked — truck updated", 'info'); }
+}
+
+// Reschedule placement mode - go to calendar, tap any slot to place job
+let pendingRescheduleJob = null;
+
+function enterReschedulePlacementMode(sourceJob) {
+  pendingRescheduleJob = sourceJob;
+  // Also store ID in case of re-render
+
+  // Go to Today tab / calendar
+  showScreen('today');
+  // Show week view - start from NEXT week so future slots are visible
+  const today = new Date();
+  // Move calDate to next week's Sunday
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + (7 - today.getDay()));
+  calDate = nextWeek;
+  calSelectedDate = nextWeek;
+  renderMonthCal();
+  // Switch to week view
+  setCalView('week');
+  const weekSection = document.getElementById('weekCalSection');
+  if (weekSection) {
+    weekSection.style.display = 'block';
+    renderWeekTimeline();
+    setTimeout(() => weekSection.scrollIntoView({behavior:'smooth', block:'start'}), 100);
+  }
+  // Show a sticky banner at top of calendar
+  const existing = document.getElementById('reschedBanner');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'reschedBanner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9000;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;padding:12px 16px;display:flex;align-items:center;gap:10px;font-family:Share Tech Mono,monospace;font-size:11px;letter-spacing:1px;';
+  banner.innerHTML = '<span style="font-size:16px;">📅</span><span style="flex:1;">TAP ANY TIME SLOT TO RESCHEDULE ' + (sourceJob.data.customerName||'JOB').toUpperCase() + '</span>';
+  const cancelReschedBtn = document.createElement('button');
+  cancelReschedBtn.textContent = '✕ Cancel';
+  cancelReschedBtn.style.cssText = 'background:rgba(0,0,0,0.2);border:none;color:#000;border-radius:4px;padding:4px 8px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;';
+  cancelReschedBtn.onclick = () => { pendingRescheduleJob = null; banner.remove(); };
+  banner.appendChild(cancelReschedBtn);
+  // Attach to body so it stays fixed regardless of scroll/navigation
+  document.body.appendChild(banner);
+  showToast('Tap any time slot on the calendar to reschedule', 'info');
+}
+
+function placeRescheduledJob(date, hour, minute) {
+  if (!pendingRescheduleJob) return false;
+  const sourceJob = pendingRescheduleJob;
+  pendingRescheduleJob = null;
+  document.getElementById('reschedBanner')?.remove();
+
+  const h = hour > 12 ? hour-12 : hour===0?12:hour;
+  const m = String(minute).padStart(2,'0');
+  const ap = hour >= 12 ? 'PM' : 'AM';
+  const time = h+':'+m+' '+ap;
+
+  // MOVE the existing job - don't create a new one
+  const j = jobs.find(x => x.id === sourceJob.id);
+  if (j) {
+    j.scheduledDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
+    j.scheduledTime = time;
+    j.scheduledDuration = j.scheduledDuration || 120;
+    j.scheduledEndTime = addMinutesToTime(time, j.scheduledDuration || 120);
+    j.status = 'pending';
+  }
+  saveToStorage();
+  renderTabs();
+  renderMonthCal();
+  if (calView === 'week') renderWeekTimeline();
+  else renderDayTimeline(date);
+  showToast('📅 Rescheduled for ' + date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) + ' at ' + time, 'success');
+  return true;
+}
+
+function rescheduleCurrentJob() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  enterReschedulePlacementMode(j);
+}
+
+// tapComplete and tapCantFinish from status buttons
+function tapComplete() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  const t = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  showDeductConfirmModal(j, t);
+}
+
+function tapCantFinish() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  const t = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  showCantFinishSheet(j, t);
 }
 
 function showDeductConfirmModal(j, finishTime) {
@@ -1740,27 +2029,23 @@ function finishComplete(j, finishTime) {
 function quickReschedule(daysAhead) {
   const j = jobs.find(x => x.id === activeJobId);
   if (!j) return;
-  const notes = document.getElementById('fmNotes')?.value.trim();
+  // Support both old and new note field IDs
+  const notes = (document.getElementById('cfNotes') || document.getElementById('fmNotes'))?.value.trim();
   if (notes) {
     j.data.notes = j.data.notes ? j.data.notes + ' | ' + notes : notes;
   }
+  // Remove whichever modal is open
+  document.getElementById('cantFinishModal')?.remove();
+  document.getElementById('cantFinishModal')?.remove();
+  document.getElementById('finishModal')?.remove();
 
   if (daysAhead === 0) {
-    // Open schedule modal with this job pre-filled
-    document.getElementById('finishModal')?.remove();
-    openScheduleModal();
-    setTimeout(() => {
-      // Pre-fill customer
-      const selDiv = document.getElementById('schedSelectedCust');
-      if (selDiv && j.data.customerName) {
-        selDiv.style.display = 'flex';
-        document.getElementById('schedSelectedCustName').textContent = j.data.customerName;
-        document.getElementById('schedSelectedCustMeta').textContent = j.data.phone||'';
-        document.getElementById('schedJobCustomer').value = '';
-      }
-    }, 100);
+    // Enter calendar placement mode
+    enterReschedulePlacementMode(j);
     return;
   }
+
+
 
   // Create a new scheduled job
   const newDate = new Date();
@@ -1784,6 +2069,7 @@ function quickReschedule(daysAhead) {
   renderTabs();
   renderMonthCal();
 
+  document.getElementById('cantFinishModal')?.remove();
   document.getElementById('finishModal')?.remove();
   const dayName = daysAhead === 1 ? 'tomorrow' : daysAhead === 7 ? 'next week' : 'in ' + daysAhead + ' days';
   showToast('📅 Rescheduled for ' + dayName, 'success');
@@ -2588,14 +2874,39 @@ function renderDayTimeline(d) {
     const sc=getStatusClass(j.status)||'pending';
     const addr=j.data&&j.data.address?j.data.address.split(',')[0]:'';
     const endT=j.scheduledEndTime||'';
-    const installing = j.data.installing ? j.data.installing.filter(i=>i&&(typeof i==='object'?i.name:i)).slice(0,2).map(i=>typeof i==='object'?i.name:i).join(', ') : '';
+    const installingItems = j.data.installing ? j.data.installing.filter(i=>i&&(typeof i==='object'?i.name:i)) : [];
+    const installing = installingItems.slice(0,2).map(i=>typeof i==='object'?i.name:i).join(', ');
     const jobNotes = j.data.notes && j.data.notes !== '—' ? j.data.notes.slice(0,40) : '';
+    // Check stock for each item - show missing items by name
+    let missingLines = '';
+    if (installingItems.length > 0) {
+      const missingItems = installingItems.filter(i => {
+        const name = typeof i==='object'?i.name:i;
+        const qty = parseInt(typeof i==='object'?i.qty:'1')||1;
+        const t2 = truck.find(t=>t.name.toLowerCase()===name.toLowerCase());
+        return !t2 || t2.qty < qty;
+      });
+      if (missingItems.length > 0) {
+        missingLines = missingItems.map(i => {
+          const name = typeof i==='object'?i.name:i;
+          const qty = parseInt(typeof i==='object'?i.qty:'1')||1;
+          const t2 = truck.find(t=>t.name.toLowerCase()===name.toLowerCase());
+          const have = t2?t2.qty:0;
+          const need = qty - have;
+          // Shorten long names for display
+          const short = name.length > 28 ? name.slice(0,26)+'…' : name;
+          return '<div style="color:var(--red);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">❌ '+short+(need>1?' (need '+need+')':'')+'</div>';
+        }).join('');
+      }
+    }
+    const hasWarning = missingLines.length > 0;
     html += '<div class="timeline-event '+sc+'" id="tevt_'+j.id+'" style="top:'+topPx+'px;height:'+heightPx+'px;z-index:5;">'+
-      '<div class="timeline-event-name">'+(j.data.customerName||'Job')+'</div>'+
+      '<div class="timeline-event-name" style="display:flex;align-items:center;gap:4px;">'+(hasWarning?'<span style="color:var(--red);font-size:10px;">⚠️</span>':'')+''+(j.data.customerName||'Job')+'</div>'+
       (heightPx>30?'<div class="timeline-event-time">'+(time||'')+(endT?' – '+endT:'')+'</div>':'')+
       (heightPx>50&&addr?'<div class="timeline-event-addr">📍'+addr+'</div>':'')+
-      (heightPx>70&&installing?'<div class="timeline-event-addr" style="opacity:0.7;">🔧'+installing+'</div>':'')+
-      (heightPx>90&&jobNotes?'<div class="timeline-event-addr" style="opacity:0.6;font-style:italic;">📝'+jobNotes+'</div>':'')+
+      (heightPx>60&&hasWarning?missingLines:'')+
+      (heightPx>90&&!hasWarning&&installing?'<div class="timeline-event-addr" style="opacity:0.7;">🔧'+installing+'</div>':'')+
+      (heightPx>110&&jobNotes?'<div class="timeline-event-addr" style="opacity:0.6;font-style:italic;">📝'+jobNotes+'</div>':'')+
       '<div class="resize-handle" id="rh_'+j.id+'" onclick="event.stopPropagation()"></div>'+
       '</div>';
   });
@@ -2626,6 +2937,9 @@ function renderDayTimeline(d) {
       addResizeToEvent(el, j.id, HOUR_H, HOUR_S);
     }
   });
+
+  // Build daily equipment summary below timeline
+  renderDailyEquipSummary(dayJobs, body);
 
   // Scroll to current time or 8am
   setTimeout(() => {
@@ -2671,7 +2985,9 @@ function renderWeekTimeline() {
   timeHtml+='</div><div class="week-cols-wrap">';
   days.forEach(d => {
     const dayJobs=getJobsForDate(d);
-    timeHtml+='<div class="week-timeline-col" style="position:relative;min-height:'+TOTAL_HEIGHT+'px;">';
+    const colDateStr = d.toISOString().split('T')[0];
+      const colDateLabel = d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+      timeHtml+='<div class="week-timeline-col" data-date="'+colDateStr+'" data-date-label="'+colDateLabel+'" style="position:relative;min-height:'+TOTAL_HEIGHT+'px;">';
     for (let h=HOUR_START;h<=HOUR_END;h++) {
       const top=(h-HOUR_START)*HOUR_HEIGHT;
       timeHtml+='<div style="position:absolute;top:'+top+'px;left:0;right:0;border-top:1px solid rgba(255,255,255,0.05);"></div>';
@@ -2690,9 +3006,18 @@ function renderWeekTimeline() {
       const heightPx=Math.max(24,(dur/60)*HOUR_HEIGHT);
       const sc=getStatusClass(j.status)||'pending';
       const endT=j.scheduledEndTime||'';
-      timeHtml+='<div class="timeline-event '+sc+'" style="top:'+topPx+'px;height:'+heightPx+'px;z-index:5;" onclick="switchJob('+j.id+');showScreen(\'job\')">'+
-        '<div class="timeline-event-name">'+(j.data.customerName||'Job')+'</div>'+
+      // Check stock warning
+      const installingItems = j.data.installing ? j.data.installing.filter(i=>i&&(typeof i==='object'?i.name:i)) : [];
+      const hasMissing = installingItems.some(i => {
+        const nm = typeof i==='object'?i.name:i;
+        const qt = parseInt(typeof i==='object'?i.qty:'1')||1;
+        const t2 = truck.find(t=>t.name.toLowerCase()===nm.toLowerCase());
+        return !t2||t2.qty<qt;
+      });
+      timeHtml+='<div class="timeline-event '+sc+'" id="wevt_'+j.id+'" style="top:'+topPx+'px;height:'+heightPx+'px;z-index:5;">'+
+        '<div class="timeline-event-name">'+(j.data.customerName||'Job')+(hasMissing?' ⚠️':'')+'</div>'+
         (heightPx>35?'<div class="timeline-event-time">'+(time||'')+(endT?' – '+endT:'')+'</div>':'')+
+        '<div class="resize-handle" id="wrh_'+j.id+'" onclick="event.stopPropagation()"></div>'+
         '</div>';
     });
     timeHtml+='</div>';
@@ -2704,6 +3029,25 @@ function renderWeekTimeline() {
   else timeHtml+='</div>';
   timeHtml+='</div></div>';
   body.innerHTML=hdrHtml+timeHtml;
+
+  // Wire drag/resize/click for each week event
+  const HOUR_H=HOUR_HEIGHT, HOUR_S=HOUR_START;
+  days.forEach(d => {
+    const dayJobs2=getJobsForDate(d);
+    const col = body.querySelectorAll('.week-timeline-col')[days.indexOf(d)];
+    if (!col) return;
+    dayJobs2.forEach(j => {
+      const el = body.querySelector('#wevt_'+j.id);
+      if (!el) return;
+      el.addEventListener('click', () => {
+        if (el._wasDragged) return;
+        showJobContextMenu(j.id, el);
+      });
+      addDragMoveToEvent(el, j.id, HOUR_H, HOUR_S, col);
+      addResizeToEvent(el, j.id, HOUR_H, HOUR_S);
+    });
+  });
+
   setTimeout(()=>{const wrap=body.querySelector('.timeline-wrap');if(wrap){const s=Math.max(0,((nowMins/60)-HOUR_START-1)*HOUR_HEIGHT);wrap.scrollTop=s;}},50);
 }
 
@@ -2722,6 +3066,17 @@ function updateTodayStats() {
 
 // ── SCHEDULE MODAL ────────────────────────────────────────
 function goToDayView(d) {
+  // In placement mode - just update day but keep week visible for navigation
+  if (pendingRescheduleJob) {
+    calSelectedDate = new Date(d);
+    renderDayTimeline(d);
+    const daySection = document.getElementById('dayTimelineSection');
+    if (daySection) {
+      daySection.style.display = 'block';
+      setTimeout(() => daySection.scrollIntoView({behavior:'smooth', block:'start'}), 50);
+    }
+    return;
+  }
   calSelectedDate = new Date(d);
   calView = 'day';
   document.getElementById('weekCalSection').style.display = 'none';
@@ -2808,6 +3163,12 @@ function showFeesBreakdown() {
 }
 
 function tapToSchedule(date, hour, minute) {
+  // If in reschedule placement mode, place the job here
+  if (pendingRescheduleJob) {
+    placeRescheduledJob(date, hour, minute);
+    return;
+  }
+  // No pending reschedule
   calSelectedDate = new Date(date);
   const ampm = hour >= 12 ? 'PM' : 'AM';
   const h = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
@@ -2854,10 +3215,15 @@ function openScheduleModal(date) {
   // Existing starts empty - user taps + Add Existing when needed
   setTimeout(checkTruckStock, 100);
   document.getElementById('scheduleModal').classList.add('open');
+  // Lock background scroll to stop wiggling
+  document.body.style.overflow = 'hidden';
 }
 
 function closeScheduleModal() {
   document.getElementById('scheduleModal').classList.remove('open');
+  document.body.style.overflow = '';
+  document.body.style.position = '';
+  document.body.style.width = '';
 }
 
 
@@ -3083,100 +3449,283 @@ function addMinutesToTime(timeStr, mins) {
   } catch(e) { return null; }
 }
 
+function renderDailyEquipSummary(dayJobs, container) {
+  // Remove existing summary
+  const existing = container.querySelector('.daily-equip-summary');
+  if (existing) existing.remove();
+
+  // Only show if there are jobs with equipment
+  const jobsWithEquip = dayJobs.filter(j => j.data.installing && j.data.installing.length > 0);
+  if (jobsWithEquip.length === 0) return;
+
+  const summary = document.createElement('div');
+  summary.className = 'daily-equip-summary';
+  summary.style.cssText = 'margin-top:16px;padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;';
+
+  // Title
+  const title = document.createElement('div');
+  title.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;';
+  title.textContent = '🔧 EQUIPMENT NEEDED TODAY';
+  summary.appendChild(title);
+
+  // Accumulate equipment across jobs in order
+  // Track running totals to show when stock runs out
+  const runningTotals = {}; // name -> {used, truckQty}
+
+  // Pre-populate truck qtys
+  truck.forEach(t => { runningTotals[t.name.toLowerCase()] = {used:0, truckQty:t.qty, displayName:t.name}; });
+
+  dayJobs.forEach((j, jobIdx) => {
+    if (!j.data.installing || j.data.installing.length === 0) return;
+    const sc = j.status==='complete'?'var(--green)':j.status==='inprogress'?'var(--accent)':j.status==='cantfinish'?'var(--red)':'var(--yellow)';
+
+    // Job header
+    const jobHdr = document.createElement('div');
+    jobHdr.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:6px;margin-top:'+(jobIdx>0?'12px':'0')+';';
+    jobHdr.innerHTML = '<span style="font-size:10px;color:'+sc+';">●</span><span style="font-size:12px;font-weight:600;color:var(--text);">'+(j.data.customerName||'Job '+(jobIdx+1))+'</span><span style="font-size:10px;color:var(--muted);">'+(j.scheduledTime||'')+'</span>';
+    summary.appendChild(jobHdr);
+
+    // Equipment rows for this job
+    j.data.installing.forEach(item => {
+      const name = typeof item==='object'?item.name:item;
+      const qty = parseInt(typeof item==='object'?item.qty:'1')||1;
+      const key = name.toLowerCase();
+
+      // Get or init tracking
+      if (!runningTotals[key]) {
+        const t2 = truck.find(t=>t.name.toLowerCase()===key);
+        runningTotals[key] = {used:0, truckQty:t2?t2.qty:0, displayName:name};
+      }
+
+      const rt = runningTotals[key];
+      const afterUse = rt.truckQty - rt.used - qty;
+      rt.used += qty;
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-radius:5px;background:'+(afterUse < 0?'rgba(255,68,68,0.08)':afterUse === 0?'rgba(255,214,0,0.05)':'rgba(0,230,118,0.05)')+';';
+
+      // Status icon
+      const icon = document.createElement('span');
+      icon.style.cssText = 'font-size:13px;flex-shrink:0;';
+      icon.textContent = afterUse < 0 ? '❌' : afterUse === 0 ? '⚠️' : '✓';
+
+      // Item name + qty
+      const nameEl = document.createElement('span');
+      nameEl.style.cssText = 'flex:1;font-size:12px;color:var(--text);';
+      nameEl.textContent = name + (qty > 1 ? ' ×'+qty : '');
+
+      // Stock status
+      const stockEl = document.createElement('span');
+      stockEl.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:10px;flex-shrink:0;';
+      if (afterUse < 0) {
+        stockEl.style.color = 'var(--red)';
+        stockEl.textContent = 'Need '+(Math.abs(afterUse))+' more';
+      } else if (afterUse === 0) {
+        stockEl.style.color = 'var(--yellow)';
+        stockEl.textContent = 'Last one';
+      } else {
+        stockEl.style.color = 'var(--green)';
+        stockEl.textContent = afterUse+' left after';
+      }
+
+      row.appendChild(icon);
+      row.appendChild(nameEl);
+      row.appendChild(stockEl);
+      summary.appendChild(row);
+    });
+  });
+
+  container.appendChild(summary);
+}
+
 function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
-  let startY = 0, startTop = 0, dragging = false, dragThreshold = 8, moved = false;
+  let startY = 0, startX = 0, startTop = 0, startLeft = 0;
+  let dragging = false, dragThreshold = 8, moved = false;
+  let origParent = null, origNextSibling = null, placeholder = null;
+  let ghostEl = null;
 
-  function onStart(clientY) {
-    startY = clientY;
-    startTop = parseInt(el.style.top) || 0;
-    dragging = false; moved = false;
-  }
-
-  function onMove(clientY) {
-    const dy = clientY - startY;
-    if (!dragging && Math.abs(dy) > dragThreshold) {
-      dragging = true;
-      el.classList.add('dragging');
-      document.body.style.userSelect = 'none';
-      document.body.style.webkitUserSelect = 'none';
-    }
-    if (!dragging) return;
-    moved = true;
-    const newTop = Math.max(0, startTop + dy);
-    el.style.top = newTop + 'px';
-    // Show ghost time
-    const mins = Math.round((newTop / HOUR_HEIGHT) * 60 / 15) * 15;
-    const h = Math.floor(mins / 60) + HOUR_START;
-    const m = mins % 60;
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    const timeStr = displayH + ':' + String(m).padStart(2,'0') + ' ' + ampm;
-    const nameEl = el.querySelector('.timeline-event-name');
-    if (nameEl) nameEl.setAttribute('data-drag-time', timeStr);
-    el.title = timeStr;
-  }
-
-  function onEnd(clientY) {
-    document.body.style.userSelect = '';
-    document.body.style.webkitUserSelect = '';
-    el.classList.remove('dragging');
-    const wasMoved = moved && dragging;
-    dragging = false; moved = false;
-    if (!wasMoved) return;
-    // Set flag to block the next click event
-    el._wasDragged = true;
-    setTimeout(() => { el._wasDragged = false; }, 300);
-    const newTop = parseInt(el.style.top) || 0;
-    // Snap to 15 min
-    const rawMins = (newTop / HOUR_HEIGHT) * 60;
+  function getTimeFromTop(top) {
+    const rawMins = (top / HOUR_HEIGHT) * 60;
     const snappedMins = Math.max(0, Math.round(rawMins / 15) * 15);
-    const snappedTop = (snappedMins / 60) * HOUR_HEIGHT;
-    el.style.top = snappedTop + 'px';
-    el.title = '';
-    // Calculate new time
     const totalMins = snappedMins + (HOUR_START * 60);
     const h = Math.floor(totalMins / 60) % 24;
     const m = totalMins % 60;
     const ampm = h >= 12 ? 'PM' : 'AM';
     const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    const newTime = displayH + ':' + String(m).padStart(2,'0') + ' ' + ampm;
-    // Save
+    return { time: displayH + ':' + String(m).padStart(2,'0') + ' ' + ampm, snappedMins, h, m };
+  }
+
+  function getWeekColAtX(clientX) {
+    // Find all week timeline columns
+    const cols = document.querySelectorAll('.week-timeline-col');
+    for (let i = 0; i < cols.length; i++) {
+      const r = cols[i].getBoundingClientRect();
+      if (clientX >= r.left && clientX <= r.right) return { col: cols[i], index: i };
+    }
+    return null;
+  }
+
+  function onStart(clientX, clientY) {
+    startY = clientY;
+    startX = clientX;
+    startTop = parseInt(el.style.top) || 0;
+    dragging = false; moved = false;
+  }
+
+  function onMove(clientX, clientY) {
+    const dy = clientY - startY;
+    const dx = clientX - startX;
+    if (!dragging && Math.hypot(dx, dy) > dragThreshold) {
+      dragging = true;
+      el.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+      document.body.style.webkitUserSelect = 'none';
+      // Create a ghost element fixed to screen
+      origParent = el.parentElement;
+      const rect = el.getBoundingClientRect();
+      ghostEl = el.cloneNode(true);
+      ghostEl.style.cssText = el.style.cssText;
+      ghostEl.style.position = 'fixed';
+      ghostEl.style.width = rect.width + 'px';
+      ghostEl.style.height = rect.height + 'px';
+      ghostEl.style.left = rect.left + 'px';
+      ghostEl.style.top = rect.top + 'px';
+      ghostEl.style.zIndex = '99999';
+      ghostEl.style.opacity = '0.85';
+      ghostEl.style.pointerEvents = 'none';
+      ghostEl.style.transition = 'none';
+      ghostEl.style.borderRadius = '6px';
+      ghostEl.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
+      document.body.appendChild(ghostEl);
+      // Hide original but keep space
+      el.style.opacity = '0.2';
+    }
+    if (!dragging) return;
+    moved = true;
+    // Move ghost
+    if (ghostEl) {
+      ghostEl.style.top = (clientY - 30) + 'px';
+      ghostEl.style.left = (clientX - 40) + 'px';
+    }
+    // Also update el.style.top for day view drop position tracking
+    const parentRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0};
+    const relativeTop = clientY - parentRect.top;
+    el.style.top = Math.max(0, relativeTop) + 'px';
+    // Show ghost time
+    const colInfo = getWeekColAtX(clientX);
+    if (colInfo) {
+      const colRect = colInfo.col.getBoundingClientRect();
+      const relY = clientY - colRect.top;
+      const { time } = getTimeFromTop(Math.max(0, relY));
+      if (ghostEl) {
+        const nameEl = ghostEl.querySelector('.timeline-event-name');
+        if (nameEl) nameEl.textContent = time;
+      }
+    }
+  }
+
+  function onEnd(clientX, clientY) {
+    document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
+    el.classList.remove('dragging');
+    el.style.opacity = '';
+    if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+    const wasMoved = moved && dragging;
+    dragging = false; moved = false;
+    if (!wasMoved) return;
+    el._wasDragged = true;
+    setTimeout(() => { el._wasDragged = false; }, 300);
+
     const j = jobs.find(x => x.id === jobId);
-    if (j) {
-      j.scheduledTime = newTime;
-      j.scheduledEndTime = addMinutesToTime(newTime, j.scheduledDuration || 60);
-      const d = j.scheduledDate ? new Date(j.scheduledDate) : new Date();
-      j.data.date = d.toISOString();
+    if (!j) return;
+
+    // Check if we're in week view (has week columns) or day view
+    const colInfo = getWeekColAtX(clientX);
+
+    if (colInfo && colInfo.col.getAttribute('data-date')) {
+      // WEEK VIEW DROP - get time from Y position relative to column
+      const colRect = colInfo.col.getBoundingClientRect();
+      const relY = clientY - colRect.top + (colInfo.col.scrollTop || 0);
+      const { time } = getTimeFromTop(Math.max(0, relY));
+      const dateStr = colInfo.col.getAttribute('data-date');
+      const newDate = new Date(dateStr + 'T12:00:00');
+      j.scheduledDate = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate()).toISOString();
+      j.data.date = j.scheduledDate;
+      j.scheduledTime = time;
+      j.scheduledEndTime = addMinutesToTime(time, j.scheduledDuration || 120);
       saveToStorage();
       renderMonthCal();
-      showToast('📅 Moved to ' + newTime, 'success');
+      renderWeekTimeline();
+      showToast('📅 Moved to ' + colInfo.col.getAttribute('data-date-label') + ' at ' + time, 'success');
+    } else {
+      // DAY VIEW DROP - get time from Y position relative to timeline container
+      const container = containerEl || el.parentElement;
+      const containerRect = container ? container.getBoundingClientRect() : {top:0};
+      // Use the element's current top position (set during drag)
+      const currentTop = parseInt(el.style.top) || 0;
+      const { time, snappedMins } = getTimeFromTop(currentTop);
+      const snappedTop = (snappedMins / 60) * HOUR_HEIGHT;
+      el.style.top = snappedTop + 'px';
+      j.scheduledTime = time;
+      j.scheduledEndTime = addMinutesToTime(time, j.scheduledDuration || 120);
+      if (j.scheduledDate) j.data.date = j.scheduledDate;
+      saveToStorage();
+      renderMonthCal();
+      renderDayTimeline(calSelectedDate);
+      showToast('📅 Moved to ' + time, 'success');
     }
   }
 
   // Touch
   el.addEventListener('touchstart', e => {
     if (e.target.closest('.resize-handle')) return;
-    onStart(e.touches[0].clientY);
+    onStart(e.touches[0].clientX, e.touches[0].clientY);
   }, {passive:true});
   el.addEventListener('touchmove', e => {
-    if (!dragging && Math.abs(e.touches[0].clientY - startY) <= dragThreshold) return;
+    if (!dragging && Math.hypot(e.touches[0].clientX - startX, e.touches[0].clientY - startY) <= dragThreshold) return;
     e.preventDefault();
-    onMove(e.touches[0].clientY);
+    onMove(e.touches[0].clientX, e.touches[0].clientY);
   }, {passive:false});
   el.addEventListener('touchend', e => {
-    onEnd(e.changedTouches[0].clientY);
+    onEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
   }, {passive:true});
 
   // Mouse
   el.addEventListener('mousedown', e => {
     if (e.target.closest('.resize-handle')) return;
     e.preventDefault();
-    onStart(e.clientY);
-    const onMv = e2 => { e2.preventDefault(); onMove(e2.clientY); };
-    const onUp = e2 => { onEnd(e2.clientY); document.removeEventListener('mousemove', onMv); document.removeEventListener('mouseup', onUp); };
+    onStart(e.clientX, e.clientY);
+    const onMv = e2 => { e2.preventDefault(); onMove(e2.clientX, e2.clientY); };
+    const onUp = e2 => { onEnd(e2.clientX, e2.clientY); document.removeEventListener('mousemove', onMv); document.removeEventListener('mouseup', onUp); };
     document.addEventListener('mousemove', onMv);
     document.addEventListener('mouseup', onUp);
   });
+}
+
+function showConfirmSheet(title, subtitle, confirmLabel, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:70000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+  const ttl = document.createElement('div');
+  ttl.style.cssText = 'font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;';
+  ttl.textContent = title;
+  const sub = document.createElement('div');
+  sub.style.cssText = 'font-size:13px;color:var(--muted);margin-bottom:20px;';
+  sub.textContent = subtitle;
+  const confirmBtn = document.createElement('button');
+  confirmBtn.style.cssText = 'width:100%;background:rgba(255,68,68,0.15);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:13px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;cursor:pointer;margin-bottom:10px;';
+  confirmBtn.textContent = confirmLabel;
+  confirmBtn.onclick = () => { overlay.remove(); onConfirm(); };
+  const cancelBtn = document.createElement('button');
+  cancelBtn.style.cssText = 'width:100%;background:none;border:none;color:var(--muted);padding:10px;font-size:13px;cursor:pointer;';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = () => overlay.remove();
+  sheet.appendChild(ttl); sheet.appendChild(sub);
+  sheet.appendChild(confirmBtn); sheet.appendChild(cancelBtn);
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
 }
 
 function showJobContextMenu(jobId, el) {
@@ -3203,13 +3752,31 @@ function showJobContextMenu(jobId, el) {
   // Action buttons
   const actions = [
     { icon:'📋', label:'Open Job', color:'var(--accent)', fn:() => { switchJob(jobId); showScreen('job'); menu.remove(); }},
-    { icon:'📅', label:'Reschedule', color:'var(--muted)', fn:() => { menu.remove(); openScheduleModal(); }},
-    { icon:'🗑️', label:'Delete from Schedule', color:'var(--red)', fn:() => {
+    { icon:'📅', label:'Reschedule', color:'var(--muted)', fn:() => {
       menu.remove();
-      // Confirm delete
-      if (!confirm('Remove ' + (j.data.customerName||'this job') + ' from schedule?')) return;
-      deleteJob(jobId, {stopPropagation:()=>{}});
-      renderDayTimeline(calSelectedDate);
+      // Enter placement mode with THIS job
+      enterReschedulePlacementMode(j);
+    }},
+    { icon:'🗑️', label:'Remove from Schedule', color:'var(--red)', fn:() => {
+      menu.remove();
+      // Use inline confirm sheet instead of window.confirm (blocked in PWA)
+      showConfirmSheet(
+        'Remove ' + (j.data.customerName||'this job') + ' from schedule?',
+        'This keeps the job and all customer data — just removes it from the calendar.',
+        'Remove',
+        () => {
+          j.scheduledDate = null;
+          j.scheduledTime = null;
+          j.scheduledEndTime = null;
+          j.scheduledDuration = null;
+          j.status = 'pending';
+          saveToStorage();
+          renderMonthCal();
+          renderDayTimeline(calSelectedDate);
+          renderWeekTimeline();
+          showToast((j.data.customerName||'Job') + ' removed from schedule', 'info');
+        }
+      );
     }},
   ];
 
@@ -3567,7 +4134,7 @@ let truck = (() => {
     if (parsed && parsed.length > 0) return parsed;
   }
   // Default inventory loaded from spreadsheet
-  const defaultInventory = [{"name": "QOLSYS IQ2 PANEL", "qty": 1}, {"name": "QOLSYS IQ4 PANEL", "qty": 1}, {"name": "QOLSYS IQ SMOKE DETECTOR WIRELESS", "qty": 1}, {"name": "QOLSYS IQ MOTION PET IMMUNE", "qty": 2}, {"name": "QOLSYS IQ GLASS BREAK DETECTOR", "qty": 1}, {"name": "QOLSYS IQ MINI D/W CONTACT (WHITE)", "qty": 4}, {"name": "QOLSYS IQ GARAGE DOOR TILT SENSOR", "qty": 0}, {"name": "QOLSYS IQ FALL PENDANT", "qty": 1}, {"name": "QOLSYS IQ KEY FOB", "qty": 1}, {"name": "2GIG GC2 4G LTE CELL RADIO VERIZON", "qty": 8}, {"name": "2GIG SMKT8-345 SMOKE/HEAT/FREEZE SENSOR", "qty": 6}, {"name": "2GIG WIRELESS 15' GLASS BREAK", "qty": 1}, {"name": "2GIG WIRELESS MOTION w PET IMMUNITY", "qty": 2}, {"name": "2GIG WIRELESS THIN D/W CONTACT", "qty": 13}, {"name": "2GIG GARAGE DOOR TILT SENSOR", "qty": 0}, {"name": "2GIG FALL PENDANT", "qty": 3}, {"name": "2GIG 4 BUTTON KEY FOB", "qty": 8}, {"name": "2GIG BATT2X RECHARGEABLE BATTERY PACK", "qty": 2}, {"name": "LIFTMASTER myQ SMART GARAGE", "qty": 1}, {"name": "LINEAR Z-WAVE GARAGE DOOR OPENER", "qty": 1}, {"name": "KWIKSET 988935 KEYPAD SMART LOCK ZWAVE", "qty": 1}, {"name": "ADC-VDB750 VIDEO DOORBELL", "qty": 3}, {"name": "ADC-V724X 1080P OUTDOOR WIFI CAM W/HDR", "qty": 1}, {"name": "ADC-V523X INDOOR WiFi CAMERA w HDR&2WAY", "qty": 1}, {"name": "ADC-V515 1080p INDOOR WIFI CAMERA", "qty": 2}, {"name": "ADC SMART GATEWAY", "qty": 1}, {"name": "2GIG WIRELESS SECONDARY KEYPAD (PAD1-345)", "qty": 1}, {"name": "2GIG PANIC BUTTON KEYFOB", "qty": 2}];
+  const defaultInventory = [{"name": "QOLSYS IQ2 PANEL", "qty": 1}, {"name": "QOLSYS IQ4 PANEL", "qty": 1}, {"name": "QOLSYS IQ SMOKE DETECTOR WIRELESS", "qty": 1}, {"name": "QOLSYS IQ MOTION PET IMMUNE", "qty": 2}, {"name": "QOLSYS IQ GLASS BREAK DETECTOR", "qty": 1}, {"name": "QOLSYS IQ MINI D/W CONTACT (WHITE)", "qty": 4}, {"name": "QOLSYS IQ GARAGE DOOR TILT SENSOR", "qty": 0}, {"name": "QOLSYS IQ FALL PENDANT", "qty": 1}, {"name": "QOLSYS IQ KEY FOB", "qty": 1}, {"name": "2GIG GC2 4G LTE CELL RADIO VERIZON", "qty": 2}, {"name": "2GIG SMKT8-345 SMOKE/HEAT/FREEZE SENSOR", "qty": 6}, {"name": "2GIG WIRELESS 15' GLASS BREAK", "qty": 1}, {"name": "2GIG WIRELESS MOTION w PET IMMUNITY", "qty": 2}, {"name": "2GIG WIRELESS THIN D/W CONTACT", "qty": 11}, {"name": "2GIG GARAGE DOOR TILT SENSOR", "qty": 0}, {"name": "2GIG FALL PENDANT", "qty": 3}, {"name": "2GIG 4 BUTTON KEY FOB", "qty": 8}, {"name": "2GIG BATT2X RECHARGEABLE BATTERY PACK", "qty": 2}, {"name": "LIFTMASTER myQ SMART GARAGE", "qty": 1}, {"name": "LINEAR Z-WAVE GARAGE DOOR OPENER", "qty": 1}, {"name": "KWIKSET 988935 KEYPAD SMART LOCK ZWAVE", "qty": 1}, {"name": "ADC-VDB750 VIDEO DOORBELL", "qty": 3}, {"name": "ADC-V724X 1080P OUTDOOR WIFI CAM W/HDR", "qty": 1}, {"name": "ADC-V523X INDOOR WiFi CAMERA w HDR&2WAY", "qty": 1}, {"name": "ADC-V515 1080p INDOOR WIFI CAMERA", "qty": 2}, {"name": "ADC SMART GATEWAY", "qty": 1}, {"name": "2GIG WIRELESS SECONDARY KEYPAD (PAD1-345)", "qty": 1}, {"name": "2GIG PANIC BUTTON KEYFOB", "qty": 2}];
   localStorage.setItem('p22_truck', JSON.stringify(defaultInventory));
   return defaultInventory;
 })();
@@ -4302,6 +4869,7 @@ try {
   }
 } catch(e) { console.warn('Firebase init failed:', e); }
 
+pendingRescheduleJob = null;
 // Init auth - this handles routing after login
 initFirebaseAuth();
 appReady = true;
@@ -4320,10 +4888,90 @@ let closerView = 'week';
 function initAppData() {
   // Load data or demo data
   if (!loadFromStorage()) {
-    const demoJobs = [{"id":2000001,"sent":true,"status":"complete","scheduledDate":"2026-03-15T12:00:00","scheduledTime":"8:00 AM","scheduledEndTime":"10:00 AM","scheduledDuration":120,"data":{"customerName":"John Martinez","address":"4521 W Camelback Rd, Phoenix, AZ 85031","phone":"(602) 555-0142","email":"jmartinez@gmail.com","cs":"CS-884421","confirmation":"ADT-2024-001","adtStatus":"Active","masterCode":"1234","verbalCode":"ALPHA","notes":"Gate code: 1234. Dog in backyard.","arriveTime":"8:05 AM","finishTime":"9:55 AM","installing":[{"name":"2GIG GC2e CONTROL PANEL","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"4"}],"existing":[],"zones":["Front Door","Back Door","Garage"]}},{"id":2000002,"sent":false,"status":"pending","scheduledDate":"2026-03-15T10:30:00","scheduledTime":"10:30 AM","scheduledDuration":120,"data":{"customerName":"Sarah Thompson","address":"1892 E Indian School Rd, Scottsdale, AZ 85016","phone":"(480) 555-0287","email":"sthompson@yahoo.com","cs":"CS-991032","notes":"Call before arriving.","installing":[{"name":"2GIG EDGE TOUCHSCREEN PANEL w VERIZON LTE","qty":"1"}],"existing":[],"zones":[]}}];
-    jobs = demoJobs; jobCounter = 2000002; activeJobId = 2000001;
-    const demoCusts = [{"id":1000001,"name":"John Martinez","address":"4521 W Camelback Rd, Phoenix, AZ 85031","phone":"(602) 555-0142","email":"jmartinez@gmail.com","cs":"CS-884421","notes":""},{"id":1000002,"name":"Sarah Thompson","address":"1892 E Indian School Rd, Scottsdale, AZ 85016","phone":"(480) 555-0287","email":"sthompson@yahoo.com","cs":"CS-991032","notes":"Call before arriving."}];
+    const today = new Date().toISOString().split('T')[0];
+    const demoJobs = [
+      {
+        "id":2000001,"sent":false,"status":"inprogress",
+        "scheduledDate":today+"T08:00:00","scheduledTime":"8:00 AM","scheduledEndTime":"10:00 AM","scheduledDuration":120,
+        "data":{
+          "customerName":"John Martinez","address":"4521 W Camelback Rd, Phoenix, AZ 85031",
+          "phone":"(602) 555-0142","email":"jmartinez@gmail.com","cs":"CS-884421",
+          "masterCode":"1234","verbalCode":"ALPHA","notes":"Gate code: 1234. Dog in backyard.",
+          "arriveTime":"8:05 AM","finishTime":"",
+          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"4"},{"name":"2GIG WIRELESS MOTION w PET IMMUNITY","qty":"1"}],
+          "existing":[],"zones":["Front Door","Back Door","Garage","Motion"]
+        }
+      },
+      {
+        "id":2000002,"sent":false,"status":"pending",
+        "scheduledDate":today+"T10:00:00","scheduledTime":"10:00 AM","scheduledEndTime":"12:00 PM","scheduledDuration":120,
+        "data":{
+          "customerName":"Sarah Thompson","address":"1892 E Indian School Rd, Scottsdale, AZ 85016",
+          "phone":"(480) 555-0287","email":"sthompson@yahoo.com","cs":"CS-991032",
+          "notes":"Call before arriving.",
+          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"5"},{"name":"ADC-VDB750 VIDEO DOORBELL","qty":"1"}],
+          "existing":[],"zones":["Front Door","Side Gate","Back Door","Living Room","Kitchen","Office"]
+        }
+      },
+      {
+        "id":2000003,"sent":false,"status":"pending",
+        "scheduledDate":today+"T12:30:00","scheduledTime":"12:30 PM","scheduledEndTime":"2:30 PM","scheduledDuration":120,
+        "data":{
+          "customerName":"Mike Chen","address":"7740 N 32nd St, Phoenix, AZ 85020",
+          "phone":"(602) 555-0398","email":"mchen@hotmail.com","cs":"CS-773214",
+          "notes":"New construction. Contact Mike.",
+          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"3"},{"name":"ADC-VDB750 VIDEO DOORBELL","qty":"1"}],
+          "existing":[],"zones":["Front Door","Back Door","Garage"]
+        }
+      },
+      {
+        "id":2000004,"sent":false,"status":"pending",
+        "scheduledDate":today+"T14:30:00","scheduledTime":"2:30 PM","scheduledEndTime":"4:30 PM","scheduledDuration":120,
+        "data":{
+          "customerName":"Robert Gallegos","address":"3301 S Mill Ave, Tempe, AZ 85282",
+          "phone":"(480) 555-0451","email":"rgallegos@gmail.com","cs":"CS-662891",
+          "notes":"Has dog. Park on street.",
+          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"4"},{"name":"2GIG WIRELESS MOTION w PET IMMUNITY","qty":"2"},{"name":"ADC-VDB750 VIDEO DOORBELL","qty":"1"}],
+          "existing":[],"zones":["Front","Back","Side","Garage","Living Room","Office"]
+        }
+      },
+      {
+        "id":2000005,"sent":false,"status":"pending",
+        "scheduledDate":today+"T16:30:00","scheduledTime":"4:30 PM","scheduledEndTime":"6:30 PM","scheduledDuration":120,
+        "data":{
+          "customerName":"Amanda Foster","address":"9155 E Via de Ventura, Scottsdale, AZ 85258",
+          "phone":"(480) 555-0512","email":"afoster@outlook.com","cs":"CS-554478",
+          "notes":"Gate code 4455. Call when arriving.",
+          "installing":[{"name":"2GIG GC2 4G LTE CELL RADIO VERIZON","qty":"1"},{"name":"2GIG WIRELESS THIN D/W CONTACT","qty":"4"},{"name":"2GIG WIRELESS MOTION w PET IMMUNITY","qty":"1"},{"name":"ADC-VDB750 VIDEO DOORBELL","qty":"1"}],
+          "existing":[],"zones":["Front Door","Back Door","Garage","Master Bedroom"]
+        }
+      }
+    ];
+    jobs = demoJobs; jobCounter = 2000005; activeJobId = 2000001;
+    const demoCusts = [
+      {"id":1000001,"name":"John Martinez","address":"4521 W Camelback Rd, Phoenix, AZ 85031","phone":"(602) 555-0142","email":"jmartinez@gmail.com","cs":"CS-884421","notes":"Gate code: 1234. Dog in backyard."},
+      {"id":1000002,"name":"Sarah Thompson","address":"1892 E Indian School Rd, Scottsdale, AZ 85016","phone":"(480) 555-0287","email":"sthompson@yahoo.com","cs":"CS-991032","notes":"Call before arriving."},
+      {"id":1000003,"name":"Mike Chen","address":"7740 N 32nd St, Phoenix, AZ 85020","phone":"(602) 555-0398","email":"mchen@hotmail.com","cs":"CS-773214","notes":"New construction."},
+      {"id":1000004,"name":"Robert Gallegos","address":"3301 S Mill Ave, Tempe, AZ 85282","phone":"(480) 555-0451","email":"rgallegos@gmail.com","cs":"CS-662891","notes":"Has dog. Park on street."},
+      {"id":1000005,"name":"Amanda Foster","address":"9155 E Via de Ventura, Scottsdale, AZ 85258","phone":"(480) 555-0512","email":"afoster@outlook.com","cs":"CS-554478","notes":"Gate code 4455."}
+    ];
     customers = demoCusts;
+    // Set truck stock to show depletion across the day:
+    // Cell radios: 2 on truck → jobs 1,2 use 1 each = runs out by job 3
+    // D/W contacts: 11 on truck → jobs use 4+5=9, leaving 2 → job 3 needs 3, job 4+ short
+    // Video doorbells: 2 on truck → jobs 2,3 use 1 each = runs out by job 4
+    // Motions: 2 on truck → job 4 needs 2 = last ones, job 5 short
+    const truckOverrides = {
+      '2GIG GC2 4G LTE CELL RADIO VERIZON': 2,
+      '2GIG WIRELESS THIN D/W CONTACT': 11,
+      'ADC-VDB750 VIDEO DOORBELL': 2,
+      '2GIG WIRELESS MOTION w PET IMMUNITY': 2
+    };
+    truck = truck.map(t => {
+      const override = truckOverrides[t.name];
+      return override !== undefined ? {...t, qty: override} : t;
+    });
+    localStorage.setItem('p22_truck', JSON.stringify(truck));
     saveToStorage();
   }
   // Show tech app
