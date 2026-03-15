@@ -3965,20 +3965,31 @@ function showLoginError(msg) {
   err.textContent = msg; err.style.display = 'block';
 }
 
+let appReady = false;
+let pendingUser = null;
+
 function onLoginSuccess(user) {
   currentUser = user;
   const u = USERS[user.email] || { role: 'tech', name: user.email, uid: user.uid };
   currentRole = u.role;
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('loginBtn').textContent = 'SIGN IN';
-  document.getElementById('loginBtn').disabled = false;
-  // Route based on role
+  const ls = document.getElementById('loginScreen');
+  const lb = document.getElementById('loginBtn');
+  if (ls) ls.style.display = 'none';
+  if (lb) { lb.textContent = 'SIGN IN'; lb.disabled = false; }
+  if (!appReady) {
+    pendingUser = user;
+    return;
+  }
+  routeUser();
+}
+
+function routeUser() {
+  if (!currentUser) return;
   if (currentRole === 'closer') {
     initCloserView();
   } else if (currentRole === 'callcenter') {
     initCallCenterView();
   } else {
-    // Admin or tech — show full app
     initTechApp();
   }
 }
@@ -4132,6 +4143,8 @@ window.onFirebaseJobs = function(data) {
 };
 
   initFirebaseAuth();
+  appReady = true;
+  if (pendingUser) { currentUser = pendingUser; pendingUser = null; routeUser(); }
 }); // end DOMContentLoaded
 </script>
 
