@@ -426,7 +426,7 @@
   .week-time-block{position:absolute;left:1px;right:1px;border-radius:4px;padding:2px 4px;font-size:8px;font-family:'Share Tech Mono',monospace;cursor:pointer;overflow:hidden;z-index:2;}
 
   /* TIMELINE VIEWS */
-  .timeline-wrap{position:relative;overflow:hidden;}
+  .timeline-wrap{position:relative;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
   .timeline-wrap::-webkit-scrollbar{width:3px;}
   .timeline-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
   .timeline-grid{position:relative;min-height:960px;}/* 16hrs * 60px */
@@ -449,7 +449,7 @@
   .timeline-now-dot{position:absolute;left:34px;width:8px;height:8px;border-radius:50%;background:var(--red);margin-top:-3px;}
 
   /* WEEK TIMELINE HEADER */
-  .week-timeline-header{display:flex;border-bottom:1px solid var(--border);margin-bottom:0;background:var(--panel2);}
+  .week-timeline-header{display:flex;border-bottom:1px solid var(--border);margin-bottom:0;background:var(--panel2);position:sticky;top:0;z-index:20;}
   .week-timeline-day-hdr{flex:1;text-align:center;padding:8px 2px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;cursor:pointer;border-right:1px solid var(--border);transition:all 0.15s;}
   .week-timeline-day-hdr:hover{color:var(--accent);}
   .week-timeline-day-hdr.today{color:var(--accent);}
@@ -457,7 +457,7 @@
   .week-timeline-day-hdr .hdr-num{font-size:16px;font-weight:bold;display:block;margin-top:2px;}
   .week-col-spacer{width:38px;flex-shrink:0;}
   .week-cols-wrap{display:flex;flex:1;}
-  .week-timeline-col{flex:1;position:relative;border-right:1px solid rgba(255,255,255,0.03);}
+  .week-timeline-col{flex:1;position:relative;border-right:1px solid rgba(255,255,255,0.03);min-width:44px;}
 
   /* ADD JOB TAP ZONE */
   .tap-to-add{position:absolute;left:2px;right:2px;cursor:pointer;z-index:1;border-radius:6px;transition:background 0.1s;}
@@ -676,6 +676,20 @@
 
   /* ── Week timeline time label narrower on small screens ── */
   .week-col-spacer, [style*="width:38px"][style*="flex-shrink:0"] { width: 28px !important; min-width: 28px !important; }
+
+  /* ── Week timeline — constrained height so it scrolls within view ── */
+  #calBodyWeek .timeline-wrap {
+    max-height: 65vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Day timeline — same ── */
+  #calBodyDay .timeline-wrap {
+    max-height: 70vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>
 </head>
@@ -1245,15 +1259,24 @@ function renderTabs() {
     stEl.className = 'current-job-status';
   }
 
-  // Filter dropdown to today ±1 day; fall back to all if nothing in range
+  // Filter dropdown to today ±1 day — compare local date strings to avoid timezone shift
   const now = new Date();
-  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1); yesterday.setHours(0,0,0,0);
-  const tomorrow  = new Date(now); tomorrow.setDate(now.getDate() + 1);  tomorrow.setHours(23,59,59,999);
+  const pad = n => String(n).padStart(2,'0');
+  const localDateStr = d => {
+    // Convert any ISO date to a local YYYY-MM-DD string
+    const dt = new Date(d);
+    return dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
+  };
+  const todayStr     = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
+  const yd = new Date(now); yd.setDate(now.getDate()-1);
+  const tm = new Date(now); tm.setDate(now.getDate()+1);
+  const yestStr = yd.getFullYear()+'-'+pad(yd.getMonth()+1)+'-'+pad(yd.getDate());
+  const tmrwStr = tm.getFullYear()+'-'+pad(tm.getMonth()+1)+'-'+pad(tm.getDate());
   let visibleJobs = jobs.filter(j => {
-    const d = j.scheduledDate || (j.data && j.data.date);
+    const d = j.scheduledDate;
     if (!d) return false;
-    const jd = new Date(d);
-    return jd >= yesterday && jd <= tomorrow;
+    const ds = localDateStr(d);
+    return ds >= yestStr && ds <= tmrwStr;
   });
   // Always include the active job even if outside range
   if (activeJobId && !visibleJobs.find(j => j.id === activeJobId)) {
@@ -2821,6 +2844,17 @@ function saveCustomers() {
   if (window.fbSet) window.fbSet('customers', customers).catch(()=>{});
 }
 
+
+function toggleNewCustomerForm() {
+  const form = document.getElementById('newCustomerForm');
+  const btn  = document.getElementById('newCustToggleBtn');
+  const open = form.style.display === 'none' || form.style.display === '';
+  form.style.display = open ? 'block' : 'none';
+  if (btn) btn.textContent = open ? '✕ CANCEL' : '+ NEW';
+  if (open) {
+    setTimeout(() => document.getElementById('ncName')?.focus(), 100);
+  }
+}
 function saveNewCustomer() {
   const name = document.getElementById('ncName').value.trim();
   if (!name) { showToast('Name is required', 'error'); return; }
@@ -2842,6 +2876,11 @@ function saveNewCustomer() {
   });
   renderCustomers();
   showToast('✓ Customer saved', 'success');
+  // Collapse the form after saving
+  const form = document.getElementById('newCustomerForm');
+  const btn  = document.getElementById('newCustToggleBtn');
+  if (form) form.style.display = 'none';
+  if (btn)  btn.textContent = '+ NEW';
 }
 
 function renderCustomers() {
@@ -2863,19 +2902,19 @@ function renderCustomers() {
     const card = document.createElement('div');
     card.className = 'customer-card';
     const initials = c.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
-    // Count jobs for this customer
     const custJobs = jobs.filter(j => j.data && j.data.customerName === c.name);
-    const jobBadge = custJobs.length > 0 ? '<span style="font-family:Share Tech Mono,monospace;font-size:9px;background:var(--accent-dim);color:var(--accent);border-radius:4px;padding:2px 6px;margin-left:4px;">'+custJobs.length+' job'+(custJobs.length>1?'s':'')+'</span>' : '';
+    const jobCount = custJobs.length;
+    const lastJob = [...custJobs].sort((a,b) => new Date(b.scheduledDate||0) - new Date(a.scheduledDate||0))[0];
+    const lastDate = lastJob && lastJob.scheduledDate ? new Date(lastJob.scheduledDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
+    const statusColor = !jobCount ? 'var(--muted)' : lastJob.status==='complete' ? 'var(--green)' : lastJob.status==='cantfinish' ? 'var(--red)' : 'var(--yellow)';
     card.innerHTML =
       '<div class="customer-avatar">'+initials+'</div>'+
       '<div class="customer-info">'+
-        '<div class="customer-name">'+c.name+jobBadge+'</div>'+
+        '<div class="customer-name">'+c.name+'</div>'+
         '<div class="customer-meta">'+(c.phone||'')+(c.address?' · '+c.address.split(',')[0]:'')+'</div>'+
+        (jobCount ? '<div style="font-size:10px;margin-top:3px;color:'+statusColor+';">'+jobCount+' job'+(jobCount>1?'s':'')+(lastDate?' · last: '+lastDate:'')+'</div>' : '')+
       '</div>'+
-      '<div class="customer-actions">'+
-        '<button class="btn-use-customer" onclick="openCustomerDetail('+c.id+');event.stopPropagation()">View</button>'+
-        '<button class="btn-remove" onclick="deleteCustomer('+c.id+',event)" style="width:28px;height:28px;">×</button>'+
-      '</div>';
+      '<div style="color:var(--muted);font-size:20px;padding:4px 8px;flex-shrink:0;">›</div>';
     card.onclick = () => openCustomerDetail(c.id);
     list.appendChild(card);
   });
@@ -2945,9 +2984,28 @@ function openCustomerDetail(id) {
   actions.style.cssText = 'display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);';
   actions.innerHTML =
   actions.innerHTML = '';
-  const lb2 = document.createElement('button'); lb2.style.cssText='flex:1;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;'; lb2.textContent='→ LOAD INTO JOB'; lb2.onclick=()=>{useCustomer(c.id);panel.remove();}; actions.appendChild(lb2);
-  const sb2 = document.createElement('button'); sb2.style.cssText='flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;'; sb2.textContent='📅 SCHEDULE'; sb2.onclick=()=>{scheduleForCustomer(c.id);panel.remove();}; actions.appendChild(sb2);
+  const lb2 = document.createElement('button'); lb2.style.cssText='flex:1;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:12px 8px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;'; lb2.textContent='→ LOAD INTO JOB'; lb2.onclick=()=>{useCustomer(c.id);panel.remove();}; actions.appendChild(lb2);
+  const sb2 = document.createElement('button'); sb2.style.cssText='flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:12px 8px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;'; sb2.textContent='📅 SCHEDULE'; sb2.onclick=()=>{scheduleForCustomer(c.id);panel.remove();}; actions.appendChild(sb2);
   sheet.appendChild(actions);
+
+  // Delete button — separate row, clearly destructive, requires confirmation
+  const deleteRow = document.createElement('div');
+  deleteRow.style.cssText = 'padding:0 16px 4px;';
+  const deleteBtn = document.createElement('button');
+  deleteBtn.style.cssText = 'width:100%;background:none;border:1px solid rgba(255,68,68,0.25);color:rgba(255,68,68,0.6);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;letter-spacing:1px;transition:all 0.15s;';
+  deleteBtn.textContent = '🗑 DELETE CUSTOMER';
+  deleteBtn.onmouseover = () => { deleteBtn.style.borderColor='var(--red)'; deleteBtn.style.color='var(--red)'; };
+  deleteBtn.onmouseout  = () => { deleteBtn.style.borderColor='rgba(255,68,68,0.25)'; deleteBtn.style.color='rgba(255,68,68,0.6)'; };
+  deleteBtn.onclick = () => {
+    showConfirmSheet(
+      'Delete ' + c.name + '?',
+      'This permanently removes the customer record. Their job history will remain.',
+      'Delete Customer',
+      () => { deleteCustomer(c.id, {stopPropagation:()=>{}}); panel.remove(); showToast(c.name + ' deleted', 'info'); }
+    );
+  };
+  deleteRow.appendChild(deleteBtn);
+  sheet.appendChild(deleteRow);
 
   // Job history for this customer
   if (custJobs.length > 0) {
@@ -3341,7 +3399,7 @@ function renderWeekTimeline() {
     timeHtml+='</div></div>';
   }
   timeHtml+='</div>';
-  body.innerHTML=hdrHtml+timeHtml;
+  body.innerHTML = '<div style="position:relative;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto;-webkit-overflow-scrolling:touch;">' + hdrHtml + timeHtml + '</div>';
 
   // Wire drag/resize/click for each week event
   const HOUR_H=HOUR_HEIGHT, HOUR_S=HOUR_START;
@@ -3895,14 +3953,17 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
   // grabOffsetY/X = where within the element the user grabbed (px from element top-left)
   let grabOffsetY = 0, grabOffsetX = 0;
 
+  let ghostOrigLeft = 0; // ghost X never changes — block stays in its column
+
   function onStart(clientX, clientY) {
     startY = clientY;
     startX = clientX;
     startTop = parseInt(el.style.top) || 0;
-    // Record grab offset so ghost and drop position stay anchored to grab point
+    // Only track Y offset — X stays fixed so block never jumps sideways
     const rect = el.getBoundingClientRect();
     grabOffsetY = clientY - rect.top;
-    grabOffsetX = clientX - rect.left;
+    grabOffsetX = clientX - rect.left; // kept for week column detection only
+    ghostOrigLeft = rect.left;         // ghost X is locked to element's original left
     dragging = false; moved = false;
   }
 
@@ -3914,7 +3975,6 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       el.classList.add('dragging');
       document.body.style.userSelect = 'none';
       document.body.style.webkitUserSelect = 'none';
-      // Ghost starts exactly where the element is — no jump
       origParent = el.parentElement;
       const rect = el.getBoundingClientRect();
       ghostEl = el.cloneNode(true);
@@ -3922,7 +3982,7 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
       ghostEl.style.position = 'fixed';
       ghostEl.style.width = rect.width + 'px';
       ghostEl.style.height = rect.height + 'px';
-      ghostEl.style.left = rect.left + 'px';
+      ghostEl.style.left = ghostOrigLeft + 'px'; // locked — no X jump
       ghostEl.style.top = rect.top + 'px';
       ghostEl.style.zIndex = '99999';
       ghostEl.style.opacity = '0.85';
@@ -3935,12 +3995,12 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     }
     if (!dragging) return;
     moved = true;
-    // Move ghost so grab point stays under the finger/cursor
+    // Ghost only moves vertically — X stays locked to column
     if (ghostEl) {
-      ghostEl.style.top  = (clientY - grabOffsetY) + 'px';
-      ghostEl.style.left = (clientX - grabOffsetX) + 'px';
+      ghostEl.style.top = (clientY - grabOffsetY) + 'px';
+      // ghostEl.style.left unchanged — stays at ghostOrigLeft
     }
-    // Track el.style.top as the element TOP (not cursor pos) for day-view drop
+    // Track el.style.top for day-view drop position
     const parentRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0};
     const elTop = (clientY - grabOffsetY) - parentRect.top;
     el.style.top = Math.max(0, elTop) + 'px';
@@ -4011,23 +4071,70 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     }
   }
 
-  // Touch
-  // Touch — higher threshold and tap detection for mobile
+  // ── Touch — long-press to drag, tap for menu, normal scroll otherwise ──
   let touchStartTime = 0;
-  const TOUCH_DRAG_THRESHOLD = 12; // px — higher than mouse to avoid accidental drags
-  const TAP_MAX_DURATION = 300;    // ms — anything shorter than this is a tap, not a drag
+  let longPressTimer = null;
+  let dragLocked = false;      // true only after long-press threshold fires
+  let cancelledByScroll = false;
+  const LONG_PRESS_MS = 420;   // hold this long to enter drag mode
+  const SCROLL_CANCEL_PX = 8;  // if finger moves this much vertically before lock, it's a scroll
+
+  function cancelLongPress() {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  }
+
+  function cleanupDrag() {
+    dragging = false; moved = false; dragLocked = false;
+    if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+    el.style.opacity = '';
+    el.style.transform = '';
+    el.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
+    cancelLongPress();
+  }
 
   el.addEventListener('touchstart', e => {
     if (e.target.closest('.resize-handle')) return;
     touchStartTime = Date.now();
+    dragLocked = false;
+    cancelledByScroll = false;
     onStart(e.touches[0].clientX, e.touches[0].clientY);
+
+    // Visual feedback after half the hold time so user knows it's working
+    longPressTimer = setTimeout(() => {
+      // Check finger hasn't drifted vertically (scroll intent)
+      const curY = e.touches[0]?.clientY || startY;
+      if (Math.abs(curY - startY) > SCROLL_CANCEL_PX) return;
+      // Activate drag mode — give haptic + visual cue
+      dragLocked = true;
+      el.style.transform = 'scale(1.03)';
+      el.style.transition = 'transform 0.1s';
+      el.style.boxShadow = '0 8px 24px rgba(0,212,255,0.4)';
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, LONG_PRESS_MS);
   }, {passive:true});
 
   el.addEventListener('touchmove', e => {
     const dx = e.touches[0].clientX - startX;
     const dy = e.touches[0].clientY - startY;
-    if (Math.hypot(dx, dy) <= TOUCH_DRAG_THRESHOLD) return; // not far enough yet
+    const dist = Math.hypot(dx, dy);
+
+    if (!dragLocked) {
+      // Not in drag mode yet — if finger moves vertically, cancel long press
+      // and let the page scroll naturally
+      if (Math.abs(dy) > SCROLL_CANCEL_PX) {
+        cancelLongPress();
+        cancelledByScroll = true;
+      }
+      return; // don't preventDefault — let scroll work
+    }
+
+    // In drag mode — prevent scroll and move the event block
     e.preventDefault();
+    el.style.transform = '';
+    el.style.transition = '';
+    el.style.boxShadow = '';
     onMove(e.touches[0].clientX, e.touches[0].clientY);
   }, {passive:false});
 
@@ -4035,37 +4142,31 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     const elapsed = Date.now() - touchStartTime;
     const endX = e.changedTouches[0].clientX;
     const endY = e.changedTouches[0].clientY;
-    const dx = endX - startX;
-    const dy = endY - startY;
-    const didMove = Math.hypot(dx, dy) > TOUCH_DRAG_THRESHOLD;
 
-    // Clean up any drag state
-    el.style.opacity = '';
-    el.classList.remove('dragging');
-    document.body.style.userSelect = '';
-    document.body.style.webkitUserSelect = '';
+    // Always clean up visual state
+    el.style.transform = '';
+    el.style.transition = '';
+    el.style.boxShadow = '';
+    cancelLongPress();
 
-    // Check for left swipe-to-complete first
-    if (typeof _finishSwipeComplete === 'function') {
-      const wasSwipe = _finishSwipeComplete(el, jobId);
-      if (wasSwipe) {
-        dragging = false; moved = false;
-        if (ghostEl) { ghostEl.remove(); ghostEl = null; }
-        return;
-      }
-    }
-
-    if (!didMove || elapsed < TAP_MAX_DURATION) {
-      // Tap — show context menu
-      dragging = false; moved = false;
-      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
-      showJobContextMenu(jobId, el);
+    if (cancelledByScroll) {
+      cleanupDrag();
       return;
     }
 
-    // Actual drag drop
+    if (!dragLocked) {
+      // Short tap — show context menu
+      cleanupDrag();
+      if (elapsed < 500) showJobContextMenu(jobId, el);
+      return;
+    }
+
+    // Was in drag mode — commit the drop
+    cleanupDrag();
     onEnd(endX, endY);
   }, {passive:true});
+
+  el.addEventListener('touchcancel', () => { cleanupDrag(); }, {passive:true});
 
   // Mouse
   el.addEventListener('mousedown', e => {
@@ -5719,22 +5820,30 @@ function bookCCAppt() {
 <!-- CUSTOMERS SCREEN -->
 <div class="screen" id="screenCustomers">
   <div style="max-width:780px;margin:0 auto;padding:20px 16px 0;">
-    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">👤 CUSTOMERS</div>
 
-    <!-- New customer form -->
-    <div class="customer-form-card" id="newCustomerForm">
-      <h3>+ NEW CUSTOMER</h3>
-      <div class="field"><label>Name</label><input type="text" id="ncName" placeholder="Full name" style="font-size:16px;"></div>
+    <!-- Header row with add button -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;">👤 CUSTOMERS</div>
+      <button onclick="toggleNewCustomerForm()" id="newCustToggleBtn" style="background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px 14px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;">+ NEW</button>
+    </div>
+
+    <!-- New customer form — collapsed by default -->
+    <div class="customer-form-card" id="newCustomerForm" style="display:none;margin-bottom:14px;">
+      <h3>NEW CUSTOMER</h3>
+      <div class="field"><label>Name *</label><input type="text" id="ncName" placeholder="Full name" style="font-size:16px;"></div>
       <div class="field"><label>Address</label><input type="text" id="ncAddress" placeholder="123 Main St, City, State" style="font-size:16px;"></div>
       <div class="field"><label>Phone</label><input type="tel" id="ncPhone" placeholder="(555) 000-0000" oninput="formatPhone(this)" style="font-size:16px;"></div>
       <div class="field"><label>Email</label><input type="email" id="ncEmail" placeholder="customer@email.com" style="font-size:16px;"></div>
       <div class="field"><label>CS #</label><input type="text" id="ncCs" placeholder="CS number" style="font-size:16px;"></div>
       <div class="field"><label>Notes</label><textarea id="ncNotes" placeholder="Any notes about this customer..." style="min-height:60px;"></textarea></div>
-      <button onclick="saveNewCustomer()" style="width:100%;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:12px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:4px;">💾 SAVE CUSTOMER</button>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button onclick="saveNewCustomer()" style="flex:1;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:2px;cursor:pointer;">💾 SAVE CUSTOMER</button>
+        <button onclick="toggleNewCustomerForm()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:13px 16px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;">CANCEL</button>
+      </div>
     </div>
 
     <!-- Search -->
-    <div class="search-bar"><input type="text" id="customerSearch" placeholder="Search customers..." oninput="renderCustomers()"></div>
+    <div class="search-bar" style="margin-bottom:10px;"><input type="text" id="customerSearch" placeholder="Search by name, phone, address..." oninput="renderCustomers()" style="font-size:16px;"></div>
     <div id="customerList"></div>
   </div>
 </div>
