@@ -847,8 +847,15 @@
       <div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:1px;">Scheduled</div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="scheduledTimeLabel">—</div>
     </div>
-    <button onclick="rescheduleCurrentJob()" style="background:none;border:1px solid rgba(0,212,255,0.2);color:var(--accent);border-radius:6px;padding:4px 9px;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer;letter-spacing:1px;white-space:nowrap;">MOVE</button>
+    <button onclick="rescheduleCurrentJob()" style="background:none;border:1px solid rgba(0,212,255,0.2);color:var(--accent);border-radius:6px;padding:4px 9px;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer;letter-spacing:1px;white-space:nowrap;">RESCHEDULE</button>
     <button onclick="removeJobFromSchedule()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 2px;line-height:1;" title="Remove from schedule">×</button>
+  </div>
+
+  <!-- Schedule button — only shown when job has no calendar date yet -->
+  <div id="scheduleJobBtn" style="display:none;margin-bottom:8px;">
+    <button onclick="scheduleCurrentJob()" style="width:100%;background:rgba(0,212,255,0.08);border:1px dashed rgba(0,212,255,0.4);color:var(--accent);border-radius:8px;padding:12px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;display:flex;align-items:center;justify-content:center;gap:8px;">
+      <span style="font-size:14px;">📅</span> SCHEDULE THIS JOB
+    </button>
   </div>
 
   <!-- Status + Time -->
@@ -1319,6 +1326,7 @@ function renderEmptyJobState() {
   const zr = document.getElementById('zoneRows');       if (zr) zr.innerHTML = '';
   const pb = document.getElementById('partialInstallBanner'); if (pb) pb.remove();
   const sb = document.getElementById('scheduledBanner'); if (sb) sb.style.display = 'none';
+  const sjb = document.getElementById('scheduleJobBtn'); if (sjb) sjb.style.display = 'none';
   updateTimeDisplay('', '');
   setStatus('pending', false);
 }
@@ -1384,14 +1392,17 @@ function loadJob(id) {
   // Show scheduled time from calendar
   const banner = document.getElementById('scheduledBanner');
   const label = document.getElementById('scheduledTimeLabel');
+  const schedBtn = document.getElementById('scheduleJobBtn');
   if (banner && label) {
     const st = j.scheduledTime;
     const sd = j.scheduledDate ? new Date(j.scheduledDate).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : null;
     if (st || sd) {
       banner.style.display = 'flex';
       label.textContent = (sd||'') + (sd&&st?' · ':'') + (st||'');
+      if (schedBtn) schedBtn.style.display = 'none';
     } else {
       banner.style.display = 'none';
+      if (schedBtn) schedBtn.style.display = 'block';
     }
   }
   document.getElementById('notes').value = d.notes || '';
@@ -2070,7 +2081,9 @@ function enterReschedulePlacementMode(sourceJob) {
   const banner = document.createElement('div');
   banner.id = 'reschedBanner';
   banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9000;background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;padding:12px 16px;display:flex;align-items:center;gap:10px;font-family:Share Tech Mono,monospace;font-size:11px;letter-spacing:1px;';
-  banner.innerHTML = '<span style="font-size:16px;">📅</span><span style="flex:1;">TAP ANY TIME SLOT TO RESCHEDULE ' + (sourceJob.data.customerName||'JOB').toUpperCase() + '</span>';
+  const hasDate = !!(sourceJob.scheduledDate || sourceJob.scheduledTime);
+  const action = hasDate ? 'RESCHEDULE' : 'SCHEDULE';
+  banner.innerHTML = '<span style="font-size:16px;">📅</span><span style="flex:1;">TAP ANY SLOT TO ' + action + ': ' + (sourceJob.data.customerName||'JOB').toUpperCase() + '</span>';
   const cancelReschedBtn = document.createElement('button');
   cancelReschedBtn.textContent = '✕ Cancel';
   cancelReschedBtn.style.cssText = 'background:rgba(0,0,0,0.2);border:none;color:#000;border-radius:4px;padding:4px 8px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;';
@@ -2132,6 +2145,16 @@ function removeJobFromSchedule() {
       showToast('Removed from schedule', 'info');
     }
   );
+}
+
+function scheduleCurrentJob() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  // Save current form state first
+  saveCurrentJob();
+  // Use tap-to-place mode — takes you to the calendar, tap any slot to set the date/time
+  // This is the same flow as RESCHEDULE but the banner says "Schedule" for unscheduled jobs
+  enterReschedulePlacementMode(j);
 }
 function rescheduleCurrentJob() {
   const j = jobs.find(x => x.id === activeJobId);
@@ -2971,19 +2994,23 @@ function scheduleForCustomer(id) {
 function useCustomer(id) {
   const c = customers.find(x => x.id === id);
   if (!c) return;
-  // Fill job form fields
-  const fields = {customerName:c.name, address:c.address, phone:c.phone, email:c.email, cs:c.cs, notes:c.notes};
-  Object.entries(fields).forEach(([fid, val]) => {
-    const el = document.getElementById(fid);
-    if (el && val) {
-      el.value = val;
-      if (fid === 'phone') formatPhone(el);
-    }
-  });
-  autoSave();
-  updateCrossStreet();
+  // Save whatever is currently in the form first so nothing is lost
+  saveCurrentJob();
+  // Create a brand new job for this customer — never overwrite the active one
+  const j = blankJob();
+  j.data.customerName = c.name || '';
+  j.data.address      = c.address || '';
+  j.data.phone        = c.phone || '';
+  j.data.email        = c.email || '';
+  j.data.cs           = c.cs || '';
+  j.data.notes        = c.notes || '';
+  jobs.push(j);
+  activeJobId = j.id;
+  saveToStorage();
+  renderTabs();
+  loadJob(j.id);
   showScreen('job');
-  showToast('✓ Customer loaded into job', 'success');
+  showToast('✓ New job created for ' + c.name, 'success');
 }
 
 function deleteCustomer(id, e) {
@@ -3516,6 +3543,9 @@ function closeScheduleModal() {
   document.body.style.overflow = '';
   document.body.style.position = '';
   document.body.style.width = '';
+  // Clear any pending "schedule existing job" flag so cancelling doesn't
+  // affect the next schedule operation
+  window._schedulingExistingJobId = null;
 }
 
 
@@ -4472,6 +4502,36 @@ function confirmScheduleJob() {
   if (installItems.length) j.data.installing = installItems;
   if (existItems.length) j.data.existing = existItems.map(i => ({name:i.name||i, qty:i.qty||'1', yes:i.yes||false, no:i.no||false, cell:i.cell||false}));
 
+  // If scheduling an existing job (from job screen), update it instead of creating new
+  if (window._schedulingExistingJobId) {
+    const existingJob = jobs.find(x => x.id === window._schedulingExistingJobId);
+    window._schedulingExistingJobId = null;
+    if (existingJob) {
+      existingJob.scheduledDate = j.scheduledDate;
+      existingJob.scheduledTime = j.scheduledTime;
+      existingJob.scheduledDuration = j.scheduledDuration;
+      existingJob.scheduledEndTime = j.scheduledEndTime;
+      existingJob.data.date = j.scheduledDate;
+      // Merge customer info if the existing job had none
+      if (!existingJob.data.customerName && j.data.customerName) {
+        existingJob.data.customerName = j.data.customerName;
+        existingJob.data.address = j.data.address;
+        existingJob.data.phone = j.data.phone;
+        existingJob.data.email = j.data.email;
+        existingJob.data.cs = j.data.cs;
+      }
+      if (j.data.installing && j.data.installing.length) existingJob.data.installing = j.data.installing;
+      if (j.data.existing && j.data.existing.length) existingJob.data.existing = j.data.existing;
+      activeJobId = existingJob.id;
+      saveToStorage();
+      renderTabs();
+      loadJob(existingJob.id);
+      closeScheduleModal();
+      renderCal();
+      showToast('✓ Scheduled for ' + time, 'success');
+      return;
+    }
+  }
   jobs.push(j);
   activeJobId = j.id;
   saveToStorage();
