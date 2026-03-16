@@ -8062,9 +8062,12 @@ function confirmScheduleJob() {
   // DEDUP CHECK: Is there already an open job for this customer on this date?
   if (custIdInt) {
     const schedDate = new Date(date + 'T12:00:00').toISOString();
+    // Determine job type from schedule modal context
+    const schedJobType = window._custJobType || 'install';
     const dupJob = jobs.find(j => 
       j.customerId === custIdInt &&
       j.scheduledDate && new Date(j.scheduledDate).toDateString() === new Date(schedDate).toDateString() &&
+      (j.data.jobType || 'install') === schedJobType &&
       j.status !== 'complete' && j.status !== 'cantfinish'
     );
     if (dupJob) {
@@ -9395,7 +9398,19 @@ function createInstallFromAppt(fbKey) {
     return;
   }
   // Auto-create customer if they don't exist, or find existing
-  let cust = customers.find(c => c.name && c.name.toLowerCase() === (a.customerName||'').toLowerCase());
+  // Match priority: phone > normalized name+address > name only
+  let cust = null;
+  if (a.phone) {
+    const normPhone = (a.phone || '').replace(/\D/g, '');
+    cust = customers.find(c => c.phone && c.phone.replace(/\D/g, '') === normPhone);
+  }
+  if (!cust && a.customerName && a.address) {
+    cust = customers.find(c => c.name && c.name.toLowerCase() === a.customerName.toLowerCase() 
+      && c.address && c.address.toLowerCase().includes(a.address.split(',')[0].toLowerCase()));
+  }
+  if (!cust && a.customerName) {
+    cust = customers.find(c => c.name && c.name.toLowerCase() === a.customerName.toLowerCase());
+  }
   if (!cust && a.customerName) {
     cust = {
       id: Date.now(),
