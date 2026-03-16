@@ -1395,6 +1395,170 @@ function getFullEquipmentList() {
 
 let equipmentList = getFullEquipmentList();
 
+// Equipment unit costs (admin only) — keyed by lowercase name
+let equipCosts = JSON.parse(localStorage.getItem('p22_equipCosts') || '{}');
+
+// Default prices from Protect22 Equipment Price Sheet
+const DEFAULT_EQUIP_COSTS = {
+  "2gig edge touchscreen control panel w verizon": 425.09,
+  "2gig gc2 4g lte cell radio verizon": 153.49,
+  "2gig gc2e control panel": 215.15,
+  "2gig wireless secondary keypad": 57.79,
+  "2gig panic button keyfob": 37.30,
+  "2gig wireless thin d/w contact": 19.05,
+  "2gig eseries carbon monoxide": 111.91,
+  "2gig wireless 15'd glass break": 79.79,
+  "2gig motion w pet immunity": 59.39,
+  "2gig firefighter w life battery": 59.31,
+  "2gig smkt8-345 smoke/heat/freeze sensor": 87.47,
+  "2gig 4 button key fob": 22.99,
+  "2gig batt2x console long life rechargeable replacement battery pack": 46.33,
+  "adc-vdb160x skybell slim video doorbell": 109.99,
+  "adc-vdb750 video doorbell": 179.99,
+  "adc-vdb770 video doorbell": 179.99,
+  "adc-vdb780 video doorbell": 189.99,
+  "adc-video doorbell wall power supply": 17.99,
+  "adc-v724x 1080p outdoor wifi cam w/hdr": 140.80,
+  "adc-indr 1080p wi-fi cam 117 field": 139.13,
+  "adc-v515 1080p indoor wifi camera": 85.00,
+  "adc-v523x indoor wifi camera w hdr&2way": 136.99,
+  "adc-wireless configurable doorball smart chime&wifi extender w115c": 59.99,
+  "adc-adc-t2000 smart thermostat": 149.19,
+  "adc-t40k smart thermostat w touchscreen": 229.99,
+  "alula re508x universal hardwire-wireless translator module": 134.99,
+  "qolysys iq2 r": 192.00,
+  "qolysys iq2 319.5": 192.00,
+  "qolysys iq2 345": 192.00,
+  "qolysys iq2 433": 192.00,
+  "qolysys 319 iq4001 panel w verizon": 399.32,
+  "qolysys 345 iq4003 panel w verizon": 409.32,
+  "qolsys iq mini dw-s (white)": 18.70,
+  "qolsys iq smoke wireless": 89.47,
+  "qolsys iq motion pet immune": 37.40,
+  "qolsys smart light bulb lbr30z-1": 23.99,
+  "qolsys iq fall pendant": 77.99,
+  "qolsys iq key fob": 29.99,
+  "dsc pg9938 powerg wireless panic key fob": 63.74,
+  "dsc pg9936 powerg wireless smoke&heat": 99.88,
+  "kwikset 988935 keypad smart lock zwave": 132.99,
+  "linear z-wave garage door opener": 138.10,
+  "leviton indoor smart plug-in outlet zwave": 45.99,
+  "leviton zwave light module": 55.14,
+  "adt 5aio 5 touchscreen panel": 193.75,
+  "adt 7aio 7 touchscreen panel": 219.99,
+  "adt command cell unit": 153.49,
+  "adt command wireless d/w sensor": 17.99,
+  "adt command glass break": 45.29,
+  "adt command smoke detector": 45.29,
+  "eufy video doorbell": 129.99,
+  "eufy s220 solocam": 87.99
+};
+
+// Merge default costs into equipCosts (don't overwrite user edits)
+(function initEquipCosts() {
+  let changed = false;
+  const fullList = getFullEquipmentList();
+  Object.entries(DEFAULT_EQUIP_COSTS).forEach(([priceKey, cost]) => {
+    if (!equipCosts[priceKey]) {
+      const match = fullList.find(e => e.toLowerCase() === priceKey || 
+        e.toLowerCase().includes(priceKey) || priceKey.includes(e.toLowerCase()));
+      const key = match ? match.toLowerCase() : priceKey;
+      if (!equipCosts[key]) {
+        equipCosts[key] = cost;
+        changed = true;
+      }
+    }
+  });
+  if (changed) localStorage.setItem('p22_equipCosts', JSON.stringify(equipCosts));
+})();
+
+// Google Sheet equipment sync
+const EQUIP_SHEET_URL = localStorage.getItem('p22_equipSheetUrl') || '';
+
+async function syncEquipmentFromSheet(silent) {
+  const url = localStorage.getItem('p22_equipSheetUrl') || '';
+  if (!url) {
+    if (!silent) showToast('Set Equipment Sheet URL in Settings first', 'error');
+    return;
+  }
+  try {
+    if (!silent) showToast('🔄 Syncing equipment list...', 'info');
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data.success || !data.items) throw new Error('Invalid response');
+
+    let added = 0, priced = 0;
+    data.items.forEach(item => {
+      // Add to equipment list if not exists
+      if (addCustomEquipment(item.name)) added++;
+      // Update cost
+      if (item.cost > 0) {
+        equipCosts[item.name.toLowerCase()] = item.cost;
+        priced++;
+      }
+    });
+    saveEquipCosts();
+    equipmentList = getFullEquipmentList();
+    localStorage.setItem('p22_equipSheetLastSync', new Date().toISOString());
+
+    if (!silent) showToast('✓ Synced ' + data.items.length + ' items' + (added ? ' · ' + added + ' new' : ''), 'success');
+  } catch(err) {
+    console.error('Equipment sheet sync error:', err);
+    if (!silent) showToast('⚠️ Sync failed: ' + err.message, 'error');
+  }
+}
+
+// Auto-sync on load if URL is set (silent)
+if (localStorage.getItem('p22_equipSheetUrl')) {
+  setTimeout(() => syncEquipmentFromSheet(true), 3000);
+}
+
+function saveEquipCosts() {
+  localStorage.setItem('p22_equipCosts', JSON.stringify(equipCosts));
+  if (window.fbSet) window.fbSet('equipCosts', equipCosts).catch(()=>{});
+}
+
+function getEquipCost(name) {
+  if (!name) return 0;
+  const key = name.toLowerCase();
+  // Exact match
+  if (equipCosts[key]) return equipCosts[key];
+  // Strip model numbers in parentheses and try
+  const stripped = key.replace(/\(.*?\)/g, '').trim();
+  if (equipCosts[stripped]) return equipCosts[stripped];
+  // Try substring match
+  const match = Object.keys(equipCosts).find(k => 
+    k.includes(stripped) || stripped.includes(k) ||
+    k.includes(key) || key.includes(k)
+  );
+  return match ? equipCosts[match] : 0;
+}
+
+function setEquipCost(name, cost) {
+  if (!name) return;
+  equipCosts[name.toLowerCase()] = parseFloat(cost) || 0;
+  saveEquipCosts();
+}
+
+function getJobEquipmentCost(j) {
+  let total = 0;
+  (j.data.installing || []).forEach(item => {
+    const name = typeof item === 'object' ? item.name : item;
+    const qty = parseInt(typeof item === 'object' ? item.qty : '1') || 1;
+    total += getEquipCost(name) * qty;
+  });
+  return total;
+}
+
+function getTruckTotalValue() {
+  return truck.reduce((s, t) => s + (getEquipCost(t.name) * t.qty), 0);
+}
+
+function getWarehouseTotalValue() {
+  return warehouse.reduce((s, t) => s + (getEquipCost(t.name) * t.qty), 0);
+}
+
 function addCustomEquipment(name) {
   if (!name || !name.trim()) return false;
   const trimmed = name.trim();
@@ -8379,8 +8543,65 @@ function showTruckTab(tab) {
     if (btn) btn.className = 'truck-tab-btn' + (t === tab ? ' active' : '');
   });
   if (tab === 'restock' && document.getElementById('truckRestockRows').children.length === 0) addRestockRow();
+  if (tab === 'restock') renderRestockExisting();
   if (tab === 'warehouse') renderWarehouse();
   if (tab === 'receipts') renderReceipts();
+}
+
+function renderRestockExisting() {
+  const dest = _restockDest || 'truck';
+  const target = dest === 'warehouse' ? warehouse : truck;
+  const list = document.getElementById('restockExistingList');
+  if (!list) return;
+  const q = (document.getElementById('restockSearch')?.value || '').toLowerCase();
+  const filtered = q ? target.filter(i => i.name.toLowerCase().includes(q)) : [...target];
+  filtered.sort((a,b) => a.name.localeCompare(b.name));
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--muted);font-size:11px;">' + (q ? 'No matches' : 'No items yet') + '</div>';
+    return;
+  }
+
+  let h = '';
+  filtered.forEach(item => {
+    const realIdx = target.indexOf(item);
+    const low = item.qty <= 2;
+    const zero = item.qty === 0;
+    h += '<div style="display:flex;align-items:center;gap:6px;padding:8px;background:var(--panel);border:1px solid var(--border);border-left:3px solid '+(zero?'var(--red)':low?'var(--yellow)':'var(--border)')+';border-radius:6px;margin-bottom:4px;">';
+    h += '<div style="flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(item.name) + '</div>';
+    h += '<button class="qty-btn" onclick="adjustStock('+realIdx+',-1)">−</button>';
+    h += '<div style="font-family:Share Tech Mono,monospace;font-size:14px;color:'+(zero?'var(--red)':low?'var(--yellow)':'var(--text)')+';min-width:28px;text-align:center;font-weight:bold;">' + item.qty + '</div>';
+    h += '<button class="qty-btn" onclick="adjustStock('+realIdx+',1)">+</button>';
+    h += '<button class="btn-remove" onclick="removeStockItem('+realIdx+')" style="font-size:12px;">×</button>';
+    h += '</div>';
+  });
+  list.innerHTML = h;
+}
+
+function adjustStock(idx, delta) {
+  const dest = _restockDest || 'truck';
+  const target = dest === 'warehouse' ? warehouse : truck;
+  if (!target[idx]) return;
+  target[idx].qty = Math.max(0, target[idx].qty + delta);
+  if (dest === 'warehouse') saveWarehouse();
+  else saveTruck();
+  // Re-render just the qty in place — don't re-sort
+  renderRestockExisting();
+}
+
+function removeStockItem(idx) {
+  const dest = _restockDest || 'truck';
+  const target = dest === 'warehouse' ? warehouse : truck;
+  if (!target[idx]) return;
+  const name = target[idx].name;
+  showConfirmSheet('Remove ' + name + '?', '', 'Remove', () => {
+    target.splice(idx, 1);
+    if (dest === 'warehouse') saveWarehouse();
+    else saveTruck();
+    renderRestockExisting();
+    renderTruck();
+    showToast(name + ' removed', 'info');
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -8458,6 +8679,7 @@ function setRestockDest(dest) {
   const wb = document.getElementById('restockDestWarehouse');
   if (tb) { tb.style.background = dest==='truck' ? 'var(--accent-dim)' : 'none'; tb.style.border = dest==='truck' ? '2px solid var(--accent)' : '1px solid var(--border)'; tb.style.color = dest==='truck' ? 'var(--accent)' : 'var(--muted)'; tb.style.fontWeight = dest==='truck' ? 'bold' : 'normal'; }
   if (wb) { wb.style.background = dest==='warehouse' ? 'rgba(139,92,246,0.15)' : 'none'; wb.style.border = dest==='warehouse' ? '2px solid rgb(139,92,246)' : '1px solid var(--border)'; wb.style.color = dest==='warehouse' ? 'rgb(139,92,246)' : 'var(--muted)'; wb.style.fontWeight = dest==='warehouse' ? 'bold' : 'normal'; }
+  renderRestockExisting();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -8565,34 +8787,46 @@ function showReceiptResults(receipt) {
 
   let h = '';
   
-  // Header with store, date, total
-  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">';
+  // Header
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
   h += '<span style="font-size:20px;">' + (catIcons[cat]||'🧾') + '</span>';
   h += '<div style="flex:1;"><div style="font-size:15px;font-weight:700;color:var(--text);">' + esc(receipt.store) + '</div>';
-  h += '<div style="font-size:11px;color:var(--muted);">' + esc(receipt.date) + ' · ' + receipt.items.length + ' item' + (receipt.items.length!==1?'s':'') + '</div></div>';
+  h += '<div style="font-size:11px;color:var(--muted);">' + esc(receipt.date) + '</div></div>';
   if (receipt.total) h += '<div style="font-family:Share Tech Mono,monospace;font-size:18px;color:var(--green);font-weight:bold;">$' + receipt.total.toFixed(2) + '</div>';
   h += '</div>';
+  h += '<div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Review items below. Tap a name to edit it or match to existing equipment.</div>';
 
-  // Items list
+  // Editable items list
+  h += '<div id="receiptItemsEditable">';
   receipt.items.forEach((item, idx) => {
-    h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
-    h += '<span style="font-size:12px;color:var(--text);flex:1;">' + esc(item.name) + '</span>';
-    if (item.qty > 1) h += '<span style="font-size:10px;color:var(--muted);">×' + item.qty + '</span>';
-    if (item.gallons) h += '<span style="font-size:10px;color:var(--orange);">' + item.gallons + ' gal</span>';
-    if (item.price) h += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--muted);">$' + item.price.toFixed(2) + '</span>';
+    h += '<div class="receipt-edit-row" data-idx="'+idx+'" style="display:flex;align-items:center;gap:6px;padding:8px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;">';
+    // Editable name — tap to edit
+    h += '<input type="text" value="' + esc(item.name) + '" data-field="name" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;min-width:0;">';
+    // Qty
+    h += '<div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">';
+    h += '<button onclick="adjustReceiptQty(this,-1)" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:3px;width:24px;height:24px;font-size:12px;cursor:pointer;">−</button>';
+    h += '<input type="text" value="' + (item.qty||1) + '" data-field="qty" style="width:30px;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:12px;padding:3px;outline:none;">';
+    h += '<button onclick="adjustReceiptQty(this,1)" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:3px;width:24px;height:24px;font-size:12px;cursor:pointer;">+</button>';
+    h += '</div>';
+    if (item.price) h += '<span style="font-size:10px;color:var(--muted);flex-shrink:0;">$' + item.price.toFixed(2) + '</span>';
+    // Remove
+    h += '<button onclick="this.closest(\'.receipt-edit-row\').remove()" style="background:none;border:none;color:rgba(255,68,68,0.5);font-size:14px;cursor:pointer;padding:0 2px;flex-shrink:0;">×</button>';
     h += '</div>';
   });
+  h += '</div>';
 
-  // Simple action buttons
-  h += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">';
+  // Add manual item
+  h += '<button onclick="addManualReceiptRow()" style="width:100%;background:none;border:1px dashed var(--border);color:var(--muted);border-radius:6px;padding:8px;font-size:11px;cursor:pointer;margin-bottom:12px;">+ Add item manually</button>';
+
+  // Actions
+  h += '<div style="display:flex;flex-direction:column;gap:8px;">';
   if (isInventory) {
-    h += '<button onclick="addReceiptToInventory(this,\'truck\');saveReceiptCategory(this)" style="width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;">✓ ADD TO TRUCK & SAVE</button>';
-    h += '<button onclick="addReceiptToInventory(this,\'warehouse\');saveReceiptCategory(this)" style="width:100%;background:none;border:1px solid rgb(139,92,246);color:rgb(139,92,246);border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;">🏠 Add to Warehouse Instead</button>';
-  } else {
-    h += '<button onclick="saveReceiptCategory(this);this.closest(\'div[style*=fixed]\').remove()" style="width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;">✓ SAVE</button>';
+    h += '<button onclick="submitReceiptToInventory(this,\'truck\')" style="width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:14px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;">✓ ADD TO TRUCK & SAVE</button>';
+    h += '<button onclick="submitReceiptToInventory(this,\'warehouse\')" style="width:100%;background:none;border:1px solid rgb(139,92,246);color:rgb(139,92,246);border-radius:8px;padding:11px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;">🏠 Add to Warehouse</button>';
   }
-  // Category correction — small, out of the way
-  h += '<div style="display:flex;gap:4px;margin-top:4px;">';
+  h += '<button onclick="saveReceiptOnly(this)" style="width:100%;background:'+(isInventory?'none':'linear-gradient(135deg,var(--green),#00a86b)')+';border:'+(isInventory?'1px solid var(--border)':'none')+';color:'+(isInventory?'var(--muted)':'#000')+';border-radius:8px;padding:'+(isInventory?'10px':'14px')+';font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;'+(isInventory?'':'font-weight:bold;')+'">💾 Save Receipt Only</button>';
+  // Category row
+  h += '<div style="display:flex;gap:4px;margin-top:2px;">';
   ['equipment','gas','supplies','food','other'].forEach(c => {
     const active = cat === c;
     h += '<button onclick="this.parentElement.querySelectorAll(\'button\').forEach(b=>{b.style.opacity=0.3;b.style.borderColor=\'var(--border)\'});this.style.opacity=1;this.style.borderColor=\'' + (catColors[c]||'var(--border)') + '\';this.closest(\'div[style*=border-radius]\')._receipt.category=\''+c+'\'" style="flex:1;background:none;border:1px solid '+(active?catColors[c]:'var(--border)')+';color:'+(catColors[c]||'var(--muted)')+';border-radius:4px;padding:4px 2px;font-size:9px;cursor:pointer;opacity:'+(active?'1':'0.3')+';">'+catIcons[c]+'</button>';
@@ -8605,6 +8839,83 @@ function showReceiptResults(receipt) {
   sheet._receipt = receipt;
   overlay.appendChild(sheet);
   document.body.appendChild(overlay);
+}
+
+function adjustReceiptQty(btn, delta) {
+  const row = btn.closest('.receipt-edit-row');
+  const qtyInput = row.querySelector('input[data-field="qty"]');
+  const v = parseInt(qtyInput.value) || 1;
+  qtyInput.value = Math.max(1, v + delta);
+}
+
+function addManualReceiptRow() {
+  const container = document.getElementById('receiptItemsEditable');
+  if (!container) return;
+  const idx = container.children.length;
+  const row = document.createElement('div');
+  row.className = 'receipt-edit-row';
+  row.dataset.idx = idx;
+  row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:8px;background:var(--panel2);border:1px solid var(--accent);border-radius:6px;margin-bottom:6px;';
+  row.innerHTML = '<input type="text" value="" data-field="name" placeholder="Item name..." style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;min-width:0;">' +
+    '<div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">' +
+    '<button onclick="adjustReceiptQty(this,-1)" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:3px;width:24px;height:24px;font-size:12px;cursor:pointer;">−</button>' +
+    '<input type="text" value="1" data-field="qty" style="width:30px;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:12px;padding:3px;outline:none;">' +
+    '<button onclick="adjustReceiptQty(this,1)" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:3px;width:24px;height:24px;font-size:12px;cursor:pointer;">+</button>' +
+    '</div>' +
+    '<button onclick="this.closest(\'.receipt-edit-row\').remove()" style="background:none;border:none;color:rgba(255,68,68,0.5);font-size:14px;cursor:pointer;padding:0 2px;flex-shrink:0;">×</button>';
+  container.appendChild(row);
+  row.querySelector('input[data-field="name"]').focus();
+}
+
+function collectReceiptItems(btn) {
+  const overlay = btn.closest('div[style*="fixed"]');
+  const sheet = overlay.querySelector('div[style*="border-radius"]');
+  const receipt = sheet._receipt;
+  const rows = overlay.querySelectorAll('.receipt-edit-row');
+  const items = [];
+  rows.forEach(row => {
+    const name = row.querySelector('input[data-field="name"]')?.value.trim();
+    const qty = parseInt(row.querySelector('input[data-field="qty"]')?.value) || 1;
+    if (name) items.push({ name, qty });
+  });
+  return { receipt, items, overlay };
+}
+
+function submitReceiptToInventory(btn, dest) {
+  const { receipt, items, overlay } = collectReceiptItems(btn);
+  if (items.length === 0) { showToast('No items to add', 'error'); return; }
+  
+  const target = dest === 'warehouse' ? warehouse : truck;
+  items.forEach(item => {
+    const existing = target.find(t => t.name.toLowerCase() === item.name.toLowerCase());
+    if (existing) existing.qty += item.qty;
+    else target.push({ name: item.name, qty: item.qty });
+    addCustomEquipment(item.name);
+  });
+
+  if (dest === 'warehouse') saveWarehouse();
+  else { saveTruck(); renderTruck(); }
+
+  // Update receipt with edited items
+  if (receipt) {
+    receipt.items = items;
+    const idx = receipts.findIndex(r => r.id === receipt.id);
+    if (idx >= 0) { receipts[idx] = receipt; saveReceipts(); }
+  }
+
+  overlay.remove();
+  showToast('✓ ' + items.length + ' item' + (items.length!==1?'s':'') + ' added to ' + dest, 'success');
+}
+
+function saveReceiptOnly(btn) {
+  const { receipt, items, overlay } = collectReceiptItems(btn);
+  if (receipt) {
+    receipt.items = items;
+    const idx = receipts.findIndex(r => r.id === receipt.id);
+    if (idx >= 0) { receipts[idx] = receipt; saveReceipts(); }
+  }
+  overlay.remove();
+  showToast('✓ Receipt saved', 'success');
 }
 
 function saveReceiptCategory(btn) {
@@ -8779,14 +9090,14 @@ function renderTruck() {
     el.className = 'truck-item';
     const low = item.qty <= 2;
     const zero = item.qty === 0;
-    el.style.cssText = zero ? 'border-left:3px solid var(--red);' : low ? 'border-left:3px solid var(--yellow);' : '';
+    el.style.cssText = 'cursor:pointer;' + (zero ? 'border-left:3px solid var(--red);' : low ? 'border-left:3px solid var(--yellow);' : '');
+    el.onclick = () => showTruckItemCard(item, i);
     el.innerHTML =
-      '<div class="truck-item-name">' + item.name + '</div>' +
-      '<div class="truck-qty-wrap">' +
-        '<button class="qty-btn" onclick="adjustTruck('+i+',-1)">−</button>' +
-        '<div class="truck-qty '+(zero?'truck-low':low?'truck-low':'')+'">' + item.qty + '</div>' +
-        '<button class="qty-btn" onclick="adjustTruck('+i+',1)">+</button>' +
-        '<button class="btn-remove" onclick="removeTruckItem('+i+')" style="margin-left:4px;">×</button>' +
+      '<div class="truck-item-name">' + esc(item.name) + '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        (currentRole === 'admin' && getEquipCost(item.name) ? '<span style="font-size:9px;color:var(--muted);">$'+getEquipCost(item.name).toFixed(2)+'</span>' : '') +
+        '<div class="truck-qty '+(zero?'truck-low':low?'truck-low':'')+'" style="font-size:16px;min-width:32px;text-align:center;">' + item.qty + '</div>' +
+        (zero ? '<span style="font-size:9px;color:var(--red);">OUT</span>' : low ? '<span style="font-size:9px;color:var(--yellow);">LOW</span>' : '') +
       '</div>';
     list.appendChild(el);
   });
@@ -8796,8 +9107,98 @@ function renderTruck() {
   const lowCount = truck.filter(t => t.qty <= 2).length;
   const summary = document.createElement('div');
   summary.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);text-align:center;padding:12px;letter-spacing:1px;';
-  summary.textContent = truck.length + ' items · ' + total + ' total units' + (lowCount ? ' · ⚠️ ' + lowCount + ' low' : '');
+  const totalVal = getTruckTotalValue();
+  summary.textContent = truck.length + ' items · ' + total + ' units' + (totalVal && currentRole === 'admin' ? ' · $' + totalVal.toFixed(2) + ' value' : '') + (lowCount ? ' · ⚠️ ' + lowCount + ' low' : '');
   list.appendChild(summary);
+}
+
+function scrollToRestockItem(name) {}
+
+function showTruckItemCard(item, idx) {
+  const existing = document.getElementById('truckItemCard');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'truckItemCard';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--panel);border:1px solid var(--border);border-radius:12px;width:100%;max-width:340px;padding:20px;';
+
+  const cost = getEquipCost(item.name);
+  const totalItemVal = cost * item.qty;
+
+  let h = '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">' + esc(item.name) + '</div>';
+  if (cost && currentRole === 'admin') {
+    h += '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">$' + cost.toFixed(2) + '/unit · $' + totalItemVal.toFixed(2) + ' total</div>';
+  } else {
+    h += '<div style="height:12px;"></div>';
+  }
+
+  // Big qty display with +/-
+  h += '<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">';
+  h += '<button onclick="truckCardAdjust(-1)" style="width:48px;height:48px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);color:var(--text);font-size:20px;cursor:pointer;">−</button>';
+  h += '<input type="text" id="truckCardQty" value="' + item.qty + '" style="width:60px;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:Share Tech Mono,monospace;font-size:24px;font-weight:bold;padding:8px;outline:none;">';
+  h += '<button onclick="truckCardAdjust(1)" style="width:48px;height:48px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);color:var(--text);font-size:20px;cursor:pointer;">+</button>';
+  h += '</div>';
+
+  // Unit cost (admin only)
+  if (currentRole === 'admin') {
+    h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;">';
+    h += '<span style="font-size:10px;color:var(--muted);white-space:nowrap;">Unit cost:</span>';
+    h += '<input type="text" id="truckCardCost" value="' + (cost || '') + '" placeholder="0.00" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--green);font-family:Share Tech Mono,monospace;font-size:14px;padding:6px 8px;outline:none;text-align:right;">';
+    h += '</div>';
+  }
+
+  // Action buttons
+  h += '<button onclick="saveTruckCard(' + idx + ')" style="width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;margin-bottom:8px;">✓ SAVE</button>';
+  h += '<button onclick="removeTruckFromCard(' + idx + ')" style="width:100%;background:none;border:1px solid rgba(255,68,68,0.3);color:rgba(255,68,68,0.6);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">Remove from Truck</button>';
+
+  card.innerHTML = h;
+  card._truckIdx = idx;
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+}
+
+function truckCardAdjust(delta) {
+  const input = document.getElementById('truckCardQty');
+  if (!input) return;
+  const v = parseInt(input.value) || 0;
+  input.value = Math.max(0, v + delta);
+}
+
+function saveTruckCard(idx) {
+  const qtyEl = document.getElementById('truckCardQty');
+  const costEl = document.getElementById('truckCardCost');
+  if (!truck[idx]) return;
+
+  const newQty = parseInt(qtyEl?.value) || 0;
+  truck[idx].qty = newQty;
+
+  if (costEl && currentRole === 'admin') {
+    const costVal = parseFloat(costEl.value);
+    if (!isNaN(costVal) && costVal >= 0) {
+      setEquipCost(truck[idx].name, costVal);
+    }
+  }
+
+  saveTruck();
+  renderTruck();
+  document.getElementById('truckItemCard')?.remove();
+  showToast('✓ Updated', 'success');
+}
+
+function removeTruckFromCard(idx) {
+  const item = truck[idx];
+  if (!item) return;
+  document.getElementById('truckItemCard')?.remove();
+  showConfirmSheet('Remove ' + item.name + ' from truck?', 'Qty: ' + item.qty, 'Remove', () => {
+    truck.splice(idx, 1);
+    saveTruck();
+    renderTruck();
+    showToast(item.name + ' removed', 'info');
+  });
 }
 
 function adjustTruck(i, delta) {
@@ -9003,6 +9404,17 @@ function loadSettingsScreen() {
 }
 
 function renderEquipManager() {
+  // Load sheet URL into field
+  const urlField = document.getElementById('equipSheetUrl');
+  if (urlField && !urlField._loaded) {
+    urlField.value = localStorage.getItem('p22_equipSheetUrl') || '';
+    urlField._loaded = true;
+  }
+  const lastSync = localStorage.getItem('p22_equipSheetLastSync');
+  const syncEl = document.getElementById('equipSheetLastSync');
+  if (syncEl && lastSync) {
+    syncEl.textContent = 'Last: ' + new Date(lastSync).toLocaleDateString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  }
   const list = document.getElementById('equipManagerList');
   const stats = document.getElementById('equipManagerStats');
   if (!list) return;
@@ -9015,13 +9427,13 @@ function renderEquipManager() {
   let h = '';
   filtered.forEach(name => {
     const isCustom = customEquipment.find(c => c.toLowerCase() === name.toLowerCase());
+    const cost = getEquipCost(name);
     h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
     h += '<span style="font-size:12px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(name) + '</span>';
+    if (cost) h += '<span style="font-size:10px;color:var(--green);font-family:Share Tech Mono,monospace;">$' + cost.toFixed(2) + '</span>';
     if (isCustom) {
       h += '<span style="font-size:8px;background:rgba(139,92,246,0.2);color:rgb(139,92,246);padding:1px 5px;border-radius:3px;">CUSTOM</span>';
       h += '<button onclick="confirmRemoveEquip(\'' + esc(name.replace(/'/g, "\\'")) + '\')" style="background:none;border:none;color:rgba(255,68,68,0.4);font-size:12px;cursor:pointer;padding:0 4px;flex-shrink:0;">×</button>';
-    } else {
-      h += '<span style="font-size:8px;color:var(--muted);">built-in</span>';
     }
     h += '</div>';
   });
@@ -9041,6 +9453,17 @@ function addEquipFromSettings() {
     showToast('✓ "' + name.toUpperCase() + '" added', 'success');
   } else {
     showToast('Already in the list', 'info');
+  }
+}
+
+function saveEquipSheetUrl() {
+  const url = document.getElementById('equipSheetUrl')?.value.trim();
+  if (url) {
+    localStorage.setItem('p22_equipSheetUrl', url);
+    showToast('✓ Sheet URL saved', 'success');
+  } else {
+    localStorage.removeItem('p22_equipSheetUrl');
+    showToast('Sheet URL cleared', 'info');
   }
 }
 
@@ -10889,14 +11312,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- Restock tab -->
     <div id="truckPanelRestock" style="display:none;">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Add equipment to truck or warehouse.</div>
-      <div style="display:flex;gap:6px;margin-bottom:12px;">
-        <button id="restockDestTruck" onclick="setRestockDest('truck')" style="flex:1;background:var(--accent-dim);border:2px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;font-weight:bold;">🚛 TO TRUCK</button>
-        <button id="restockDestWarehouse" onclick="setRestockDest('warehouse')" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:8px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">🏠 TO WAREHOUSE</button>
+      <!-- Destination toggle -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <button id="restockDestTruck" onclick="setRestockDest('truck')" style="flex:1;background:var(--accent-dim);border:2px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;font-weight:bold;">🚛 TRUCK</button>
+        <button id="restockDestWarehouse" onclick="setRestockDest('warehouse')" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:8px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">🏠 WAREHOUSE</button>
       </div>
+
+      <!-- Existing stock — edit qty, remove -->
+      <div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">CURRENT STOCK (tap +/− to adjust)</div>
+      <input type="text" id="restockSearch" placeholder="Filter items..." oninput="renderRestockExisting()" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px;outline:none;margin-bottom:8px;box-sizing:border-box;">
+      <div id="restockExistingList" style="max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>
+
+      <!-- Add new items -->
+      <div style="font-size:9px;color:var(--green);letter-spacing:1px;margin-bottom:6px;">ADD NEW STOCK</div>
       <div id="truckRestockRows"></div>
-      <button class="btn-add" onclick="addRestockRow()" style="margin-top:8px;">+ Add Equipment</button>
-      <button onclick="submitRestock()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;">✓ ADD TO STOCK</button>
+      <button class="btn-add" onclick="addRestockRow()" style="margin-top:6px;">+ Add Equipment</button>
+      <button onclick="submitRestock()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;">✓ ADD TO STOCK</button>
     </div>
 
     <!-- Receipts tab -->
@@ -11122,7 +11553,21 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
     <div class="card" id="equipManagerCard" style="display:none;">
       <div class="card-head"><span>🔧</span><h2>Equipment List</h2></div>
       <div class="card-body">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Manage the master equipment list. Items added here become searchable across all screens.</div>
+        <!-- Google Sheet Sync -->
+        <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">📊 GOOGLE SHEET SYNC</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">Link a Google Sheet to manage equipment & prices. Edit the sheet → tap Sync.</div>
+          <div style="display:flex;gap:6px;margin-bottom:6px;">
+            <input type="text" id="equipSheetUrl" placeholder="Google Apps Script URL..." value="" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:8px;outline:none;">
+            <button onclick="saveEquipSheetUrl()" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 10px;font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:bold;cursor:pointer;">SAVE</button>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="syncEquipmentFromSheet(false)" style="flex:1;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:6px;padding:8px;font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:bold;cursor:pointer;">🔄 SYNC NOW</button>
+            <div id="equipSheetLastSync" style="flex:1;font-size:9px;color:var(--muted);display:flex;align-items:center;justify-content:center;"></div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Or manage manually below:</div>
         
         <!-- Add new item -->
         <div style="display:flex;gap:6px;margin-bottom:12px;">
