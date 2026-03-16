@@ -1010,7 +1010,10 @@
         <label style="color:var(--green);">📡 NEW IMEI (Installing)</label>
         <div class="copy-row">
           <input type="text" id="imeiNew" onblur="lockIfFilled('imeiNew')" placeholder="New unit IMEI being installed" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imeiOld').focus();}">
-          <button onclick="openLiveScanner('imeiNew')" style="display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Scan barcode">📷</button>
+          <button onclick="openLiveScanner('imeiNew')" style="display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Live scan">📷</button>
+          <label style="display:flex;align-items:center;justify-content:center;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.4);color:rgb(139,92,246);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:14px;" title="AI photo read">
+            🤖<input type="file" accept="image/*" capture="environment" onchange="aiExtractImei(event,'imeiNew')" style="display:none;">
+          </label>
           <button class="btn-copy" onclick="copyField('imeiNew',this)" title="Copy">⎘</button>
           <button class="btn-paste" onclick="pasteField('imeiNew',this)" title="Paste">⏎</button>
         </div>
@@ -1019,7 +1022,10 @@
         <label style="color:var(--orange);">📡 OLD IMEI (Removing)</label>
         <div class="copy-row">
           <input type="text" id="imeiOld" onblur="lockIfFilled('imeiOld')" placeholder="Old unit IMEI being pulled" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}">
-          <button onclick="openLiveScanner('imeiOld')" style="display:flex;align-items:center;justify-content:center;background:rgba(251,146,60,0.15);border:1px solid var(--orange);color:var(--orange);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Scan barcode">📷</button>
+          <button onclick="openLiveScanner('imeiOld')" style="display:flex;align-items:center;justify-content:center;background:rgba(251,146,60,0.15);border:1px solid var(--orange);color:var(--orange);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Live scan">📷</button>
+          <label style="display:flex;align-items:center;justify-content:center;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.4);color:rgb(139,92,246);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:14px;" title="AI photo read">
+            🤖<input type="file" accept="image/*" capture="environment" onchange="aiExtractImei(event,'imeiOld')" style="display:none;">
+          </label>
           <button class="btn-copy" onclick="copyField('imeiOld',this)" title="Copy">⎘</button>
           <button class="btn-paste" onclick="pasteField('imeiOld',this)" title="Paste">⏎</button>
         </div>
@@ -8817,6 +8823,142 @@ function captureImeiOnComplete(j) {
   }
 }
 
+// ══════════════════════════════════════════════════════════
+// AI-powered IMEI extraction from photos
+// ══════════════════════════════════════════════════════════
+async function aiExtractImei(event, targetFieldId) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  showToast('🤖 Analyzing photo for IMEI...', 'info');
+
+  try {
+    // Convert to base64
+    const base64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(',')[1]);
+      r.onerror = () => rej(new Error('Read failed'));
+      r.readAsDataURL(file);
+    });
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 } },
+            { type: 'text', text: 'Extract ALL IMEI numbers, serial numbers, and ICCID numbers from this image. Return ONLY a JSON array of objects like: [{"type":"IMEI","value":"35380511-1327461"},{"type":"Serial","value":"ABC123"}]. If no numbers found, return []. No other text.' }
+          ]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content?.map(c => c.text || '').join('') || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+
+    let results = [];
+    try { results = JSON.parse(clean); } catch(e) {
+      // Try to extract numbers from text directly
+      const matches = text.match(/\d[\d\-]{8,}/g);
+      if (matches) results = matches.map(m => ({type:'IMEI', value:m}));
+    }
+
+    if (results.length === 0) {
+      showToast('No IMEI/serial numbers found in photo', 'error');
+      return;
+    }
+
+    if (targetFieldId) {
+      // Put first result in the target field
+      const el = document.getElementById(targetFieldId);
+      if (el) { el.value = results[0].value; debouncedAutoSave(); }
+      showToast('✓ Found: ' + results[0].value, 'success');
+      if (results.length > 1) {
+        showToast(results.length + ' numbers found — first one applied', 'info');
+      }
+    } else {
+      // Admin mode — show all results and let user pick which to add
+      showImeiExtractResults(results);
+    }
+  } catch(err) {
+    console.error('AI extract error:', err);
+    showToast('⚠️ Could not analyze photo — check connection', 'error');
+  }
+}
+
+function showImeiExtractResults(results) {
+  const existing = document.getElementById('imeiExtractOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'imeiExtractOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:70000;background:rgba(0,0,0,0.8);display:flex;align-items:flex-end;';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+
+  let h = '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:rgb(139,92,246);letter-spacing:2px;margin-bottom:12px;">🤖 FOUND ' + results.length + ' NUMBER' + (results.length > 1 ? 'S' : '') + '</div>';
+
+  results.forEach((r, i) => {
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">';
+    h += '<div style="flex:1;min-width:0;">';
+    h += '<div style="font-family:Share Tech Mono,monospace;font-size:16px;color:var(--text);font-weight:bold;letter-spacing:1px;">' + esc(r.value) + '</div>';
+    h += '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + esc(r.type || 'Number') + '</div>';
+    h += '</div>';
+    h += '<button onclick="addExtractedImei(\'' + esc(r.value) + '\');this.textContent=\'✓\';this.disabled=true;this.style.background=\'var(--green)\';this.style.color=\'#000\';" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;">+ ADD</button>';
+    h += '</div>';
+  });
+
+  h += '<button onclick="document.getElementById(\'imeiExtractOverlay\').remove()" style="width:100%;margin-top:8px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;">DONE</button>';
+
+  sheet.innerHTML = h;
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+function addExtractedImei(val) {
+  addImeiToTracker(val);
+}
+
+// ══════════════════════════════════════════════════════════
+// Google Sheets IMEI Sync
+// ══════════════════════════════════════════════════════════
+async function syncImeiToSheets() {
+  if (imeiTracker.length === 0) { showToast('No IMEIs to sync', 'info'); return; }
+  showToast('📤 Syncing to Google Sheets...', 'info');
+  try {
+    const payload = {
+      action: 'imei_sync',
+      data: imeiTracker.map(e => ({
+        imei: e.imei,
+        type: e.type || 'old',
+        status: e.status || 'unchecked',
+        dateAdded: new Date(e.addedDate).toLocaleDateString(),
+        customer: e.source?.customer || '',
+        address: e.source?.address || '',
+        notes: e.notes || ''
+      }))
+    };
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    showToast('✓ ' + imeiTracker.length + ' IMEIs synced to Sheets', 'success');
+  } catch(err) {
+    console.error('Sheets sync error:', err);
+    showToast('⚠️ Sync failed — check connection', 'error');
+  }
+}
+
 function autoCollectImeis() {
   let added = 0;
   jobs.forEach(j => {
@@ -9282,10 +9424,17 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
         </div>
 
         <!-- Add IMEI -->
-        <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
           <input type="text" id="adminImeiInput" inputmode="numeric" placeholder="Enter IMEI number..." style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;letter-spacing:1px;padding:10px;outline:none;">
           <button onclick="openLiveScanner('adminImeiInput')" style="background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:44px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">📷</button>
           <button onclick="addImeiToTracker()" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 16px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;">+ ADD</button>
+        </div>
+        <!-- AI Photo Extract -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.4);color:rgb(139,92,246);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;">
+            🤖 SCAN PHOTO FOR IMEI
+            <input type="file" accept="image/*" capture="environment" onchange="aiExtractImei(event)" style="display:none;">
+          </label>
         </div>
 
         <!-- Filter/search -->
@@ -9308,6 +9457,7 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
           <button onclick="exportImeiCSV()" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📥 EXPORT CSV</button>
           <button onclick="autoCollectImeis()" style="flex:1;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">🔄 PULL FROM JOBS</button>
         </div>
+        <button onclick="syncImeiToSheets()" style="width:100%;margin-top:8px;background:none;border:1px solid var(--green);color:var(--green);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📤 SYNC TO GOOGLE SHEETS</button>
       </div>
     </div>
 
