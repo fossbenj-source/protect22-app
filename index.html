@@ -1724,21 +1724,25 @@ function doDeleteJob(id) {
   const deleted = jobs.find(j => j.id === id);
   if (!deleted) return;
   const deletedIndex = jobs.indexOf(deleted);
+  // Blur any focused element to prevent renderTabs from bailing
+  if (document.activeElement) document.activeElement.blur();
   jobs = jobs.filter(j => j.id !== id);
-  removeJobFromFirebase(id); // Remove from Firebase per-record
+  removeJobFromFirebase(id);
   if (jobs.length === 0) {
     activeJobId = null;
     renderTabs();
     renderEmptyJobState();
   } else {
-    if (activeJobId === id) activeJobId = jobs[jobs.length - 1].id;
-    loadJob(activeJobId);
+    if (activeJobId === id) {
+      activeJobId = jobs[jobs.length - 1].id;
+    }
     renderTabs();
+    loadJob(activeJobId);
   }
   saveToStorage();
   renderMonthCal();
+  if (currentScreen === 'today') { renderCal(); updateTodayStats(); }
   showUndoToast('Job removed', () => {
-    // Undo — restore the job at its original position
     jobs.splice(deletedIndex, 0, deleted);
     activeJobId = deleted.id;
     renderTabs();
@@ -1899,7 +1903,7 @@ function saveCurrentJob() {
   d.phone = document.getElementById('phone').value;
   d.confirmation = document.getElementById('confirmation').value;
   d.notes = document.getElementById('notes').value;
-  d.installing = [...document.getElementById('installingRows').querySelectorAll('.list-row')]
+  d.installing = [...document.getElementById('installingRows').querySelectorAll('.equip-item')]
     .map(r => ({ name: r.querySelector('.combo-wrap').getValue(), qty: r.querySelector('.qty-input').value||'1' }));
   d.existing = [...document.getElementById('existingRows').querySelectorAll('.equip-item')]
     .map(item => ({
@@ -9401,6 +9405,11 @@ function loadSettingsScreen() {
   const equipCard = document.getElementById('equipManagerCard');
   if (equipCard) equipCard.style.display = (currentRole === 'admin') ? 'block' : 'none';
   if (currentRole === 'admin') renderEquipManager();
+  // Auto-sync IMEI sheet and equipment sheet when entering settings (silent)
+  if (currentRole === 'admin') {
+    syncEquipmentFromSheet(true);
+    pullImeiFromSheets().catch(()=>{});
+  }
   const apiKeyEl = document.getElementById('settingsAnthropicKey');
   if (apiKeyEl) {
     const saved = localStorage.getItem('p22_anthropicKey') || '';
@@ -10820,7 +10829,7 @@ function syncEquipToCustomer(j) {
 
 function captureImeiOnComplete(j) {
   const d = j.data;
-  // OLD IMEI → goes to tracker (pulled units for checking/reuse)
+  // OLD IMEI → goes to tracker AND Google Sheet (pulled units for checking/reuse)
   if (d.imeiOld && d.imeiOld.trim().length >= 5) {
     const val = d.imeiOld.trim().replace(/[^0-9\-]/g, '');
     if (!imeiTracker.find(x => x.imei === val)) {
@@ -10834,15 +10843,16 @@ function captureImeiOnComplete(j) {
         notes: 'Old unit removed from ' + (d.customerName || 'job')
       });
       saveImeiTracker();
+      // Auto-push OLD IMEI to Google Sheet
+      pushImeiToSheet(val, 'Can Be Activated');
     }
   }
-  // NEW IMEI → link to customer profile
+  // NEW IMEI → customer card only (NOT the IMEI sheet)
   if (d.imeiNew && d.imeiNew.trim().length >= 5 && d.customerName) {
     const cust = customers.find(c => c.name && c.name.toLowerCase() === d.customerName.toLowerCase());
     if (cust) {
       cust.imeiNew = d.imeiNew.trim();
       if (!cust.imeiHistory) cust.imeiHistory = [];
-      // Add to history if not already there
       if (!cust.imeiHistory.find(h => h.imei === d.imeiNew.trim())) {
         cust.imeiHistory.push({
           imei: d.imeiNew.trim(),
@@ -10853,6 +10863,21 @@ function captureImeiOnComplete(j) {
       saveCustomers();
     }
   }
+}
+
+// Push a single IMEI to Google Sheets (appends to bottom)
+async function pushImeiToSheet(imei, status) {
+  try {
+    await fetch(IMEI_SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'append',
+        items: [{ imei: imei, status: status || 'Unchecked' }]
+      })
+    });
+  } catch(e) { console.warn('IMEI sheet push failed:', e); }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -11002,36 +11027,63 @@ async function syncImeiToSheets() {
   if (imeiTracker.length === 0) { showToast('No IMEIs to sync', 'info'); return; }
   showToast('📤 Syncing to Google Sheets...', 'info');
   try {
+    // Push all local IMEIs to sheet (append mode — deduplicates on sheet side)
     const payload = {
-      action: 'imei_sync',
-      data: imeiTracker.map(e => ({
+      action: 'append',
+      items: imeiTracker.map(e => ({
         imei: e.imei,
-        type: e.type || 'old',
-        status: e.status || 'unchecked',
-        dateAdded: new Date(e.addedDate).toLocaleDateString(),
-        customer: e.source?.customer || '',
-        address: e.source?.address || '',
-        notes: e.notes || ''
+        status: e.status === 'active' ? 'Already Registered' : e.status === 'inactive' ? 'Not Found' : 'Can Be Activated'
       }))
     };
-    // Use text/plain to avoid CORS preflight, Google Apps Script handles it
-    const resp = await fetch(IMEI_SHEETS_URL, {
+    await fetch(IMEI_SHEETS_URL, {
       method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(payload)
-    }).catch(() => null);
-    // Also try no-cors as fallback (won't get response but data still arrives)
-    if (!resp || !resp.ok) {
-      await fetch(IMEI_SHEETS_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
-      });
-    }
+    });
     showToast('✓ ' + imeiTracker.length + ' IMEIs synced to Sheets', 'success');
   } catch(err) {
     console.error('Sheets sync error:', err);
     showToast('⚠️ Sync failed — check connection', 'error');
+  }
+}
+
+// Pull IMEIs from Google Sheet into the app tracker
+async function pullImeiFromSheets(silent) {
+  if (!silent) showToast('📥 Pulling from Sheets...', 'info');
+  try {
+    const resp = await fetch(IMEI_SHEETS_URL);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data.success || !data.items) throw new Error('Invalid response');
+
+    let added = 0;
+    data.items.forEach(item => {
+      if (!item.imei || imeiTracker.find(x => x.imei === item.imei)) return;
+      let appStatus = 'unchecked';
+      if (item.status === 'Already Registered') appStatus = 'active';
+      else if (item.status === 'Not Found') appStatus = 'inactive';
+      else if (item.status === 'Can Be Activated') appStatus = 'unchecked';
+
+      imeiTracker.push({
+        imei: item.imei,
+        addedDate: new Date().toISOString(),
+        addedBy: 'sheet-sync',
+        status: appStatus,
+        source: null,
+        notes: 'Imported from sheet'
+      });
+      added++;
+    });
+
+    if (added > 0) {
+      saveImeiTracker();
+      renderImeiList();
+    }
+    if (!silent) showToast('✓ Pulled ' + data.count + ' IMEIs · ' + added + ' new', 'success');
+  } catch(err) {
+    console.error('IMEI pull error:', err);
+    if (!silent) showToast('⚠️ Pull failed: ' + err.message, 'error');
   }
 }
 
@@ -11671,7 +11723,10 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
           <button onclick="exportImeiCSV()" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📥 EXPORT CSV</button>
           <button onclick="autoCollectImeis()" style="flex:1;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">🔄 PULL FROM JOBS</button>
         </div>
-        <button onclick="syncImeiToSheets()" style="width:100%;margin-top:8px;background:none;border:1px solid var(--green);color:var(--green);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📤 SYNC TO GOOGLE SHEETS</button>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button onclick="pullImeiFromSheets()" style="flex:1;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📥 PULL FROM SHEET</button>
+          <button onclick="syncImeiToSheets()" style="flex:1;background:none;border:1px solid var(--green);color:var(--green);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📤 PUSH TO SHEET</button>
+        </div>
       </div>
     </div>
 
