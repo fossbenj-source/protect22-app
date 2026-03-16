@@ -1117,6 +1117,15 @@
     </div>
   </div>
 
+  <!-- User Codes -->
+  <div class="card">
+    <div class="card-head"><span>👤</span><h2>User Codes</h2></div>
+    <div class="card-body">
+      <div id="userCodeRows"></div>
+      <button class="btn-add" onclick="addUserCodeRow()">+ Add User Code</button>
+    </div>
+  </div>
+
   <!-- Notes -->
   <div class="card">
     <div class="card-head"><span>📝</span><h2>Notes</h2></div>
@@ -4743,7 +4752,7 @@ function openCustomerDetail(id) {
 
   const panel = document.createElement('div');
   panel.id = 'customerDetailPanel';
-  panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:var(--bg);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;';
+  panel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:56px;z-index:40000;background:var(--bg);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;';
 
   const custJobs = jobs.filter(j => {
     if (j.customerId === c.id) return true;
@@ -4897,25 +4906,35 @@ function openCustomerDetail(id) {
   });
   h += '</div>';
 
-  // System Numbers (IMEI, ADT Status, Confirmation)
-  const sysFields = [
-    {label:'Current IMEI', val:c.imeiNew, icon:'📡', color:'var(--green)'},
-    {label:'ADT Bot Status', val:c.adtStatus, icon:'🤖', color:'var(--accent)'},
-    {label:'Confirmation #', val:c.confirmation, icon:'✓', color:'var(--accent)'},
-  ];
-  const hasSysFields = sysFields.some(f => f.val);
-  if (hasSysFields) {
-    h += '<div style="margin-top:10px;"><div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">SYSTEM & TRACKING</div>';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
-    sysFields.forEach(f => {
-      if (!f.val) return;
-      h += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">';
-      h += '<div style="font-size:9px;color:' + f.color + ';letter-spacing:1px;">' + f.icon + ' ' + f.label.toUpperCase() + '</div>';
-      h += '<div style="font-family:Share Tech Mono,monospace;font-size:13px;color:var(--text);margin-top:2px;word-break:break-all;letter-spacing:1px;">' + esc(f.val) + '</div>';
-      h += '</div>';
-    });
-    h += '</div></div>';
+  // System Numbers (IMEI, ADT Status, Confirmation) — always show, editable
+  h += '<div style="margin-top:10px;"><div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">SYSTEM & TRACKING</div>';
+  
+  // IMEI — editable with select-from-available button
+  h += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:6px;">';
+  h += '<div style="font-size:9px;color:var(--green);letter-spacing:1px;margin-bottom:4px;">📡 CURRENT IMEI</div>';
+  h += '<div style="display:flex;gap:6px;align-items:center;">';
+  h += '<input type="text" id="custImeiField" value="' + esc(c.imeiNew || '') + '" placeholder="No IMEI assigned" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:Share Tech Mono,monospace;font-size:13px;padding:6px 8px;outline:none;letter-spacing:1px;">';
+  h += '<button onclick="saveCustImei('+c.id+')" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:6px 8px;font-family:Share Tech Mono,monospace;font-size:9px;font-weight:bold;cursor:pointer;">SAVE</button>';
+  h += '</div>';
+  // Available IMEIs button
+  const availableCount = imeiTracker.filter(x => x.status === 'can_activate').length;
+  if (availableCount > 0) {
+    h += '<button onclick="showAvailableImeis('+c.id+')" style="width:100%;margin-top:6px;background:rgba(0,212,255,0.08);border:1px dashed var(--accent);color:var(--accent);border-radius:4px;padding:6px;font-family:Share Tech Mono,monospace;font-size:9px;cursor:pointer;">🔵 SELECT FROM ' + availableCount + ' AVAILABLE IMEI' + (availableCount!==1?'s':'') + '</button>';
   }
+  h += '</div>';
+
+  // ADT Status + Confirmation — editable
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+  h += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">';
+  h += '<div style="font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">🤖 ADT BOT STATUS</div>';
+  h += '<input type="text" id="custAdtField" value="' + esc(c.adtStatus || '') + '" placeholder="—" onchange="saveCustSysField('+c.id+')" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:5px;outline:none;box-sizing:border-box;">';
+  h += '</div>';
+  h += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">';
+  h += '<div style="font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;">✓ CONFIRMATION #</div>';
+  h += '<input type="text" id="custConfField" value="' + esc(c.confirmation || '') + '" placeholder="—" onchange="saveCustSysField('+c.id+')" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:5px;outline:none;box-sizing:border-box;">';
+  h += '</div>';
+  h += '</div>';
+  h += '</div>';
   h += '</div>';
 
   // Equipment at this home — EDITABLE
@@ -5144,22 +5163,6 @@ function addCustPlannedEquipFromCombo(custId, comboNum) {
   showToast('✓ Equipment added', 'success');
 }
 
-function addCustPlannedEquip(custId) {
-  const sel = document.getElementById('custEquipSelect');
-  if (!sel || !sel.value) return;
-  const c = customers.find(x => x.id === custId);
-  if (!c) return;
-  if (!c.plannedEquipment) c.plannedEquipment = [];
-  const existing = c.plannedEquipment.find(e => e.name === sel.value);
-  if (existing) { existing.qty = (parseInt(existing.qty)||1) + 1; }
-  else { c.plannedEquipment.push({ name: sel.value, qty: 1 }); }
-  saveCustomers();
-  sel.value = '';
-  closeCustomerProfile();
-  openCustomerDetail(custId);
-  showToast('✓ Equipment added', 'success');
-}
-
 function setCustAccountType(custId, type) {
   const c = customers.find(x => x.id === custId);
   if (!c) return;
@@ -5175,8 +5178,112 @@ function saveCustDealer(custId) {
   if (!c) return;
   const el = document.getElementById('custDealerName');
   if (el) c.accountDealer = el.value.trim();
-  saveCustomers();
+  saveCustomers(custId);
   showToast('✓ Saved', 'success');
+}
+
+function saveCustImei(custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  const field = document.getElementById('custImeiField');
+  if (!field) return;
+  const newImei = field.value.trim();
+  const oldImei = c.imeiNew || '';
+  c.imeiNew = newImei;
+  if (newImei && newImei !== oldImei) {
+    if (!c.imeiHistory) c.imeiHistory = [];
+    if (!c.imeiHistory.find(h => h.imei === newImei)) {
+      c.imeiHistory.push({ imei: newImei, installedDate: new Date().toISOString(), source: 'manual' });
+    }
+  }
+  saveCustomers(custId);
+  showToast('✓ IMEI saved', 'success');
+}
+
+function saveCustSysField(custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  const adtField = document.getElementById('custAdtField');
+  const confField = document.getElementById('custConfField');
+  if (adtField) c.adtStatus = adtField.value.trim();
+  if (confField) c.confirmation = confField.value.trim();
+  saveCustomers(custId);
+}
+
+function showAvailableImeis(custId) {
+  const available = imeiTracker.filter(x => x.status === 'can_activate');
+  if (available.length === 0) { showToast('No available IMEIs', 'info'); return; }
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;max-height:70vh;overflow-y:auto;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+
+  let h = '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:4px;">🔵 AVAILABLE IMEIs</div>';
+  h += '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Tap to assign to this customer</div>';
+
+  // Search
+  h += '<input type="text" id="availImeiSearch" placeholder="Search IMEI..." oninput="filterAvailableImeis('+custId+')" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:Share Tech Mono,monospace;font-size:14px;padding:8px;outline:none;margin-bottom:10px;box-sizing:border-box;">';
+  h += '<div id="availImeiList"></div>';
+
+  h += '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="width:100%;margin-top:10px;background:none;border:none;color:var(--muted);padding:8px;font-size:11px;cursor:pointer;">Cancel</button>';
+
+  sheet.innerHTML = h;
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+
+  setTimeout(() => filterAvailableImeis(custId), 50);
+}
+
+function filterAvailableImeis(custId) {
+  const list = document.getElementById('availImeiList');
+  if (!list) return;
+  const q = (document.getElementById('availImeiSearch')?.value || '').trim();
+  let available = imeiTracker.filter(x => x.status === 'can_activate');
+  if (q) available = available.filter(x => x.imei.includes(q));
+
+  let h = '';
+  available.forEach((entry, idx) => {
+    const realIdx = imeiTracker.indexOf(entry);
+    const sheetNum = entry.sheetRow || (realIdx + 1);
+    h += '<div onclick="pickImeiForCustomer('+realIdx+','+custId+')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;margin-bottom:4px;cursor:pointer;">';
+    h += '<span style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:1px 5px;">#' + sheetNum + '</span>';
+    h += '<span style="font-family:Share Tech Mono,monospace;font-size:14px;color:var(--text);font-weight:bold;flex:1;letter-spacing:1px;">' + esc(entry.imei) + '</span>';
+    h += '<span style="font-size:9px;color:var(--green);">SELECT</span>';
+    h += '</div>';
+  });
+  if (available.length === 0) h = '<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;">No matches</div>';
+  list.innerHTML = h;
+}
+
+function pickImeiForCustomer(trackerIdx, custId) {
+  const entry = imeiTracker[trackerIdx];
+  const c = customers.find(x => x.id === custId);
+  if (!entry || !c) return;
+
+  c.imeiNew = entry.imei;
+  if (!c.imeiHistory) c.imeiHistory = [];
+  if (!c.imeiHistory.find(h => h.imei === entry.imei)) {
+    c.imeiHistory.push({ imei: entry.imei, installedDate: new Date().toISOString(), source: 'selected' });
+  }
+  saveCustomers(custId);
+
+  entry.status = 'registered';
+  entry.assignedTo = c.name;
+  entry.assignedDate = new Date().toISOString();
+  saveImeiTracker();
+
+  // Push status update to Google Sheet
+  pushImeiToSheet(entry.imei, 'Already Registered');
+
+  // Close the picker
+  document.querySelector('div[style*="fixed"][style*="60000"]')?.remove();
+  // Refresh customer card
+  closeCustomerProfile();
+  openCustomerDetail(custId);
+  showToast('✓ IMEI ...' + entry.imei.slice(-6) + ' assigned to ' + c.name, 'success');
 }
 
 function setCustJobType(type) {
@@ -7148,7 +7255,7 @@ function getTruckKey(equipName) {
 function getDayStockShortfall(dayJobs) {
   const sorted = sortJobsByTime(dayJobs);
   const running = {};
-  truck.forEach(t => { running[t.name.toLowerCase()] = { qty: t.qty, displayName: t.name }; });
+  truck.forEach(t => { running[t.name.toLowerCase()] = { qty: (t.qty - (t.defective||0)), displayName: t.name }; });
   let hasShortfall = false;
   sorted.forEach(j => {
     if (j.status === 'complete' || j.status === 'cantfinish') return;
@@ -7211,7 +7318,7 @@ function renderDayBrief() {
 
   // Calculate cumulative rundown
   const running = {};
-  truck.forEach(t => { running[t.name.toLowerCase()] = { qty: t.qty, displayName: t.name }; });
+  truck.forEach(t => { running[t.name.toLowerCase()] = { qty: (t.qty - (t.defective||0)), displayName: t.name }; });
   const shortfalls = []; // { itemName, qty, jobName, jobTime }
   const pickupNeeded = {}; // itemName -> total shortfall qty
 
@@ -7239,7 +7346,7 @@ function renderDayBrief() {
   // Recompute total pickup needed per item
   const pickupList = [];
   const runFinal = {};
-  truck.forEach(t => { runFinal[t.name.toLowerCase()] = t.qty; });
+  truck.forEach(t => { runFinal[t.name.toLowerCase()] = (t.qty - (t.defective||0)); });
   pendingTodayJobs.forEach(j => {
     const src = (j.data.installingRemaining?.length) ? j.data.installingRemaining : (j.data.installing || []);
     src.filter(i => i && (typeof i==='object' ? i.name : i)).forEach(item => {
@@ -9078,25 +9185,33 @@ function submitRestock() {
   const rows = document.getElementById('truckRestockRows').querySelectorAll('.restock-row');
   const dest = _restockDest || 'truck';
   const target = dest === 'warehouse' ? warehouse : truck;
-  let added = 0;
+  let added = 0, increased = 0;
   rows.forEach(row => {
     const name = row.querySelector('.combo-wrap').getValue();
     const qty = parseInt(row.querySelector('.qty-input').value) || 1;
     if (!name) return;
     const existing = target.find(t => t.name.toLowerCase() === name.toLowerCase());
-    if (existing) { existing.qty += qty; }
-    else { target.push({ name, qty }); }
-    added++;
+    if (existing) {
+      existing.qty += qty;
+      increased++;
+    } else {
+      target.push({ name, qty });
+      added++;
+    }
   });
-  if (added === 0) { showToast('Add at least one item', 'error'); return; }
+  if (added === 0 && increased === 0) { showToast('Add at least one item', 'error'); return; }
   if (dest === 'warehouse') saveWarehouse();
   else saveTruck();
   document.getElementById('truckRestockRows').innerHTML = '';
   addRestockRow();
   const destLabel = dest === 'warehouse' ? 'warehouse' : 'truck';
-  showToast('✓ ' + added + ' item' + (added>1?'s':'') + ' added to ' + destLabel, 'success');
-  showTruckTab(dest === 'warehouse' ? 'warehouse' : 'inventory');
-  if (dest !== 'warehouse') renderTruck();
+  let msg = '✓ ';
+  if (added > 0) msg += added + ' new item' + (added>1?'s':'');
+  if (added > 0 && increased > 0) msg += ' + ';
+  if (increased > 0) msg += increased + ' existing updated (+qty)';
+  msg += ' on ' + destLabel;
+  showToast(msg, 'success');
+  renderRestockExisting();
 }
 
 function renderTruck() {
@@ -9132,6 +9247,7 @@ function renderTruck() {
     el.innerHTML =
       '<div class="truck-item-name">' + esc(item.name) + '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;">' +
+        (item.defective > 0 ? '<span style="font-size:8px;background:rgba(255,68,68,0.15);color:var(--red);padding:1px 5px;border-radius:3px;">⚠️'+item.defective+' bad</span>' : '') +
         (currentRole === 'admin' && getEquipCost(item.name) ? '<span style="font-size:9px;color:var(--muted);">$'+getEquipCost(item.name).toFixed(2)+'</span>' : '') +
         '<div class="truck-qty '+(zero?'truck-low':low?'truck-low':'')+'" style="font-size:16px;min-width:32px;text-align:center;">' + item.qty + '</div>' +
         (zero ? '<span style="font-size:9px;color:var(--red);">OUT</span>' : low ? '<span style="font-size:9px;color:var(--yellow);">LOW</span>' : '') +
@@ -9189,6 +9305,35 @@ function showTruckItemCard(item, idx) {
   }
 
   // Action buttons
+  // Defective items list
+  const defectList = item.defectiveItems || [];
+  h += '<div style="margin-bottom:12px;">';
+  h += '<div style="font-size:9px;color:var(--red);letter-spacing:1px;margin-bottom:6px;">⚠️ DEFECTIVE / BAD UNITS (' + defectList.length + ')</div>';
+  if (defectList.length > 0) {
+    defectList.forEach((d, di) => {
+      h += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
+      h += '<span style="font-size:10px;color:var(--red);">⚠️</span>';
+      h += '<span style="font-size:11px;color:var(--text);flex:1;">' + esc(d.description || 'Bad unit #'+(di+1)) + '</span>';
+      h += '<span style="font-size:9px;color:var(--muted);">' + (d.date ? new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '') + '</span>';
+      h += '<button onclick="removeDefectiveItem('+idx+','+di+')" style="background:none;border:none;color:rgba(255,68,68,0.4);font-size:12px;cursor:pointer;">×</button>';
+      h += '</div>';
+    });
+  }
+  h += '<div style="display:flex;gap:6px;margin-top:6px;">';
+  h += '<input type="text" id="truckCardDefectDesc" placeholder="Describe the bad unit..." style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;padding:6px;outline:none;">';
+  h += '<button onclick="addDefectiveItem('+idx+')" style="background:rgba(255,68,68,0.15);border:1px solid var(--red);color:var(--red);border-radius:4px;padding:5px 8px;font-size:9px;cursor:pointer;white-space:nowrap;">+ BAD</button>';
+  h += '</div>';
+  if (defectList.length > 0) {
+    h += '<div style="font-size:9px;color:var(--muted);margin-top:4px;">'+defectList.length + ' defective · ' + (item.qty - defectList.length) + ' usable</div>';
+  }
+  h += '</div>';
+
+  // Notes
+  h += '<div style="margin-bottom:12px;">';
+  h += '<input type="text" id="truckCardNotes" value="' + esc(item.notes || '') + '" placeholder="General notes..." style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:8px;outline:none;box-sizing:border-box;">';
+  h += '</div>';
+
+  // Save / remove buttons
   h += '<button onclick="saveTruckCard(' + idx + ')" style="width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;margin-bottom:8px;">✓ SAVE</button>';
   h += '<button onclick="removeTruckFromCard(' + idx + ')" style="width:100%;background:none;border:1px solid rgba(255,68,68,0.3);color:rgba(255,68,68,0.6);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">Remove from Truck</button>';
 
@@ -9205,13 +9350,44 @@ function truckCardAdjust(delta) {
   input.value = Math.max(0, v + delta);
 }
 
+function truckCardDefectAdjust(delta) {}
+
+function addDefectiveItem(truckIdx) {
+  const desc = document.getElementById('truckCardDefectDesc');
+  if (!desc || !desc.value.trim()) { showToast('Describe which unit is bad', 'error'); return; }
+  if (!truck[truckIdx].defectiveItems) truck[truckIdx].defectiveItems = [];
+  truck[truckIdx].defectiveItems.push({
+    description: desc.value.trim(),
+    date: new Date().toISOString(),
+    addedBy: currentUser?.email || 'admin'
+  });
+  truck[truckIdx].defective = truck[truckIdx].defectiveItems.length;
+  saveTruck();
+  // Refresh the card
+  document.getElementById('truckItemCard')?.remove();
+  showTruckItemCard(truck[truckIdx], truckIdx);
+  showToast('⚠️ Marked as defective', 'info');
+}
+
+function removeDefectiveItem(truckIdx, defectIdx) {
+  if (!truck[truckIdx]?.defectiveItems) return;
+  truck[truckIdx].defectiveItems.splice(defectIdx, 1);
+  truck[truckIdx].defective = truck[truckIdx].defectiveItems.length;
+  saveTruck();
+  document.getElementById('truckItemCard')?.remove();
+  showTruckItemCard(truck[truckIdx], truckIdx);
+  showToast('✓ Removed from defective', 'success');
+}
+
 function saveTruckCard(idx) {
   const qtyEl = document.getElementById('truckCardQty');
   const costEl = document.getElementById('truckCardCost');
+  const notesEl = document.getElementById('truckCardNotes');
   if (!truck[idx]) return;
 
   const newQty = parseInt(qtyEl?.value) || 0;
   truck[idx].qty = newQty;
+  truck[idx].notes = notesEl?.value.trim() || '';
 
   if (costEl && currentRole === 'admin') {
     const costVal = parseFloat(costEl.value);
@@ -10693,7 +10869,7 @@ function addImeiToTracker(imeiVal) {
     imei: val,
     addedDate: new Date().toISOString(),
     addedBy: currentUser?.email || 'admin',
-    status: 'unchecked', // unchecked, active, inactive
+    status: 'not_checked', // not_checked, registered, can_activate, not_found
     source: source,
     notes: ''
   });
@@ -10712,9 +10888,10 @@ function renderImeiList() {
 
   let filtered = [...imeiTracker];
   if (search) filtered = filtered.filter(x => x.imei.includes(search) || (x.source?.customer||'').toLowerCase().includes(search));
-  if (filter === 'unchecked') filtered = filtered.filter(x => x.status === 'unchecked');
-  if (filter === 'active') filtered = filtered.filter(x => x.status === 'active');
-  if (filter === 'inactive') filtered = filtered.filter(x => x.status === 'inactive');
+  if (filter === 'not_checked') filtered = filtered.filter(x => x.status === 'not_checked' || x.status === 'unchecked');
+  if (filter === 'registered') filtered = filtered.filter(x => x.status === 'registered' || x.status === 'active');
+  if (filter === 'can_activate') filtered = filtered.filter(x => x.status === 'can_activate');
+  if (filter === 'not_found') filtered = filtered.filter(x => x.status === 'not_found' || x.status === 'inactive');
   if (filter === 'today') filtered = filtered.filter(x => new Date(x.addedDate).toDateString() === today);
 
   // Sort newest first
@@ -10722,11 +10899,13 @@ function renderImeiList() {
 
   // Update stats
   const totalEl = document.getElementById('imeiTotal');
-  const todayEl = document.getElementById('imeiToday');
+  const readyEl = document.getElementById('imeiReady');
   const uncheckedEl = document.getElementById('imeiUnchecked');
+  const registeredEl = document.getElementById('imeiRegistered');
   if (totalEl) totalEl.textContent = imeiTracker.length;
-  if (todayEl) todayEl.textContent = imeiTracker.filter(x => new Date(x.addedDate).toDateString() === today).length;
-  if (uncheckedEl) uncheckedEl.textContent = imeiTracker.filter(x => x.status === 'unchecked').length;
+  if (readyEl) readyEl.textContent = imeiTracker.filter(x => x.status === 'can_activate').length;
+  if (uncheckedEl) uncheckedEl.textContent = imeiTracker.filter(x => x.status === 'not_checked' || x.status === 'unchecked').length;
+  if (registeredEl) registeredEl.textContent = imeiTracker.filter(x => x.status === 'registered' || x.status === 'active').length;
 
   if (filtered.length === 0) {
     list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">No IMEIs found</div>';
@@ -10736,24 +10915,36 @@ function renderImeiList() {
   let h = '';
   filtered.forEach((entry, idx) => {
     const realIdx = imeiTracker.indexOf(entry);
-    const sc = entry.status === 'active' ? 'var(--green)' : entry.status === 'inactive' ? 'var(--red)' : 'var(--yellow)';
+    const sheetNum = entry.sheetRow || (realIdx + 1);
+    const sc = (entry.status === 'registered' || entry.status === 'active') ? 'var(--green)' : (entry.status === 'not_found' || entry.status === 'inactive') ? 'var(--red)' : entry.status === 'can_activate' ? 'var(--accent)' : 'var(--yellow)';
+    const isReady = entry.status === 'can_activate';
     const date = new Date(entry.addedDate).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    const time = new Date(entry.addedDate).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
     h += '<div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid ' + sc + ';border-radius:6px;padding:10px;margin-bottom:6px;">';
     h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
-    h += '<span style="font-family:Share Tech Mono,monospace;font-size:14px;color:var(--text);font-weight:bold;flex:1;letter-spacing:1px;">' + esc(entry.imei) + '</span>';
-    h += '<select onchange="updateImeiStatus(' + realIdx + ',this.value)" style="background:var(--input-bg);border:1px solid ' + sc + ';border-radius:4px;color:' + sc + ';font-family:Share Tech Mono,monospace;font-size:10px;padding:3px 6px;outline:none;">';
-    h += '<option value="unchecked"' + (entry.status==='unchecked'?' selected':'') + '>⏳ Unchecked</option>';
-    h += '<option value="active"' + (entry.status==='active'?' selected':'') + '>✅ Active</option>';
-    h += '<option value="inactive"' + (entry.status==='inactive'?' selected':'') + '>❌ Inactive</option>';
+    // Row number badge
+    h += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:2px 6px;min-width:28px;text-align:center;">#' + sheetNum + '</span>';
+    // IMEI number
+    h += '<span style="font-family:Share Tech Mono,monospace;font-size:13px;color:var(--text);font-weight:bold;flex:1;letter-spacing:1px;">' + esc(entry.imei) + '</span>';
+    // Assign button (only for "Can Be Activated")
+    if (isReady) {
+      h += '<button onclick="showAssignImei(' + realIdx + ')" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:3px 8px;font-family:Share Tech Mono,monospace;font-size:9px;font-weight:bold;cursor:pointer;">USE</button>';
+    }
+    h += '</div>';
+    // Status + date row
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">';
+    h += '<select onchange="updateImeiStatus(' + realIdx + ',this.value)" style="background:var(--input-bg);border:1px solid ' + sc + ';border-radius:4px;color:' + sc + ';font-family:Share Tech Mono,monospace;font-size:9px;padding:2px 4px;outline:none;">';
+    const st = entry.status;
+    h += '<option value="not_checked"' + (st==='not_checked'||st==='unchecked'?' selected':'') + '>⏳ Not Checked</option>';
+    h += '<option value="registered"' + (st==='registered'||st==='active'?' selected':'') + '>✅ Already Registered</option>';
+    h += '<option value="can_activate"' + (st==='can_activate'?' selected':'') + '>🔵 Can Be Activated</option>';
+    h += '<option value="not_found"' + (st==='not_found'||st==='inactive'?' selected':'') + '>❌ Not Found</option>';
     h += '</select>';
-    h += '<button onclick="deleteImei(' + realIdx + ')" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:2px 4px;">×</button>';
+    h += '<span style="font-size:9px;color:var(--muted);">' + date + '</span>';
+    if (entry.source?.customer) h += '<span style="font-size:9px;color:var(--muted);">· ' + esc(entry.source.customer) + '</span>';
+    h += '<button onclick="deleteImei(' + realIdx + ')" style="background:none;border:none;color:rgba(255,68,68,0.3);font-size:12px;cursor:pointer;padding:0 2px;margin-left:auto;">×</button>';
     h += '</div>';
-    h += '<div style="font-size:10px;color:var(--muted);">' + date + ' ' + time;
-    if (entry.source?.customer) h += ' · ' + esc(entry.source.customer);
-    if (entry.source?.address) h += ' · ' + esc(entry.source.address.split(',')[0]);
-    h += '</div>';
-    if (entry.notes) h += '<div style="font-size:10px;color:var(--muted);font-style:italic;margin-top:2px;">📝 ' + esc(entry.notes) + '</div>';
+    if (entry.assignedTo) h += '<div style="font-size:9px;color:var(--green);margin-top:2px;">→ Assigned to: ' + esc(entry.assignedTo) + '</div>';
+    if (entry.notes) h += '<div style="font-size:9px;color:var(--muted);font-style:italic;margin-top:1px;">📝 ' + esc(entry.notes) + '</div>';
     h += '</div>';
   });
   list.innerHTML = h;
@@ -10763,8 +10954,135 @@ function updateImeiStatus(idx, status) {
   if (imeiTracker[idx]) {
     imeiTracker[idx].status = status;
     saveImeiTracker();
+    // Map to sheet status and push
+    const sheetStatus = status === 'registered' ? 'Already Registered' : status === 'not_found' ? 'Not Found' : status === 'can_activate' ? 'Can Be Activated' : 'Not Checked';
+    pushImeiToSheet(imeiTracker[idx].imei, sheetStatus);
     renderImeiList();
   }
+}
+
+function showAssignImei(trackerIdx) {
+  const entry = imeiTracker[trackerIdx];
+  if (!entry) return;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;max-height:70vh;overflow-y:auto;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+
+  let h = '<div style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:4px;">ASSIGN IMEI</div>';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:16px;color:var(--text);margin-bottom:12px;letter-spacing:1px;">' + esc(entry.imei) + '</div>';
+
+  // Search customers
+  h += '<input type="text" id="imeiAssignSearch" placeholder="Search customer..." oninput="filterImeiAssignList(' + trackerIdx + ')" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;padding:10px;outline:none;margin-bottom:10px;box-sizing:border-box;">';
+
+  // Customer list
+  h += '<div id="imeiAssignCustomers" style="max-height:300px;overflow-y:auto;"></div>';
+
+  // Or assign to active job
+  const activeJob = jobs.find(j => j.id === activeJobId);
+  if (activeJob && activeJob.data.customerName) {
+    h += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">';
+    h += '<button onclick="assignImeiToJob(' + trackerIdx + ',' + activeJobId + ')" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;">📋 ASSIGN TO CURRENT JOB — ' + esc(activeJob.data.customerName) + '</button>';
+    h += '</div>';
+  }
+
+  h += '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="width:100%;margin-top:8px;background:none;border:none;color:var(--muted);padding:8px;font-size:11px;cursor:pointer;">Cancel</button>';
+
+  sheet.innerHTML = h;
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+
+  // Render initial customer list
+  setTimeout(() => filterImeiAssignList(trackerIdx), 50);
+}
+
+function filterImeiAssignList(trackerIdx) {
+  const list = document.getElementById('imeiAssignCustomers');
+  if (!list) return;
+  const q = (document.getElementById('imeiAssignSearch')?.value || '').toLowerCase();
+  const filtered = q ? customers.filter(c => c.name && c.name.toLowerCase().includes(q)) : customers.slice(0, 20);
+
+  let h = '';
+  filtered.forEach(c => {
+    h += '<div onclick="assignImeiToCustomer(' + trackerIdx + ',' + c.id + ')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;cursor:pointer;">';
+    h += '<div style="flex:1;"><div style="font-size:13px;font-weight:600;color:var(--text);">' + esc(c.name) + '</div>';
+    if (c.address) h += '<div style="font-size:10px;color:var(--muted);">' + esc(c.address.split(',')[0]) + '</div>';
+    h += '</div>';
+    h += '<span style="font-size:9px;color:var(--accent);">SELECT</span>';
+    h += '</div>';
+  });
+  if (filtered.length === 0) h = '<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;">No customers found</div>';
+  list.innerHTML = h;
+}
+
+function assignImeiToCustomer(trackerIdx, custId) {
+  const entry = imeiTracker[trackerIdx];
+  const cust = customers.find(c => c.id === custId);
+  if (!entry || !cust) return;
+
+  // Set as customer's new IMEI
+  cust.imeiNew = entry.imei;
+  if (!cust.imeiHistory) cust.imeiHistory = [];
+  if (!cust.imeiHistory.find(h => h.imei === entry.imei)) {
+    cust.imeiHistory.push({ imei: entry.imei, installedDate: new Date().toISOString(), source: 'assigned' });
+  }
+  saveCustomers(custId);
+
+  // Mark as registered in tracker
+  entry.status = 'registered';
+  entry.assignedTo = cust.name;
+  entry.assignedDate = new Date().toISOString();
+  saveImeiTracker();
+
+  // Push status update to Google Sheet
+  pushImeiToSheet(entry.imei, 'Already Registered');
+
+  // Close overlay
+  document.querySelector('div[style*="fixed"][style*="60000"]')?.remove();
+  renderImeiList();
+  showToast('✓ IMEI assigned to ' + cust.name, 'success');
+}
+
+function assignImeiToJob(trackerIdx, jobId) {
+  const entry = imeiTracker[trackerIdx];
+  const j = jobs.find(x => x.id === jobId);
+  if (!entry || !j) return;
+
+  // Set on job
+  j.data.imeiNew = entry.imei;
+  j.lastModified = Date.now();
+  const imeiField = document.getElementById('imeiNew');
+  if (imeiField) imeiField.value = entry.imei;
+
+  // Mark as registered
+  entry.status = 'registered';
+  entry.assignedTo = j.data.customerName || 'Job #' + jobId;
+  entry.assignedDate = new Date().toISOString();
+  saveImeiTracker();
+  saveToStorage();
+
+  // Push status update to Google Sheet
+  pushImeiToSheet(entry.imei, 'Already Registered');
+
+  // Also link to customer if available
+  if (j.customerId) {
+    const cust = customers.find(c => c.id === j.customerId);
+    if (cust) {
+      cust.imeiNew = entry.imei;
+      if (!cust.imeiHistory) cust.imeiHistory = [];
+      if (!cust.imeiHistory.find(h => h.imei === entry.imei)) {
+        cust.imeiHistory.push({ imei: entry.imei, installedDate: new Date().toISOString(), source: 'assigned' });
+      }
+      saveCustomers(cust.id);
+    }
+  }
+
+  document.querySelector('div[style*="fixed"][style*="60000"]')?.remove();
+  renderImeiList();
+  showToast('✓ IMEI assigned to ' + (j.data.customerName || 'job'), 'success');
 }
 
 function deleteImei(idx) {
@@ -10876,7 +11194,7 @@ function captureImeiOnComplete(j) {
         type: 'old',
         addedDate: new Date().toISOString(),
         addedBy: 'auto-complete',
-        status: 'unchecked',
+        status: 'not_checked',
         source: { jobId: j.id, customer: d.customerName, address: d.address, date: j.scheduledDate },
         notes: 'Old unit removed from ' + (d.customerName || 'job')
       });
@@ -11070,7 +11388,7 @@ async function syncImeiToSheets() {
       action: 'append',
       items: imeiTracker.map(e => ({
         imei: e.imei,
-        status: e.status === 'active' ? 'Already Registered' : e.status === 'inactive' ? 'Not Found' : 'Can Be Activated'
+        status: e.status === 'registered' || e.status === 'active' ? 'Already Registered' : e.status === 'not_found' || e.status === 'inactive' ? 'Not Found' : e.status === 'can_activate' ? 'Can Be Activated' : 'Not Checked'
       }))
     };
     await fetch(IMEI_SHEETS_URL, {
@@ -11098,18 +11416,20 @@ async function pullImeiFromSheets(silent) {
     let added = 0;
     data.items.forEach(item => {
       if (!item.imei || imeiTracker.find(x => x.imei === item.imei)) return;
-      let appStatus = 'unchecked';
-      if (item.status === 'Already Registered') appStatus = 'active';
-      else if (item.status === 'Not Found') appStatus = 'inactive';
-      else if (item.status === 'Can Be Activated') appStatus = 'unchecked';
+      let appStatus = 'not_checked';
+      if (item.status === 'Already Registered') appStatus = 'registered';
+      else if (item.status === 'Not Found') appStatus = 'not_found';
+      else if (item.status === 'Can Be Activated') appStatus = 'can_activate';
+      else if (item.status === 'Not Checked') appStatus = 'not_checked';
 
       imeiTracker.push({
         imei: item.imei,
         addedDate: new Date().toISOString(),
         addedBy: 'sheet-sync',
         status: appStatus,
+        sheetRow: item.row || 0,
         source: null,
-        notes: 'Imported from sheet'
+        notes: ''
       });
       added++;
     });
@@ -11157,8 +11477,8 @@ function loadImeiFromCloud() {
             const lt = new Date(local.addedDate || 0).getTime();
             const rt = new Date(rem.addedDate || 0).getTime();
             // If status differs, prefer non-unchecked (someone checked it)
-            if (local.status !== 'unchecked' && rem.status === 'unchecked') merged.push(local);
-            else if (rem.status !== 'unchecked' && local.status === 'unchecked') merged.push(rem);
+            if (local.status !== 'not_checked' && (rem.status === 'not_checked' || rem.status === 'unchecked')) merged.push(local);
+            else if (rem.status !== 'not_checked' && rem.status !== 'unchecked' && (local.status === 'not_checked' || local.status === 'unchecked')) merged.push(rem);
             else merged.push(rt > lt ? rem : local);
           }
         });
@@ -11183,7 +11503,7 @@ function autoCollectImeis() {
         imeiTracker.push({
           imei: val, type: 'old',
           addedDate: j.scheduledDate || new Date().toISOString(),
-          addedBy: 'auto-collect', status: 'unchecked',
+          addedBy: 'auto-collect', status: 'not_checked',
           source: { jobId: j.id, customer: j.data.customerName, address: j.data.address, date: j.scheduledDate },
           notes: 'Old unit from ' + (j.data.customerName || 'job')
         });
@@ -11217,7 +11537,7 @@ function exportImeiCSV() {
   if (imeiTracker.length === 0) { showToast('No IMEIs to export', 'info'); return; }
   let csv = 'IMEI,Status,Date Added,Customer,Address,Notes\n';
   imeiTracker.forEach(e => {
-    csv += '"' + e.imei + '","' + (e.status||'unchecked') + '","' + new Date(e.addedDate).toLocaleDateString() + '","' + (e.source?.customer||'') + '","' + (e.source?.address||'') + '","' + (e.notes||'') + '"\n';
+    csv += '"' + e.imei + '","' + (e.status||'not_checked') + '","' + new Date(e.addedDate).toLocaleDateString() + '","' + (e.source?.customer||'') + '","' + (e.source?.address||'') + '","' + (e.notes||'') + '"\n';
   });
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
@@ -11414,15 +11734,18 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
 
       <!-- Existing stock — edit qty, remove -->
-      <div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">CURRENT STOCK (tap +/− to adjust)</div>
+      <div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">EDIT CURRENT STOCK</div>
       <input type="text" id="restockSearch" placeholder="Filter items..." oninput="renderRestockExisting()" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px;outline:none;margin-bottom:8px;box-sizing:border-box;">
       <div id="restockExistingList" style="max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>
 
       <!-- Add new items -->
-      <div style="font-size:9px;color:var(--green);letter-spacing:1px;margin-bottom:6px;">ADD NEW STOCK</div>
-      <div id="truckRestockRows"></div>
-      <button class="btn-add" onclick="addRestockRow()" style="margin-top:6px;">+ Add Equipment</button>
-      <button onclick="submitRestock()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;">✓ ADD TO STOCK</button>
+      <div style="border-top:1px solid var(--border);padding-top:12px;">
+        <div style="font-size:9px;color:var(--green);letter-spacing:1px;margin-bottom:4px;">ADD NEW ITEMS (not already on truck)</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">Use this to add equipment you don't have yet. To adjust existing stock, use +/− above.</div>
+        <div id="truckRestockRows"></div>
+        <button class="btn-add" onclick="addRestockRow()" style="margin-top:6px;">+ Add Equipment</button>
+        <button onclick="submitRestock()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;">✓ ADD NEW TO STOCK</button>
+      </div>
     </div>
 
     <!-- Receipts tab -->
@@ -11712,18 +12035,22 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
     <div class="card">
       <div class="card-head"><span>📡</span><h2>IMEI / Cell Unit Tracker</h2></div>
       <div class="card-body">
-        <div id="imeiStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
-          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
-            <div id="imeiTotal" style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--accent);font-weight:bold;">0</div>
-            <div style="font-size:9px;color:var(--muted);margin-top:2px;">Total Tracked</div>
+        <div id="imeiStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px;">
+          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+            <div id="imeiTotal" style="font-family:'Share Tech Mono',monospace;font-size:20px;color:var(--accent);font-weight:bold;">0</div>
+            <div style="font-size:8px;color:var(--muted);margin-top:2px;">TOTAL</div>
           </div>
-          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
-            <div id="imeiToday" style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--green);font-weight:bold;">0</div>
-            <div style="font-size:9px;color:var(--muted);margin-top:2px;">Today</div>
+          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+            <div id="imeiReady" style="font-family:'Share Tech Mono',monospace;font-size:20px;color:var(--green);font-weight:bold;">0</div>
+            <div style="font-size:8px;color:var(--green);margin-top:2px;">READY</div>
           </div>
-          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
-            <div id="imeiUnchecked" style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--yellow);font-weight:bold;">0</div>
-            <div style="font-size:9px;color:var(--muted);margin-top:2px;">Unchecked</div>
+          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+            <div id="imeiUnchecked" style="font-family:'Share Tech Mono',monospace;font-size:20px;color:var(--yellow);font-weight:bold;">0</div>
+            <div style="font-size:8px;color:var(--yellow);margin-top:2px;">NOT CHECKED</div>
+          </div>
+          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+            <div id="imeiRegistered" style="font-family:'Share Tech Mono',monospace;font-size:20px;color:var(--red);font-weight:bold;">0</div>
+            <div style="font-size:8px;color:var(--red);margin-top:2px;">REGISTERED</div>
           </div>
         </div>
 
@@ -11746,9 +12073,10 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
           <input type="text" id="imeiSearch" placeholder="Search IMEIs..." oninput="renderImeiList()" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;padding:8px 10px;outline:none;">
           <select id="imeiFilter" onchange="renderImeiList()" style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:11px;padding:8px;outline:none;">
             <option value="all">All</option>
-            <option value="unchecked">Unchecked</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            <option value="not_checked">Not Checked</option>
+            <option value="registered">Already Registered</option>
+            <option value="can_activate">Can Be Activated</option>
+            <option value="not_found">Not Found</option>
             <option value="today">Today</option>
           </select>
         </div>
