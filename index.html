@@ -1009,10 +1009,7 @@
         <label>IMEI / Serial #</label>
         <div class="copy-row">
           <input type="text" id="imei" onblur="lockIfFilled('imei')" placeholder="Scan or enter IMEI / serial" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}">
-          <label style="display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Scan barcode">
-            📷
-            <input type="file" accept="image/*" capture="environment" onchange="scanBarcode(event,'imei')" style="display:none;">
-          </label>
+          <button onclick="openLiveScanner('imei')" style="display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Scan barcode">📷</button>
           <button class="btn-copy" onclick="copyField('imei',this)" title="Copy IMEI">⎘</button>
           <button class="btn-paste" onclick="pasteField('imei',this)" title="Paste IMEI">⏎</button>
         </div>
@@ -4743,18 +4740,62 @@ function openLiveScanner(fieldId) {
 
   overlay.appendChild(videoWrap);
 
-  // Manual entry fallback at bottom
+  // Freeze button — tap to pause video and zoom in to read the number
+  const freezeBtn = document.createElement('button');
+  freezeBtn.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.6);border:2px solid #fff;color:#fff;border-radius:50%;width:64px;height:64px;font-size:24px;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;';
+  freezeBtn.textContent = '⏸';
+  freezeBtn.title = 'Freeze frame to read number';
+  let frozen = false;
+  freezeBtn.onclick = () => {
+    if (!frozen) {
+      // Freeze — capture current frame to canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Pause video and show frozen image
+      video.pause();
+      const frozenImg = document.createElement('img');
+      frozenImg.id = 'frozenFrame';
+      frozenImg.src = canvas.toDataURL('image/jpeg', 0.9);
+      frozenImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;';
+      // Make it pinch-zoomable
+      frozenImg.style.touchAction = 'pinch-zoom';
+      videoWrap.appendChild(frozenImg);
+      freezeBtn.textContent = '▶';
+      frozen = true;
+      indicator.textContent = 'Pinch to zoom — type the number below';
+      indicator.style.color = 'var(--green)';
+      // Focus the manual input
+      setTimeout(() => manualInput.focus(), 200);
+    } else {
+      // Unfreeze
+      const fi = document.getElementById('frozenFrame');
+      if (fi) fi.remove();
+      video.play();
+      freezeBtn.textContent = '⏸';
+      frozen = false;
+      indicator.textContent = 'Point at barcode...';
+      indicator.style.color = 'var(--accent)';
+    }
+  };
+  videoWrap.appendChild(freezeBtn);
+
+  // Manual entry at bottom
   const footer = document.createElement('div');
-  footer.style.cssText = 'padding:12px 16px;flex-shrink:0;background:var(--panel);';
+  footer.style.cssText = 'padding:12px 16px;flex-shrink:0;background:var(--panel);padding-bottom:calc(12px + env(safe-area-inset-bottom));';
   const manualRow = document.createElement('div');
   manualRow.style.cssText = 'display:flex;gap:8px;';
   const manualInput = document.createElement('input');
   manualInput.type = 'text';
+  manualInput.inputMode = 'numeric';
   manualInput.id = 'scanManualInput';
-  manualInput.placeholder = 'Or type manually...';
+  manualInput.placeholder = 'Type IMEI / serial...';
   manualInput.style.cssText = 'flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:Share Tech Mono,monospace;font-size:16px;letter-spacing:1px;padding:12px;outline:none;';
+  manualInput.addEventListener('keydown', e => { if (e.key === 'Enter') { manualSave.click(); } });
   const manualSave = document.createElement('button');
-  manualSave.style.cssText = 'background:var(--accent);color:#000;border:none;border-radius:8px;padding:12px 20px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;white-space:nowrap;';
+  manualSave.style.cssText = 'background:var(--accent);color:#000;border:none;border-radius:8px;padding:12px 20px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;cursor:pointer;white-space:nowrap;touch-action:manipulation;';
   manualSave.textContent = 'SAVE';
   manualSave.onclick = () => {
     const val = manualInput.value.trim();
