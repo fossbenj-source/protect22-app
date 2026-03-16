@@ -966,11 +966,12 @@
       <span id="customerCollapseChevron" style="margin-left:auto;color:var(--muted);font-size:12px;">▾</span>
     </div>
     <!-- Collapsed summary — shown when all fields locked -->
-    <div id="customerCollapsedSummary" style="display:none;padding:10px 14px;font-size:13px;color:var(--text);cursor:pointer;" onclick="toggleCustomerCollapse()">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div id="customerCollapsedSummary" style="display:none;padding:10px 14px;font-size:13px;color:var(--text);">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;" onclick="toggleCustomerCollapse()">
         <span id="collapsedName" style="font-weight:700;"></span>
         <span id="collapsedPhone" style="color:var(--muted);font-size:12px;"></span>
         <span id="collapsedCS" style="color:var(--muted);font-size:12px;"></span>
+        <button onclick="event.stopPropagation();openProfileFromJob()" style="margin-left:auto;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:4px;padding:3px 8px;font-family:Share Tech Mono,monospace;font-size:9px;cursor:pointer;letter-spacing:1px;flex-shrink:0;">PROFILE</button>
       </div>
     </div>
     <div class="card-body" id="customerInfoBody">
@@ -1396,11 +1397,14 @@ function addJob() {
 }
 
 function switchJob(id) {
-  saveCurrentJob();
+  // Only save current job form if we're on the job screen
+  if (currentScreen === 'job') saveCurrentJob();
   activeJobId = id;
   renderTabs();
   loadJob(id);
   saveToStorage();
+  // Update the active job banner (shows/hides based on whether there's an in-progress job)
+  updateActiveJobBanner();
 }
 
 function deleteJob(id, e) {
@@ -1477,6 +1481,9 @@ function renderTabs() {
     const aj = jobs.find(j => j.id === activeJobId);
     if (aj) visibleJobs = [aj, ...visibleJobs];
   }
+  // Always include in-progress jobs so you can return to them
+  jobs.filter(j => j.status === 'inprogress' && !visibleJobs.find(v => v.id === j.id))
+    .forEach(j => visibleJobs.unshift(j));
   // If nothing scheduled in range at all, show all jobs
   if (visibleJobs.length === 0) visibleJobs = jobs;
 
@@ -2379,6 +2386,7 @@ function stampTime(type) {
     input.value = t;
     setTimeout(() => { input.focus(); input.select(); }, 50);
     startLiveTimer();
+    setActiveInProgress(j.id);
     // Auto set status to In Progress
     if (j.status === 'pending' || !j.status) {
       setStatus('inprogress', false);
@@ -2578,10 +2586,12 @@ function showCantFinishSheet(j, t) {
     overlay.remove();
     // Save cant finish status first
     j.data.finishTime = t;
+    if (!j.data.arriveTime) j.data.arriveTime = t;
     const inp = document.getElementById('finishInput');
     if(inp) inp.value = t;
     if (notes) j.data.notes = j.data.notes ? j.data.notes + ' | ' + notes : notes;
     updateTimeDisplay(j.data.arriveTime, t);
+    stopLiveTimer();
     setStatus('cantfinish');
     saveToStorage();
     // Enter reschedule placement mode and go to calendar
@@ -2643,11 +2653,13 @@ function finishCantFinish(j, t, notes, daysAhead, cfItemData) {
     renderTruck();
   }
   // Set status and save notes
+  if (!j.data.arriveTime) j.data.arriveTime = t;
   j.data.finishTime = t;
   const input = document.getElementById('finishInput');
   if(input) input.value = t;
   if (notes) j.data.notes = j.data.notes ? j.data.notes + ' | ' + notes : notes;
   updateTimeDisplay(j.data.arriveTime, t);
+  stopLiveTimer();
   setStatus('cantfinish');
   saveToStorage();
   // Reschedule if days specified
@@ -2906,10 +2918,17 @@ function showDeductConfirmModal(j, finishTime) {
 }
 
 function finishComplete(j, finishTime) {
+  // Auto-stamp arrive time if not set
+  if (!j.data.arriveTime) {
+    j.data.arriveTime = finishTime;
+    const arrInput = document.getElementById('arriveInput');
+    if (arrInput) arrInput.value = finishTime;
+  }
   j.data.finishTime = finishTime;
   const input = document.getElementById('finishInput');
   if(input) input.value = finishTime;
   updateTimeDisplay(j.data.arriveTime, finishTime);
+  stopLiveTimer();
   // Set status without auto-deduct (already handled)
   const prevActive = activeJobId;
   activeJobId = j.id;
@@ -2917,12 +2936,167 @@ function finishComplete(j, finishTime) {
   document.getElementById('btnInProgress') && (document.getElementById('btnInProgress').className = 'status-btn');
   document.getElementById('btnComplete') && (document.getElementById('btnComplete').className = 'status-btn active-complete');
   document.getElementById('btnCantFinish') && (document.getElementById('btnCantFinish').className = 'status-btn');
+  document.getElementById('btnFinish') && (document.getElementById('btnFinish').className = 'time-btn stamped');
   activeJobId = prevActive;
   renderTabs();
   saveToStorage();
   renderMonthCal();
+  // Clear active in-progress tracking
+  if (_activeInProgressId === j.id) clearActiveInProgress();
+  // Auto-send install record on completion
+  autoSendRecord(j);
   // Auto-advance: find next pending job for today and offer to open it
   offerNextJob(j.id);
+}
+
+// Auto-send install record when job is completed
+async function autoSendRecord(j) {
+  if (j.sent) return; // Already sent
+  if (!j.data.customerName) return; // No customer data to send
+  try {
+    const prevActive = activeJobId;
+    activeJobId = j.id;
+    // Make sure job data is current
+    saveCurrentJob();
+    const data = collectData();
+    activeJobId = prevActive;
+    await emailjs.send('service_ody8c3i', 'template_rzxkses', {
+      to_email: getEmailRecipient(),
+      customer_name: data.customer, install_date: data.date,
+      installing: data.installing, existing_equipment: data.existing,
+      cs_number: data.cs, customer_email: data.email,
+      customer_phone: data.phone, confirmation: data.confirmation,
+      zones: data.zones, address: data.address, notes: data.notes,
+      status: data.status, arrive_time: data.arriveTime, finish_time: data.finishTime,
+      fees: data.fees, verbal_code: data.verbalCode || '—', master_code: data.masterCode || '—',
+      user_codes: data.userCodes || '—'
+    });
+    await logToSheets(data);
+    j.sent = true;
+    saveToStorage();
+    const sb = document.getElementById('sentBanner');
+    const btn = document.getElementById('submitBtn');
+    if (sb) sb.classList.add('show');
+    if (btn) btn.innerHTML = '✉ Resend Install Record';
+    showToast('✉ Install record auto-sent to ' + getEmailRecipient(), 'success');
+  } catch (e) {
+    console.warn('Auto-send failed:', e);
+    showToast('⚠️ Auto-send failed — tap Send manually', 'error');
+  }
+}
+
+// Persistent active job banner — shows on any screen when you have an in-progress job
+let _activeInProgressId = null;
+let _globalTimerInterval = null;
+
+function setActiveInProgress(jobId) {
+  _activeInProgressId = jobId;
+  startGlobalTimer();
+  updateActiveJobBanner();
+}
+
+function clearActiveInProgress() {
+  _activeInProgressId = null;
+  stopGlobalTimer();
+  const banner = document.getElementById('returnJobBanner');
+  if (banner) banner.remove();
+}
+
+function startGlobalTimer() {
+  stopGlobalTimer();
+  _globalTimerInterval = setInterval(() => {
+    const timerEl = document.getElementById('globalTimerText');
+    if (!timerEl || !_activeInProgressId) return;
+    const j = jobs.find(x => x.id === _activeInProgressId);
+    if (!j || !j.data.arriveTime || j.data.finishTime) { timerEl.textContent = ''; return; }
+    const arriveMs = timeToMs(j.data.arriveTime);
+    if (arriveMs === null) return;
+    const now = new Date();
+    const nowMs = now.getHours()*3600000 + now.getMinutes()*60000 + now.getSeconds()*1000;
+    const elapsed = nowMs - arriveMs;
+    if (elapsed < 0) { timerEl.textContent = '0:00'; return; }
+    const h = Math.floor(elapsed / 3600000);
+    const m = Math.floor((elapsed % 3600000) / 60000);
+    const s = Math.floor((elapsed % 60000) / 1000);
+    timerEl.textContent = (h>0?h+':':'') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    timerEl.style.color = elapsed > 7200000 ? 'var(--red)' : elapsed > 3600000 ? '#fbbf24' : '#fff';
+  }, 1000);
+}
+
+function stopGlobalTimer() {
+  if (_globalTimerInterval) { clearInterval(_globalTimerInterval); _globalTimerInterval = null; }
+}
+
+function updateActiveJobBanner() {
+  const banner = document.getElementById('returnJobBanner');
+  const inProgressJob = _activeInProgressId
+    ? jobs.find(j => j.id === _activeInProgressId && j.status === 'inprogress')
+    : jobs.find(j => j.status === 'inprogress');
+
+  if (!inProgressJob) {
+    if (banner) banner.remove();
+    return;
+  }
+  _activeInProgressId = inProgressJob.id;
+
+  // Don't show banner if we're viewing this job on the job screen
+  if (currentScreen === 'job' && activeJobId === inProgressJob.id) {
+    if (banner) banner.remove();
+    return;
+  }
+
+  const name = inProgressJob.data.customerName || 'Active job';
+  const addr = inProgressJob.data.address ? inProgressJob.data.address.split(',')[0] : '';
+
+  if (banner) {
+    banner.querySelector('.ajb-name').textContent = name;
+    const addrEl = banner.querySelector('.ajb-addr');
+    if (addrEl) addrEl.textContent = addr ? '📍 ' + addr : '';
+    banner._jobId = inProgressJob.id;
+    return;
+  }
+
+  // Create banner
+  const b = document.createElement('div');
+  b.id = 'returnJobBanner';
+  b._jobId = inProgressJob.id;
+  b.style.cssText = 'position:fixed;bottom:58px;left:0;right:0;z-index:8998;background:linear-gradient(135deg,#1a3a2a,#0d2818);border-top:2px solid var(--green);padding:8px 12px;display:flex;align-items:center;gap:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));';
+
+  // Timer
+  const timerWrap = document.createElement('div');
+  timerWrap.style.cssText = 'display:flex;align-items:center;gap:4px;flex-shrink:0;';
+  timerWrap.innerHTML = '<span style="font-size:10px;">⏱</span><span id="globalTimerText" style="font-family:Share Tech Mono,monospace;font-size:14px;color:#fff;font-weight:bold;min-width:42px;"></span>';
+
+  // Job info
+  const info = document.createElement('div');
+  info.style.cssText = 'flex:1;min-width:0;cursor:pointer;';
+  info.innerHTML = '<div class="ajb-name" style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--green);font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(name) + '</div>' +
+    (addr ? '<div class="ajb-addr" style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 ' + esc(addr) + '</div>' : '<div class="ajb-addr" style="font-size:9px;color:var(--muted);"></div>');
+  info.onclick = () => { switchJob(inProgressJob.id); showScreen('job'); };
+
+  // GO navigate button
+  const goBtn = document.createElement('button');
+  goBtn.style.cssText = 'background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:6px;padding:6px 10px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;display:' + (addr ? 'block' : 'none') + ';';
+  goBtn.textContent = '📍 GO';
+  goBtn.onclick = (e) => {
+    e.stopPropagation();
+    const encoded = encodeURIComponent(inProgressJob.data.address);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) window.location.href = 'maps://?q=' + encoded;
+    else window.open('https://www.google.com/maps/search/?api=1&query=' + encoded, '_blank');
+  };
+
+  // Return button
+  const retBtn = document.createElement('button');
+  retBtn.style.cssText = 'background:rgba(52,211,153,0.2);border:1px solid var(--green);color:var(--green);border-radius:6px;padding:6px 10px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;white-space:nowrap;';
+  retBtn.textContent = '↩ BACK';
+  retBtn.onclick = () => { switchJob(inProgressJob.id); showScreen('job'); };
+
+  b.appendChild(timerWrap);
+  b.appendChild(info);
+  b.appendChild(goBtn);
+  b.appendChild(retBtn);
+  document.body.appendChild(b);
 }
 
 function offerNextJob(completedJobId) {
@@ -3880,116 +4054,204 @@ function openCustomerDetail(id) {
   if (!c) return;
   const existing = document.getElementById('customerDetailPanel');
   if (existing) existing.remove();
+  document.body.style.overflow = 'hidden';
 
   const panel = document.createElement('div');
   panel.id = 'customerDetailPanel';
-  panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
-  panel.onclick = e => { if(e.target===panel) panel.remove(); };
+  panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;';
 
-  const custJobs = jobs.filter(j => j.data && j.data.customerName === c.name).sort((a,b) => new Date(b.scheduledDate||b.data.date||0) - new Date(a.scheduledDate||a.data.date||0));
+  const custJobs = jobs.filter(j => j.data && j.data.customerName && j.data.customerName.toLowerCase() === c.name.toLowerCase()).sort((a,b) => new Date(b.scheduledDate||b.data.date||0) - new Date(a.scheduledDate||a.data.date||0));
+  const completedJobs = custJobs.filter(j => j.status === 'complete');
   const initials = c.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const totalRevenue = completedJobs.reduce((s,j) => s + getJobFee(j), 0);
 
-  const sheet = document.createElement('div');
-  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;max-height:85vh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom);';
-
-  // Header
-  const hdr = document.createElement('div');
-  hdr.style.cssText = 'display:flex;align-items:center;gap:14px;padding:18px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);z-index:1;';
-  hdr.innerHTML =
-    '<div style="width:48px;height:48px;border-radius:50%;background:var(--accent-dim);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-family:Share Tech Mono,monospace;font-size:18px;color:var(--accent);flex-shrink:0;">'+initials+'</div>'+
-    '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:18px;color:var(--text);">'+c.name+'</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+(custJobs.length)+' job'+(custJobs.length!==1?'s':'')+' on record</div></div>'+
-    '<button id="cdpClose" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px;">×</button>';
-  sheet.appendChild(hdr);
-  const cdpCloseBtn = hdr.querySelector('#cdpClose');
-  if (cdpCloseBtn) cdpCloseBtn.onclick = () => panel.remove();
-
-  // Contact info section
-  const contactSection = document.createElement('div');
-  contactSection.style.cssText = 'padding:16px;border-bottom:1px solid var(--border);';
-  contactSection.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">CONTACT INFO</div>';
-
-  const fields = [
-    {icon:'📍', label:'Address', val:c.address},
-    {icon:'📞', label:'Phone', val:c.phone, action: c.phone ? 'tel:'+c.phone.replace(/\D/g,'') : null},
-    {icon:'✉️', label:'Email', val:c.email, action: c.email ? 'mailto:'+c.email : null},
-    {icon:'#', label:'CS #', val:c.cs},
-    {icon:'📝', label:'Notes', val:c.notes},
-  ];
-  fields.forEach(f => {
-    if (!f.val) return;
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);';
-    row.innerHTML = '<span style="font-size:14px;width:20px;flex-shrink:0;">'+f.icon+'</span>'+
-      '<div style="flex:1;min-width:0;"><div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;">'+f.label+'</div>'+
-      '<div style="font-size:14px;color:var(--text);margin-top:2px;">'+f.val+'</div></div>';
-    if (f.action) {
-      const btn = document.createElement('a');
-      btn.href = f.action || '#';
-      btn.style.cssText = 'background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:4px 8px;font-size:11px;text-decoration:none;flex-shrink:0;align-self:center;';
-      btn.textContent = f.label === 'Phone' ? '📞 Call' : '✉️ Mail';
-      row.appendChild(btn);
-    }
-    contactSection.appendChild(row);
-  });
-  sheet.appendChild(contactSection);
-
-  // Action buttons
-  const actions = document.createElement('div');
-  actions.style.cssText = 'display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);';
-  actions.innerHTML = '';
-  const lb2 = document.createElement('button'); lb2.style.cssText='flex:1;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:12px 8px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;'; lb2.textContent='→ LOAD INTO JOB'; lb2.onclick=()=>{useCustomer(c.id);panel.remove();}; actions.appendChild(lb2);
-  const sb2 = document.createElement('button'); sb2.style.cssText='flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:12px 8px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;'; sb2.textContent='📅 SCHEDULE'; sb2.onclick=()=>{scheduleForCustomer(c.id);panel.remove();}; actions.appendChild(sb2);
-  sheet.appendChild(actions);
-
-  // Delete button — separate row, clearly destructive, requires confirmation
-  const deleteRow = document.createElement('div');
-  deleteRow.style.cssText = 'padding:0 16px 4px;';
-  const deleteBtn = document.createElement('button');
-  deleteBtn.style.cssText = 'width:100%;background:none;border:1px solid rgba(255,68,68,0.25);color:rgba(255,68,68,0.6);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;letter-spacing:1px;transition:all 0.15s;';
-  deleteBtn.textContent = '🗑 DELETE CUSTOMER';
-  deleteBtn.onmouseover = () => { deleteBtn.style.borderColor='var(--red)'; deleteBtn.style.color='var(--red)'; };
-  deleteBtn.onmouseout  = () => { deleteBtn.style.borderColor='rgba(255,68,68,0.25)'; deleteBtn.style.color='rgba(255,68,68,0.6)'; };
-  deleteBtn.onclick = () => {
-    showConfirmSheet(
-      'Delete ' + c.name + '?',
-      'This permanently removes the customer record. Their job history will remain.',
-      'Delete Customer',
-      () => { deleteCustomer(c.id, {stopPropagation:()=>{}}); panel.remove(); showToast(c.name + ' deleted', 'info'); }
-    );
-  };
-  deleteRow.appendChild(deleteBtn);
-  sheet.appendChild(deleteRow);
-
-  // Job history for this customer
-  if (custJobs.length > 0) {
-    const jobSection = document.createElement('div');
-    jobSection.style.cssText = 'padding:16px;';
-    jobSection.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">JOB HISTORY ('+custJobs.length+')</div>';
-    custJobs.forEach(j => {
-      const sc = j.status==='complete'?'var(--green)':j.status==='inprogress'?'var(--accent)':j.status==='cantfinish'?'var(--red)':j.status==='reschedule'?'var(--orange)':'var(--yellow)';
-      const date = (j.scheduledDate||j.data.date) ? new Date(j.scheduledDate||j.data.date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '—';
-      const time = j.scheduledTime || j.data.arriveTime || '';
-      const installing = j.data.installing ? j.data.installing.filter(i=>i&&(typeof i==='object'?i.name:i)).slice(0,3).map(i=>typeof i==='object'?i.name:i).join(', ') : '';
-      const jobRow = document.createElement('div');
-      jobRow.style.cssText = 'background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;';
-      jobRow.innerHTML =
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
-          '<span style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);">'+date+(time?' · '+time:'')+'</span>'+
-          '<span style="margin-left:auto;font-size:11px;color:'+sc+';">'+getStatusIcon(j.status)+' '+(j.status||'pending')+'</span>'+
-        '</div>'+
-        (installing ? '<div style="font-size:11px;color:var(--muted);">🔧 '+installing+'</div>' : '')+
-        (j.data.notes && j.data.notes!=='—' ? '<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:4px;">📝 '+j.data.notes.slice(0,60)+'</div>' : '');
-      jobRow.onmouseover = () => { jobRow.style.borderColor = 'var(--accent)'; };
-      jobRow.onmouseout = () => { jobRow.style.borderColor = 'var(--border)'; };
-      jobRow.onclick = () => { switchJob(j.id); showScreen('job'); panel.remove(); };
-      jobSection.appendChild(jobRow);
+  // Aggregate installed equipment across all completed jobs
+  const allEquip = {};
+  completedJobs.forEach(j => {
+    (j.data.installing || []).filter(i => i && (typeof i==='object' ? i.name : i)).forEach(item => {
+      const name = typeof item==='object' ? item.name : item;
+      const qty = parseInt(typeof item==='object' ? item.qty : '1') || 1;
+      allEquip[name] = (allEquip[name]||0) + qty;
     });
-    sheet.appendChild(jobSection);
+  });
+
+  let h = '';
+
+  // Header with back button
+  h += '<div style="display:flex;align-items:center;gap:12px;padding:16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:2;">';
+  h += '<button onclick="closeCustomerProfile()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:6px 10px;font-size:14px;cursor:pointer;">←</button>';
+  h += '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:18px;color:var(--text);">' + esc(c.name) + '</div>';
+  h += '<div style="font-size:11px;color:var(--muted);">' + custJobs.length + ' job' + (custJobs.length!==1?'s':'') + ' · $' + totalRevenue + ' revenue</div></div>';
+  h += '<div style="width:48px;height:48px;border-radius:50%;background:var(--accent-dim);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-family:Share Tech Mono,monospace;font-size:18px;color:var(--accent);flex-shrink:0;">' + initials + '</div>';
+  h += '</div>';
+
+  // Quick actions bar
+  h += '<div style="display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);overflow-x:auto;">';
+  if (c.phone) h += '<a href="tel:' + c.phone.replace(/\D/g,'') + '" style="display:flex;align-items:center;gap:4px;background:rgba(52,211,153,0.15);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;text-decoration:none;white-space:nowrap;flex-shrink:0;">📞 Call</a>';
+  if (c.address) h += '<button onclick="navToAddress(\'' + esc(c.address.replace(/'/g,"\\'")) + '\')" style="display:flex;align-items:center;gap:4px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">📍 Navigate</button>';
+  if (c.email) h += '<a href="mailto:' + esc(c.email) + '" style="display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;text-decoration:none;white-space:nowrap;flex-shrink:0;">✉ Email</a>';
+  h += '<button onclick="closeCustomerProfile();scheduleForCustomer(' + c.id + ')" style="display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">📅 Schedule</button>';
+  h += '<button onclick="closeCustomerProfile();createServiceCallFor(' + c.id + ')" style="display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">🛠 Service Call</button>';
+  h += '</div>';
+
+  // Contact & Account Info
+  h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">CONTACT & ACCOUNT</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+  const contactFields = [
+    {label:'Address', val:c.address, icon:'📍'},
+    {label:'Phone', val:c.phone, icon:'📞'},
+    {label:'Email', val:c.email, icon:'✉'},
+    {label:'CS #', val:c.cs, icon:'#'},
+  ];
+  contactFields.forEach(f => {
+    if (!f.val) return;
+    h += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">';
+    h += '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;">' + f.icon + ' ' + f.label.toUpperCase() + '</div>';
+    h += '<div style="font-size:13px;color:var(--text);margin-top:2px;word-break:break-word;">' + esc(f.val) + '</div>';
+    h += '</div>';
+  });
+  h += '</div></div>';
+
+  // Equipment at this home
+  const equipEntries = Object.entries(allEquip);
+  if (equipEntries.length > 0) {
+    h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
+    h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">🔧 INSTALLED EQUIPMENT</div>';
+    equipEntries.forEach(([name, qty]) => {
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
+      h += '<span style="font-size:13px;color:var(--text);flex:1;">' + esc(name) + '</span>';
+      h += '<span style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);">×' + qty + '</span>';
+      h += '</div>';
+    });
+    h += '</div>';
   }
 
-  panel.appendChild(sheet);
+  // Communication / Notes log
+  h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">📝 NOTES & COMMUNICATION</div>';
+  // Customer-level notes
+  if (c.notes) {
+    h += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px;color:var(--text);">' + esc(c.notes) + '</div>';
+  }
+  // Communication log from customer data
+  const commLog = c.commLog || [];
+  if (commLog.length > 0) {
+    commLog.forEach(entry => {
+      h += '<div style="background:var(--panel);border-left:3px solid var(--accent);border-radius:4px;padding:8px 10px;margin-bottom:6px;">';
+      h += '<div style="font-size:9px;color:var(--muted);">' + esc(entry.date || '') + '</div>';
+      h += '<div style="font-size:12px;color:var(--text);margin-top:2px;">' + esc(entry.text || '') + '</div>';
+      h += '</div>';
+    });
+  }
+  // Add note form
+  h += '<div style="display:flex;gap:6px;margin-top:8px;">';
+  h += '<input type="text" id="custCommInput" placeholder="Add a note..." style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;padding:10px;outline:none;">';
+  h += '<button onclick="addCustomerNote(' + c.id + ')" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 14px;font-family:Share Tech Mono,monospace;font-size:11px;font-weight:bold;cursor:pointer;flex-shrink:0;">ADD</button>';
+  h += '</div></div>';
+
+  // Service History
+  h += '<div style="padding:16px;">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">📋 SERVICE HISTORY (' + custJobs.length + ')</div>';
+  if (custJobs.length === 0) {
+    h += '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No jobs yet</div>';
+  } else {
+    custJobs.forEach(j => {
+      const sc = j.status==='complete'?'var(--green)':j.status==='inprogress'?'var(--accent)':j.status==='cantfinish'?'var(--red)':'var(--yellow)';
+      const date = (j.scheduledDate||j.data.date) ? new Date(j.scheduledDate||j.data.date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : '—';
+      const time = j.scheduledTime || j.data.arriveTime || '';
+      const jobType = j.data.jobType === 'service' ? '<span style="background:rgba(251,146,60,0.2);color:var(--orange);padding:1px 5px;border-radius:3px;font-size:9px;margin-left:6px;">SERVICE</span>' : '<span style="background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;font-size:9px;margin-left:6px;">INSTALL</span>';
+      const installing = (j.data.installing||[]).filter(i=>i&&(typeof i==='object'?i.name:i)).slice(0,3).map(i=>typeof i==='object'?i.name:i).join(', ');
+      const timeOnSite = (j.data.arriveTime && j.data.finishTime) ? calcTimeOnSite(j.data.arriveTime, j.data.finishTime) : '';
+      const fee = getJobFee(j);
+
+      h += '<div style="background:var(--panel);border:1px solid var(--border);border-left:3px solid ' + sc + ';border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;" onclick="closeCustomerProfile();switchJob(' + j.id + ');showScreen(\'job\')">';
+      h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">';
+      h += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--muted);">' + esc(date) + '</span>';
+      h += jobType;
+      h += '<span style="margin-left:auto;font-size:11px;color:' + sc + ';">' + getStatusIcon(j.status) + ' ' + (j.status||'pending') + '</span>';
+      h += '</div>';
+      if (time) h += '<div style="font-size:11px;color:var(--muted);">🕐 ' + esc(time) + (timeOnSite ? ' · ⏱ ' + timeOnSite : '') + (fee ? ' · $' + fee : '') + '</div>';
+      if (installing) h += '<div style="font-size:11px;color:var(--muted);margin-top:3px;">🔧 ' + esc(installing) + '</div>';
+      if (j.data.serviceType) h += '<div style="font-size:11px;color:var(--orange);margin-top:3px;">🛠 ' + esc(j.data.serviceType) + (j.data.serviceIssue ? ' — ' + esc(j.data.serviceIssue.slice(0,50)) : '') + '</div>';
+      if (j.data.notes && j.data.notes!=='—') h += '<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:3px;">📝 ' + esc(j.data.notes.slice(0,80)) + '</div>';
+      h += '</div>';
+    });
+  }
+
+  // Delete button at bottom
+  h += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">';
+  h += '<button onclick="confirmDeleteCustomer(' + c.id + ')" style="width:100%;background:none;border:1px solid rgba(255,68,68,0.25);color:rgba(255,68,68,0.6);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">🗑 DELETE CUSTOMER</button>';
+  h += '</div></div>';
+
+  panel.innerHTML = h;
   document.body.appendChild(panel);
+}
+
+function closeCustomerProfile() {
+  document.body.style.overflow = '';
+  const panel = document.getElementById('customerDetailPanel');
+  if (panel) panel.remove();
+}
+
+function openProfileFromJob() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j || !j.data.customerName) { showToast('No customer on this job', 'error'); return; }
+  const c = customers.find(x => x.name.toLowerCase() === j.data.customerName.toLowerCase());
+  if (c) {
+    openCustomerDetail(c.id);
+  } else {
+    showToast('Customer not in database yet', 'info');
+  }
+}
+
+function addCustomerNote(custId) {
+  const input = document.getElementById('custCommInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  if (!c.commLog) c.commLog = [];
+  c.commLog.unshift({
+    date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' ' + new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}),
+    text: text
+  });
+  saveCustomers();
+  // Re-render the profile
+  openCustomerDetail(custId);
+  showToast('📝 Note added', 'success');
+}
+
+function confirmDeleteCustomer(custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  showConfirmSheet(
+    'Delete ' + c.name + '?',
+    'This permanently removes the customer record. Their job history will remain.',
+    'Delete Customer',
+    () => { deleteCustomer(custId, {stopPropagation:()=>{}}); closeCustomerProfile(); showToast(c.name + ' deleted', 'info'); }
+  );
+}
+
+function createServiceCallFor(custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  const j = blankJob();
+  j.data.jobType = 'service';
+  j.data.customerName = c.name;
+  j.data.address = c.address || '';
+  j.data.phone = c.phone || '';
+  j.data.email = c.email || '';
+  j.data.cs = c.cs || '';
+  j.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => j.data[f]);
+  jobs.push(j);
+  activeJobId = j.id;
+  saveToStorage();
+  showScreen('job');
+  renderTabs();
+  loadJob(j.id);
+  showToast('🛠 Service call created for ' + c.name, 'success');
 }
 
 function scheduleForCustomer(id) {
@@ -6305,6 +6567,74 @@ function showConfirmSheet(title, subtitle, confirmLabel, onConfirm) {
   document.body.appendChild(overlay);
 }
 
+// Quick Peek — view job details without switching away from current job
+function showQuickPeek(jobId) {
+  const j = jobs.find(x => x.id === jobId);
+  if (!j) return;
+  const d = j.data;
+  const existing = document.getElementById('quickPeekOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'quickPeekOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:60000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;padding:20px 16px;max-height:75vh;overflow-y:auto;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+
+  const sc = j.status==='complete'?'var(--green)':j.status==='inprogress'?'var(--accent)':j.status==='cantfinish'?'var(--red)':'var(--yellow)';
+  const typeLabel = d.jobType === 'service' ? '<span style="background:rgba(251,146,60,0.2);color:var(--orange);padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px;">SERVICE</span>' : '';
+
+  let h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);letter-spacing:2px;">👁 QUICK PEEK</div>';
+  h += '<button onclick="document.getElementById(\'quickPeekOverlay\').remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>';
+  h += '</div>';
+
+  h += '<div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px;">' + esc(d.customerName || 'Unnamed') + typeLabel + '</div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">';
+  h += '<span style="font-size:11px;color:' + sc + ';">' + getStatusIcon(j.status) + ' ' + (j.status || 'pending') + '</span>';
+  if (j.scheduledTime) h += '<span style="font-size:11px;color:var(--muted);">🕐 ' + esc(j.scheduledTime) + (j.scheduledEndTime ? ' – ' + esc(j.scheduledEndTime) : '') + '</span>';
+  h += '</div>';
+
+  if (d.address) {
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:8px;">';
+    h += '<div style="flex:1;font-size:13px;color:var(--text);">📍 ' + esc(d.address) + '</div>';
+    h += '<button onclick="navToAddress(\'' + esc(d.address.replace(/'/g, "\\'")) + '\')" style="background:linear-gradient(135deg,var(--accent),#0088aa);color:#000;border:none;border-radius:6px;padding:8px 12px;font-size:11px;font-weight:bold;cursor:pointer;">GO</button>';
+    h += '</div>';
+  }
+  if (d.phone) {
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;margin-bottom:8px;">';
+    h += '<div style="flex:1;font-size:13px;color:var(--text);">📞 ' + esc(d.phone) + '</div>';
+    h += '<button onclick="window.location.href=\'tel:' + d.phone.replace(/\D/g, '') + '\'" style="background:rgba(52,211,153,0.15);border:1px solid var(--green);color:var(--green);border-radius:6px;padding:8px 12px;font-size:11px;cursor:pointer;">CALL</button>';
+    h += '</div>';
+  }
+  if (d.cs) h += '<div style="font-size:12px;color:var(--muted);padding:4px 0;">CS: ' + esc(d.cs) + '</div>';
+  if (d.email) h += '<div style="font-size:12px;color:var(--muted);padding:4px 0;">✉ ' + esc(d.email) + '</div>';
+
+  // Equipment
+  const installing = (d.installing || []).filter(i => i && (typeof i === 'object' ? i.name : i));
+  if (installing.length) {
+    h += '<div style="margin-top:10px;font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">EQUIPMENT</div>';
+    installing.forEach(item => {
+      const name = typeof item === 'object' ? item.name : item;
+      const qty = parseInt(typeof item === 'object' ? item.qty : '1') || 1;
+      h += '<div style="font-size:12px;color:var(--text);padding:2px 0;">' + (qty > 1 ? qty + '× ' : '') + esc(name) + '</div>';
+    });
+  }
+
+  if (d.notes && d.notes !== '—') {
+    h += '<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;">📝 ' + esc(d.notes.slice(0, 200)) + '</div>';
+  }
+
+  // Open full job button
+  h += '<button onclick="document.getElementById(\'quickPeekOverlay\').remove();switchJob(' + j.id + ');showScreen(\'job\')" style="width:100%;margin-top:16px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:12px;cursor:pointer;letter-spacing:1px;">📋 OPEN FULL JOB</button>';
+
+  sheet.innerHTML = h;
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
 function showJobContextMenu(jobId, el) {
   const j = jobs.find(x => x.id === jobId);
   if (!j) return;
@@ -6328,6 +6658,7 @@ function showJobContextMenu(jobId, el) {
 
   // Action buttons
   const actions = [
+    { icon:'👁', label:'Quick Peek', color:'var(--text)', fn:() => { menu.remove(); showQuickPeek(jobId); }},
     { icon:'📋', label:'Open Job', color:'var(--accent)', fn:() => { switchJob(jobId); showScreen('job'); menu.remove(); const cn = document.getElementById('customerName'); if(cn && !cn.value) setTimeout(()=>cn.focus(),200); }},
     { icon:'📅', label:'Reschedule', color:'var(--muted)', fn:() => {
       menu.remove();
@@ -6753,9 +7084,9 @@ function confirmScheduleJob() {
   if (existItems.length) j.data.existing = existItems.map(i => ({name:i.name||i, qty:i.qty||'1', cell:i.cell||false}));
 
   jobs.push(j);
-  activeJobId = j.id;
+  // Don't change activeJobId — the Job screen still shows the previous job
+  // activeJobId will change when user explicitly opens this new job
   saveToStorage();
-  renderTabs();
   closeScheduleModal();
   calSelectedDate = new Date(j.scheduledDate);
   renderCal();
@@ -6799,6 +7130,8 @@ function showScreen(name) {
   if (name === 'customers') renderCustomers();
   if (name === 'settings') loadSettingsScreen();
   if (name === 'truck') { renderTruck(); }
+  // Update active job banner on all screen changes
+  updateActiveJobBanner();
 }
 
 // ── HISTORY ────────────────────────────────────────────────
@@ -7633,7 +7966,35 @@ document.addEventListener('visibilitychange', () => {
     renderCal();
     updateTodayStats();
   }
+  updateActiveJobBanner();
 });
+
+// Swipe right from left edge to return to active job
+let _swipeStartX = 0, _swipeStartY = 0;
+document.addEventListener('touchstart', e => {
+  if (e.touches[0].clientX < 25) { // Started from left edge
+    _swipeStartX = e.touches[0].clientX;
+    _swipeStartY = e.touches[0].clientY;
+  } else {
+    _swipeStartX = -1;
+  }
+}, {passive:true});
+document.addEventListener('touchend', e => {
+  if (_swipeStartX < 0) return;
+  const endX = e.changedTouches[0].clientX;
+  const endY = e.changedTouches[0].clientY;
+  const dx = endX - _swipeStartX;
+  const dy = Math.abs(endY - _swipeStartY);
+  if (dx > 100 && dy < 80 && _activeInProgressId) {
+    const j = jobs.find(x => x.id === _activeInProgressId && x.status === 'inprogress');
+    if (j && (currentScreen !== 'job' || activeJobId !== _activeInProgressId)) {
+      switchJob(_activeInProgressId);
+      showScreen('job');
+      showToast('↩ Back to ' + (j.data.customerName || 'active job'), 'success');
+    }
+  }
+  _swipeStartX = -1;
+}, {passive:true});
 
 }); // end DOMContentLoaded
 
