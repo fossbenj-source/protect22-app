@@ -4487,13 +4487,10 @@ function openCustomerDetail(id) {
   });
   h += '</div>';
 
-  // Add equipment
-  h += '<div style="display:flex;gap:6px;margin-bottom:12px;">';
-  h += '<select id="custEquipSelect" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:8px;outline:none;">';
-  h += '<option value="">+ Add equipment...</option>';
-  h += equipmentList.map(e => '<option value="' + esc(e) + '">' + esc(e) + '</option>').join('');
-  h += '</select>';
-  h += '<button onclick="addCustPlannedEquip('+c.id+')" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;">ADD</button>';
+  // Add equipment - searchable
+  h += '<div style="display:flex;gap:6px;margin-bottom:12px;align-items:flex-start;">';
+  h += '<div id="custEquipCombo1" style="flex:1;"></div>';
+  h += '<button onclick="addCustPlannedEquipFromCombo('+c.id+',1)" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 12px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;height:40px;">ADD</button>';
   h += '</div>';
 
   // Action buttons
@@ -4588,13 +4585,10 @@ function openCustomerDetail(id) {
     h += '</div>';
   }
 
-  // Add equipment button
-  h += '<div style="display:flex;gap:6px;margin-top:8px;">';
-  h += '<select id="custEquipSelect" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:8px;outline:none;">';
-  h += '<option value="">+ Add equipment...</option>';
-  h += equipmentList.map(e => '<option value="' + esc(e) + '">' + esc(e) + '</option>').join('');
-  h += '</select>';
-  h += '<button onclick="addCustPlannedEquip('+c.id+')" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;">ADD</button>';
+  // Add equipment button - searchable
+  h += '<div style="display:flex;gap:6px;margin-top:8px;align-items:flex-start;">';
+  h += '<div id="custEquipCombo2" style="flex:1;"></div>';
+  h += '<button onclick="addCustPlannedEquipFromCombo('+c.id+',2)" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 12px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;height:40px;">ADD</button>';
   h += '</div>';
 
   // Schedule install with this equipment
@@ -4678,6 +4672,24 @@ function openCustomerDetail(id) {
 
   panel.innerHTML = h;
   document.body.appendChild(panel);
+  
+  // Mount searchable equipment combos
+  const combo1Container = document.getElementById('custEquipCombo1');
+  if (combo1Container) {
+    const combo1 = createCombo('');
+    combo1.style.width = '100%';
+    combo1.querySelector('input').placeholder = 'Search equipment...';
+    combo1.id = 'custEquipComboEl1';
+    combo1Container.appendChild(combo1);
+  }
+  const combo2Container = document.getElementById('custEquipCombo2');
+  if (combo2Container) {
+    const combo2 = createCombo('');
+    combo2.style.width = '100%';
+    combo2.querySelector('input').placeholder = 'Search equipment...';
+    combo2.id = 'custEquipComboEl2';
+    combo2Container.appendChild(combo2);
+  }
   } catch(err) {
     console.error('openCustomerDetail error:', err);
     document.body.style.overflow = '';
@@ -4690,6 +4702,24 @@ function closeCustomerProfile() {
   document.documentElement.style.overflow = '';
   const panel = document.getElementById('customerDetailPanel');
   if (panel) panel.remove();
+}
+
+function addCustPlannedEquipFromCombo(custId, comboNum) {
+  const comboEl = document.getElementById('custEquipComboEl' + comboNum);
+  if (!comboEl) return;
+  const input = comboEl.querySelector('input');
+  const val = comboEl.getValue ? comboEl.getValue() : (input ? input.value.trim() : '');
+  if (!val) { showToast('Select equipment first', 'error'); return; }
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  if (!c.plannedEquipment) c.plannedEquipment = [];
+  const existing = c.plannedEquipment.find(e => e.name === val);
+  if (existing) { existing.qty = (parseInt(existing.qty)||1) + 1; }
+  else { c.plannedEquipment.push({ name: val, qty: 1 }); }
+  saveCustomers();
+  closeCustomerProfile();
+  openCustomerDetail(custId);
+  showToast('✓ Equipment added', 'success');
 }
 
 function addCustPlannedEquip(custId) {
