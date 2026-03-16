@@ -3119,7 +3119,7 @@ function showJobPool() {
   const overlay = document.createElement('div');
   overlay.id = 'jobPoolOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;overscroll-behavior:contain;';
-  overlay.onclick = e => { if (e.target === overlay) { document.body.style.overflow=''; overlay.remove(); } };
+  overlay.onclick = e => { if (e.target === overlay) { document.body.style.overflow=''; document.documentElement.style.overflow=''; overlay.remove(); } };
 
   const sheet = document.createElement('div');
   sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;max-height:85vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
@@ -4499,6 +4499,7 @@ function openCustomerDetail(id) {
 
 function closeCustomerProfile() {
   document.body.style.overflow = '';
+  document.documentElement.style.overflow = '';
   const panel = document.getElementById('customerDetailPanel');
   if (panel) panel.remove();
 }
@@ -5132,7 +5133,7 @@ function showJobsPanel(title, filteredJobs) {
     const cleanBtn = document.createElement('button');
     cleanBtn.style.cssText = 'background:none;border:1px solid var(--orange);color:var(--orange);border-radius:4px;padding:4px 8px;font-family:Share Tech Mono,monospace;font-size:9px;cursor:pointer;margin-right:8px;';
     cleanBtn.textContent = '🧹 ' + blanks.length + ' blank';
-    cleanBtn.onclick = () => { document.body.style.overflow=''; panel.remove(); cleanupBlankJobs(); };
+    cleanBtn.onclick = () => { document.body.style.overflow=''; document.documentElement.style.overflow=''; panel.remove(); cleanupBlankJobs(); };
     hdr.appendChild(cleanBtn);
   }
   hdr.appendChild(closeBtn);
@@ -5896,7 +5897,7 @@ function showReportsDashboard() {
   const overlay = document.createElement('div');
   overlay.id = 'reportsDashboard';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;overscroll-behavior:contain;';
-  overlay.onclick = e => { if (e.target === overlay) { document.body.style.overflow=''; overlay.remove(); } };
+  overlay.onclick = e => { if (e.target === overlay) { document.body.style.overflow=''; document.documentElement.style.overflow=''; overlay.remove(); } };
 
   const sheet = document.createElement('div');
   sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;max-height:85vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
@@ -7654,6 +7655,9 @@ let truck = (() => {
 let selectedDay = new Date().toDateString();
 
 function showScreen(name) {
+  // Always restore scroll — safety net for any overlay that didn't clean up
+  document.body.style.overflow = '';
+  document.documentElement.style.overflow = '';
   // Save current job data before leaving the job screen
   if (currentScreen === 'job' && name !== 'job') {
     saveCurrentJob();
