@@ -1665,7 +1665,8 @@ function loadJob(id) {
       if (schedBtn) schedBtn.style.display = 'none';
       // Show stock status for this job's day
       const _todayJobsForStock = getJobsForDate(new Date(j.scheduledDate));
-      if (_todayJobsForStock.length > 1) {
+      // Show stock status for this job's day — skip for completed jobs
+      if (_todayJobsForStock.length > 1 && j.status !== 'complete' && j.status !== 'cantfinish') {
         const _stockStatus = getCumulativeStockAtJob(j, _todayJobsForStock);
         const _stockEl = document.getElementById('scheduledStockStatus');
         if (_stockEl) {
@@ -1681,6 +1682,9 @@ function loadJob(id) {
             _stockEl.style.display = 'none';
           }
         }
+      } else {
+        const _stockEl = document.getElementById('scheduledStockStatus');
+        if (_stockEl) _stockEl.style.display = 'none';
       }
     } else {
       banner.style.display = 'none';
@@ -5843,6 +5847,8 @@ function getDayStockShortfall(dayJobs) {
   truck.forEach(t => { running[t.name.toLowerCase()] = { qty: t.qty, displayName: t.name }; });
   let hasShortfall = false;
   sorted.forEach(j => {
+    // Skip completed/cantfinish jobs — their items are already deducted from truck
+    if (j.status === 'complete' || j.status === 'cantfinish') return;
     const src = (j.data.installingRemaining?.length) ? j.data.installingRemaining : (j.data.installing || []);
     src.filter(i => i && (typeof i==='object' ? i.name : i)).forEach(item => {
       const name = typeof item==='object' ? item.name : item;
