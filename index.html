@@ -6311,19 +6311,118 @@ function sortJobsByTime(jobs) {
 
 // Calculate cumulative stock rundown for a set of jobs in order.
 // Returns { items: { name: { needed, available, runOutAtJob } }, hasShortfall }
+// ══════════════════════════════════════════════════════════
+// Fuzzy Truck Stock Matching
+// ══════════════════════════════════════════════════════════
+// Equipment template names (e.g. "2GIG eSERIES 4-BUTTON KEYFOB (KEY2e-345)")
+// don't exactly match truck names (e.g. "2GIG 4 BUTTON KEY FOB").
+// This fuzzy matcher bridges the gap.
+
+function normalizeName(s) {
+  return (s || '').toLowerCase()
+    .replace(/\(.*?\)/g, '')       // strip parenthetical model numbers
+    .replace(/eseries\s*/gi, '')   // strip eSERIES prefix
+    .replace(/[-_\/]/g, ' ')       // normalize separators
+    .replace(/\s+/g, ' ')         // collapse whitespace
+    .trim();
+}
+
+function findTruckMatch(equipName) {
+  if (!equipName) return null;
+  const key = equipName.toLowerCase().trim();
+  // 1. Exact match
+  const exact = truck.find(t => t.name.toLowerCase().trim() === key);
+  if (exact) return exact;
+  // 2. Normalized match
+  const normEquip = normalizeName(equipName);
+  const normMatch = truck.find(t => normalizeName(t.name) === normEquip);
+  if (normMatch) return normMatch;
+  // 3. Substring: one contains the other
+  const sub = truck.find(t => {
+    const tn = t.name.toLowerCase().trim();
+    return key.includes(tn) || tn.includes(key);
+  });
+  if (sub) return sub;
+  // 4. Word overlap — extract meaningful words and compare
+  const equipWords = normEquip.split(/\s+/).filter(w => w.length > 2 && !['the','and','for','with'].includes(w));
+  if (equipWords.length >= 2) {
+    let bestMatch = null, bestScore = 0;
+    truck.forEach(t => {
+      const tWords = normalizeName(t.name).split(/\s+/).filter(w => w.length > 2 && !['the','and','for','with'].includes(w));
+      const overlap = equipWords.filter(w => tWords.some(tw => tw === w || tw.includes(w) || w.includes(tw)));
+      const score = overlap.length / Math.max(equipWords.length, tWords.length);
+      if (overlap.length >= 2 && score > bestScore) {
+        bestScore = score;
+        bestMatch = t;
+      }
+    });
+    if (bestMatch && bestScore >= 0.4) return bestMatch;
+  }
+  return null;
+}
+
+function getTruckQty(equipName) {
+  const match = findTruckMatch(equipName);
+  return match ? match.qty : 0;
+}
+
+function getTruckKey(equipName) {
+  const match = findTruckMatch(equipName);
+  return match ? match.name.toLowerCase().trim() : equipName.toLowerCase().trim();
+}
+
+// ══════════════════════════════════════════════════════════
+// Fuzzy Stock Matching — truck names vs equipment names
+// ══════════════════════════════════════════════════════════
+function findTruckMatch(equipName) {
+  if (!equipName) return null;
+  const key = equipName.toLowerCase().trim();
+  // 1. Exact match
+  const exact = truck.find(t => t.name.toLowerCase().trim() === key);
+  if (exact) return exact;
+  // 2. Substring: one contains the other
+  const sub = truck.find(t => {
+    const tk = t.name.toLowerCase().trim();
+    return key.includes(tk) || tk.includes(key);
+  });
+  if (sub) return sub;
+  // 3. Core word overlap (strip model numbers in parentheses, match key words)
+  const coreWords = key.replace(/\(.*?\)/g, '').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+  if (coreWords.length >= 2) {
+    let bestMatch = null, bestScore = 0;
+    truck.forEach(t => {
+      const tWords = t.name.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+      const overlap = coreWords.filter(w => tWords.includes(w)).length;
+      const score = overlap / Math.max(coreWords.length, tWords.length);
+      if (overlap >= 2 && score > bestScore) { bestScore = score; bestMatch = t; }
+    });
+    if (bestMatch && bestScore >= 0.4) return bestMatch;
+  }
+  return null;
+}
+
+function getTruckQty(equipName) {
+  const m = findTruckMatch(equipName);
+  return m ? m.qty : 0;
+}
+
+function getTruckKey(equipName) {
+  const m = findTruckMatch(equipName);
+  return m ? m.name.toLowerCase().trim() : equipName.toLowerCase().trim();
+}
+
 function getDayStockShortfall(dayJobs) {
   const sorted = sortJobsByTime(dayJobs);
   const running = {};
   truck.forEach(t => { running[t.name.toLowerCase()] = { qty: t.qty, displayName: t.name }; });
   let hasShortfall = false;
   sorted.forEach(j => {
-    // Skip completed/cantfinish jobs — their items are already deducted from truck
     if (j.status === 'complete' || j.status === 'cantfinish') return;
     const src = (j.data.installingRemaining?.length) ? j.data.installingRemaining : (j.data.installing || []);
     src.filter(i => i && (typeof i==='object' ? i.name : i)).forEach(item => {
       const name = typeof item==='object' ? item.name : item;
       const qty  = parseInt(typeof item==='object' ? item.qty : '1') || 1;
-      const key  = name.toLowerCase();
+      const key  = getTruckKey(name);
       if (!running[key]) running[key] = { qty: 0, displayName: name };
       running[key].qty -= qty;
       if (running[key].qty < 0) hasShortfall = true;
@@ -6342,16 +6441,15 @@ function getCumulativeStockAtJob(targetJob, dayJobs) {
   let hasCumulativeShortfall = false;
 
   for (const j of sorted) {
-    // Skip completed jobs — their items are already deducted from truck inventory
     if (j.status === 'complete' && j.id !== targetJob.id) continue;
+    if (j.status === 'cantfinish' && j.id !== targetJob.id) continue;
     const src = (j.data.installingRemaining?.length) ? j.data.installingRemaining : (j.data.installing || []);
     const items = src.filter(i => i && (typeof i==='object' ? i.name : i));
     if (j.id === targetJob.id) {
-      // Compute status for this job's items
       items.forEach(item => {
         const name = typeof item==='object' ? item.name : item;
         const qty  = parseInt(typeof item==='object' ? item.qty : '1') || 1;
-        const key  = name.toLowerCase();
+        const key  = getTruckKey(name);
         const before = running[key] ?? 0;
         const after  = before - qty;
         itemStatus[key] = after < 0 ? 'short' : after === 0 ? 'last' : 'ok';
@@ -6359,11 +6457,10 @@ function getCumulativeStockAtJob(targetJob, dayJobs) {
       });
       break;
     }
-    // Consume this earlier job's items
     items.forEach(item => {
       const name = typeof item==='object' ? item.name : item;
       const qty  = parseInt(typeof item==='object' ? item.qty : '1') || 1;
-      const key  = name.toLowerCase();
+      const key  = getTruckKey(name);
       if (running[key] === undefined) running[key] = 0;
       running[key] -= qty;
     });
@@ -6385,14 +6482,14 @@ function renderDayBrief() {
   const pickupNeeded = {}; // itemName -> total shortfall qty
 
   // Only count pending/in-progress jobs — completed jobs already deducted from truck
-  const pendingTodayJobs = todayJobs.filter(j => j.status !== 'complete');
+  const pendingTodayJobs = todayJobs.filter(j => j.status !== 'complete' && j.status !== 'cantfinish');
 
   pendingTodayJobs.forEach(j => {
     const src = (j.data.installingRemaining?.length) ? j.data.installingRemaining : (j.data.installing || []);
     src.filter(i => i && (typeof i==='object' ? i.name : i)).forEach(item => {
       const name = typeof item==='object' ? item.name : item;
       const qty  = parseInt(typeof item==='object' ? item.qty : '1') || 1;
-      const key  = name.toLowerCase();
+      const key  = getTruckKey(name);
       if (!running[key]) running[key] = { qty: 0, displayName: name };
       const before = running[key].qty;
       running[key].qty -= qty;
@@ -6414,8 +6511,8 @@ function renderDayBrief() {
     src.filter(i => i && (typeof i==='object' ? i.name : i)).forEach(item => {
       const name = typeof item==='object' ? item.name : item;
       const qty  = parseInt(typeof item==='object' ? item.qty : '1') || 1;
-      const key  = name.toLowerCase();
-      if (!runFinal[key]) runFinal[key] = 0;
+      const key  = getTruckKey(name);
+      if (runFinal[key] === undefined) runFinal[key] = 0;
       runFinal[key] -= qty;
     });
   });
@@ -6594,7 +6691,7 @@ function renderDailyEquipSummary(dayJobs, container, outsideTimeline) {
   if (existing) existing.remove();
 
   // Only show pending/in-progress jobs — completed jobs already had items deducted from truck
-  const pendingJobs = dayJobs.filter(j => j.status !== 'complete');
+  const pendingJobs = dayJobs.filter(j => j.status !== 'complete' && j.status !== 'cantfinish');
 
   // Only show if there are pending jobs with real named equipment items
   const jobsWithEquip = pendingJobs.filter(j =>
@@ -6636,12 +6733,12 @@ function renderDailyEquipSummary(dayJobs, container, outsideTimeline) {
     realItems.forEach(item => {
       const name = typeof item==='object'?item.name:item;
       const qty = parseInt(typeof item==='object'?item.qty:'1')||1;
-      const key = name.toLowerCase();
+      const key = getTruckKey(name);
 
       // Get or init tracking
       if (!runningTotals[key]) {
-        const t2 = truck.find(t=>t.name.toLowerCase()===key);
-        runningTotals[key] = {used:0, truckQty:t2?t2.qty:0, displayName:name};
+        const tMatch = findTruckMatch(name);
+        runningTotals[key] = {used:0, truckQty:tMatch?tMatch.qty:0, displayName:name};
       }
 
       const rt = runningTotals[key];
@@ -9877,7 +9974,7 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
       <div id="schedCustList" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);margin-bottom:6px;"></div>
 
       <!-- Hidden select for form value -->
-      <select id="schedJobCustomer" style="display:none;"></select>
+      <input type="hidden" id="schedJobCustomer" value="">
       <!-- Inline new customer form -->
       <div id="schedNewCustForm" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:4px;">
         <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">NEW CUSTOMER</div>
