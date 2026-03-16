@@ -2592,6 +2592,7 @@ function showCantFinishSheet(j, t) {
     if (notes) j.data.notes = j.data.notes ? j.data.notes + ' | ' + notes : notes;
     updateTimeDisplay(j.data.arriveTime, t);
     stopLiveTimer();
+    clearActiveInProgress();
     setStatus('cantfinish');
     saveToStorage();
     // Enter reschedule placement mode and go to calendar
@@ -2660,6 +2661,7 @@ function finishCantFinish(j, t, notes, daysAhead, cfItemData) {
   if (notes) j.data.notes = j.data.notes ? j.data.notes + ' | ' + notes : notes;
   updateTimeDisplay(j.data.arriveTime, t);
   stopLiveTimer();
+  clearActiveInProgress();
   setStatus('cantfinish');
   saveToStorage();
   // Reschedule if days specified
@@ -2929,20 +2931,18 @@ function finishComplete(j, finishTime) {
   if(input) input.value = finishTime;
   updateTimeDisplay(j.data.arriveTime, finishTime);
   stopLiveTimer();
-  // Set status without auto-deduct (already handled)
-  const prevActive = activeJobId;
-  activeJobId = j.id;
+  // Mark complete
   j.status = 'complete';
+  activeJobId = j.id;
   document.getElementById('btnInProgress') && (document.getElementById('btnInProgress').className = 'status-btn');
   document.getElementById('btnComplete') && (document.getElementById('btnComplete').className = 'status-btn active-complete');
   document.getElementById('btnCantFinish') && (document.getElementById('btnCantFinish').className = 'status-btn');
   document.getElementById('btnFinish') && (document.getElementById('btnFinish').className = 'time-btn stamped');
-  activeJobId = prevActive;
   renderTabs();
   saveToStorage();
   renderMonthCal();
-  // Clear active in-progress tracking
-  if (_activeInProgressId === j.id) clearActiveInProgress();
+  // Always clear active in-progress tracking when ANY job completes
+  clearActiveInProgress();
   // Auto-send install record on completion
   autoSendRecord(j);
   // Auto-advance: find next pending job for today and offer to open it
@@ -3030,8 +3030,8 @@ function stopGlobalTimer() {
 function updateActiveJobBanner() {
   const banner = document.getElementById('returnJobBanner');
   const inProgressJob = _activeInProgressId
-    ? jobs.find(j => j.id === _activeInProgressId && j.status === 'inprogress')
-    : jobs.find(j => j.status === 'inprogress');
+    ? jobs.find(j => j.id === _activeInProgressId && j.status === 'inprogress' && j.data.arriveTime && !j.data.finishTime)
+    : jobs.find(j => j.status === 'inprogress' && j.data.arriveTime && !j.data.finishTime);
 
   if (!inProgressJob) {
     if (banner) banner.remove();
@@ -8027,6 +8027,12 @@ function initAppData() {
   const lbl = document.getElementById('todayDateLabel');
   if (lbl) lbl.textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
   scheduleDailySummary();
+  // Restore active in-progress job tracking — only if they actually arrived on site
+  const inProgressJob = jobs.find(j => j.status === 'inprogress' && j.data.arriveTime && !j.data.finishTime);
+  if (inProgressJob) {
+    _activeInProgressId = inProgressJob.id;
+    startGlobalTimer();
+  }
   showScreen('today');
   // Sync Firebase jobs if available — per-job merge using lastModified timestamps
   window.onFirebaseJobs = function(data) {
