@@ -3675,18 +3675,18 @@ document.addEventListener('click', e => { if(openDropdown&&!e.target.closest('.c
 function addInstallingRow(val, qty) {
   const c=document.getElementById('installingRows');
   const row=document.createElement('div'); row.className='list-row';
-  row.style.cssText='display:flex;flex-direction:column;gap:6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;';
+  row.style.cssText='background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;';
   // Line 1: full-width equipment name
   const combo=createCombo(val);
   combo.style.width='100%';
   combo.querySelector('input').style.fontSize='14px';
   combo.querySelector('input').addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addInstallingRow();setTimeout(()=>{const ins=c.querySelectorAll('.combo-wrap input');ins[ins.length-1].focus();},50);} });
-  // Line 2: qty controls + remove, right-aligned
+  // Line 2: qty + remove — compact, right-aligned
   const controlRow=document.createElement('div');
-  controlRow.style.cssText='display:flex;align-items:center;justify-content:flex-end;gap:6px;';
-  const qtyLabel=document.createElement('span');
-  qtyLabel.style.cssText='font-family:Share Tech Mono,monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-right:auto;';
-  qtyLabel.textContent='QTY';
+  controlRow.style.cssText='display:flex;align-items:center;gap:6px;margin-top:6px;';
+  // Spacer to push qty right
+  const spacer=document.createElement('div');
+  spacer.style.cssText='flex:1;';
   const qtyWrap=document.createElement('div'); qtyWrap.className='qty-wrap';
   const qtyMinus=document.createElement('button'); qtyMinus.className='qty-btn'; qtyMinus.textContent='−'; qtyMinus.type='button';
   const qtyInput=document.createElement('input'); qtyInput.type='text'; qtyInput.className='qty-input'; qtyInput.value=qty||'1'; qtyInput.maxLength=3;
@@ -3697,7 +3697,7 @@ function addInstallingRow(val, qty) {
   qtyWrap.appendChild(qtyMinus); qtyWrap.appendChild(qtyInput); qtyWrap.appendChild(qtyPlus);
   const rm=document.createElement('button'); rm.className='btn-remove'; rm.innerHTML='&times;';
   rm.onclick=()=>{row.remove();autoSave();};
-  controlRow.appendChild(qtyLabel); controlRow.appendChild(qtyWrap); controlRow.appendChild(rm);
+  controlRow.appendChild(spacer); controlRow.appendChild(qtyWrap); controlRow.appendChild(rm);
   row.appendChild(combo); row.appendChild(controlRow);
   c.appendChild(row);
 }
