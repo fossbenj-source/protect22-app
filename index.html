@@ -1183,8 +1183,10 @@
         <button onclick="scheduleFollowUp(0)" class="btn-add" style="flex:1 1 calc(25% - 6px);min-width:70px;font-size:10px;padding:10px 4px;border-color:var(--accent);color:var(--accent);">CUSTOM...</button>
       </div>
       <div id="followUpCustom" style="display:none;margin-top:10px;">
-        <input type="date" id="followUpDate" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 12px;outline:none;">
-        <button onclick="confirmCustomFollowUp()" style="width:100%;margin-top:8px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;">✓ SCHEDULE FOLLOW-UP</button>
+        <input type="date" id="followUpDate" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 12px;outline:none;margin-bottom:8px;">
+        <input type="text" id="followUpTime" placeholder="e.g. 9, 930, 9:30, 2pm" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 12px;outline:none;box-sizing:border-box;">
+        <div style="font-size:10px;color:var(--muted);margin:4px 0 8px;">Leave blank for 9:00 AM default</div>
+        <button onclick="confirmCustomFollowUp()" style="width:100%;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;">✓ SCHEDULE FOLLOW-UP</button>
       </div>
     </div>
   </div>
@@ -1425,6 +1427,10 @@ function linkJobToCustomer(job, custId) {
   job.data.email = c.email || '';
   job.data.cs = c.cs || '';
   job.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => job.data[f]);
+  // Carry over planned equipment if job has none yet
+  if (c.plannedEquipment && c.plannedEquipment.length > 0 && (!job.data.installing || job.data.installing.length === 0)) {
+    job.data.installing = c.plannedEquipment.map(e => ({name: e.name, qty: String(e.qty || 1)}));
+  }
 }
 
 function findOpenJobForCustomer(custId, date) {
@@ -2864,6 +2870,7 @@ function placeRescheduledJob(date, hour, minute) {
   j.scheduledDuration = j.scheduledDuration || 120;
   j.scheduledEndTime = addMinutesToTime(time, j.scheduledDuration || 120);
   j.status = j.status === 'complete' ? 'complete' : 'pending';
+  j.lastModified = Date.now();
   saveToStorage();
   renderTabs();
   renderMonthCal();
@@ -3437,6 +3444,7 @@ function quickReschedule(daysAhead) {
   newDate.setHours(j.scheduledDate ? new Date(j.scheduledDate).getHours() : 9, 0, 0, 0);
 
   const newJob = blankJob();
+  newJob.customerId = j.customerId || null; // Carry customer link
   newJob.scheduledDate = newDate.toISOString();
   newJob.scheduledTime = j.scheduledTime || '9:00 AM';
   newJob.scheduledEndTime = j.scheduledEndTime;
@@ -3448,6 +3456,8 @@ function quickReschedule(daysAhead) {
     confirmation: '', adtStatus: ''
   };
   newJob.status = 'pending';
+  newJob.lastModified = Date.now();
+  newJob.data.parentJobId = j.id; // Link back to original
   jobs.push(newJob);
   saveToStorage();
   renderTabs();
@@ -4322,10 +4332,14 @@ function renderCustomers() {
     const lastJob = [...custJobs].sort((a,b) => new Date(b.scheduledDate||0) - new Date(a.scheduledDate||0))[0];
     const lastDate = lastJob && lastJob.scheduledDate ? new Date(lastJob.scheduledDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
     const statusColor = !jobCount ? 'var(--muted)' : lastJob.status==='complete' ? 'var(--green)' : lastJob.status==='cantfinish' ? 'var(--red)' : 'var(--yellow)';
+    const acctBadge = c.accountType === 'inhouse' ? '<span style="font-size:8px;background:rgba(52,211,153,0.2);color:var(--green);padding:1px 5px;border-radius:3px;margin-left:6px;">IN-HOUSE</span>'
+      : c.accountType === 'dealer' ? '<span style="font-size:8px;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;margin-left:6px;">DEALER'+(c.accountDealer?' · '+esc(c.accountDealer):'')+'</span>'
+      : c.accountType === 'sold' ? '<span style="font-size:8px;background:rgba(251,146,60,0.2);color:var(--orange);padding:1px 5px;border-radius:3px;margin-left:6px;">SOLD'+(c.accountDealer?' · '+esc(c.accountDealer):'')+'</span>'
+      : '';
     card.innerHTML =
       '<div class="customer-avatar">'+initials+'</div>'+
       '<div class="customer-info">'+
-        '<div class="customer-name">'+c.name+'</div>'+
+        '<div class="customer-name">'+c.name+acctBadge+'</div>'+
         '<div class="customer-meta">'+(c.phone||'')+(c.address?' · '+c.address.split(',')[0]:'')+'</div>'+
         (jobCount ? '<div style="font-size:10px;margin-top:3px;color:'+statusColor+';">'+jobCount+' job'+(jobCount>1?'s':'')+(lastDate?' · last: '+lastDate:'')+'</div>' : '')+
       '</div>'+
@@ -4379,13 +4393,112 @@ function openCustomerDetail(id) {
   if (c.phone) h += '<a href="tel:' + c.phone.replace(/\D/g,'') + '" style="display:flex;align-items:center;gap:4px;background:rgba(52,211,153,0.15);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;text-decoration:none;white-space:nowrap;flex-shrink:0;">📞 Call</a>';
   if (c.address) h += '<button onclick="navToAddress(\'' + esc(c.address.replace(/'/g,"\\'")) + '\')" style="display:flex;align-items:center;gap:4px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">📍 Navigate</button>';
   if (c.email) h += '<a href="mailto:' + esc(c.email) + '" style="display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;text-decoration:none;white-space:nowrap;flex-shrink:0;">✉ Email</a>';
-  h += '<button onclick="closeCustomerProfile();scheduleForCustomer(' + c.id + ')" style="display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">📅 Schedule</button>';
-  h += '<button onclick="closeCustomerProfile();createServiceCallFor(' + c.id + ')" style="display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">🛠 Service Call</button>';
+  h += '</div>';
+
+  // ═══ NEW JOB INTAKE ═══
+  // Check for existing open job
+  const openJob = findOpenJobForCustomer(c.id, null);
+  if (openJob) {
+    h += '<div style="padding:16px;border-bottom:1px solid var(--border);background:rgba(0,212,255,0.03);">';
+    h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:8px;">📋 OPEN JOB</div>';
+    const ojType = openJob.data.jobType === 'service' ? 'SERVICE' : 'INSTALL';
+    const ojDate = openJob.scheduledDate ? new Date(openJob.scheduledDate).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : 'Unscheduled';
+    const ojTime = openJob.scheduledTime || '';
+    h += '<div style="background:var(--panel);border:1px solid var(--accent);border-radius:8px;padding:12px;cursor:pointer;" onclick="closeCustomerProfile();switchJob('+openJob.id+');showScreen(\'job\')">';
+    h += '<div style="display:flex;align-items:center;gap:8px;">';
+    h += '<span style="font-size:9px;background:var(--accent-dim);color:var(--accent);padding:2px 6px;border-radius:3px;">' + ojType + '</span>';
+    h += '<span style="font-size:12px;color:var(--text);flex:1;">' + esc(ojDate) + (ojTime ? ' · ' + esc(ojTime) : '') + '</span>';
+    h += '<span style="font-size:11px;color:var(--yellow);">' + (openJob.status || 'pending') + '</span>';
+    h += '</div>';
+    const ojEquip = (openJob.data.installing||[]).filter(i=>i&&(typeof i==='object'?i.name:i)).slice(0,3).map(i=>typeof i==='object'?i.name:i).join(', ');
+    if (ojEquip) h += '<div style="font-size:11px;color:var(--muted);margin-top:4px;">🔧 ' + esc(ojEquip) + '</div>';
+    h += '</div>';
+    h += '<div style="font-size:10px;color:var(--muted);margin-top:6px;text-align:center;">Tap to open · or create new below</div>';
+    h += '</div>';
+  }
+
+  h += '<div style="padding:16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.01);">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--green);letter-spacing:2px;margin-bottom:10px;">📋 CREATE NEW JOB</div>';
+  
+  // Job type toggle
+  h += '<div style="display:flex;gap:6px;margin-bottom:12px;">';
+  h += '<button id="custJobTypeInstall" onclick="setCustJobType(\'install\')" style="flex:1;background:var(--accent-dim);border:2px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;font-weight:bold;">🔧 INSTALL</button>';
+  h += '<button id="custJobTypeService" onclick="setCustJobType(\'service\')" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;">🛠 SERVICE</button>';
+  h += '</div>';
+
+  // Service-specific fields (hidden by default)
+  h += '<div id="custServiceFields" style="display:none;margin-bottom:12px;">';
+  h += '<select id="custServiceType" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:10px;outline:none;margin-bottom:8px;">';
+  h += '<option value="">Select service type...</option>';
+  h += '<option value="Panel Swap">Panel Swap</option><option value="Sensor Replacement">Sensor Replacement</option><option value="Troubleshooting">Troubleshooting</option>';
+  h += '<option value="Takeover">Takeover</option><option value="Add-on Equipment">Add-on Equipment</option><option value="Battery Replacement">Battery Replacement</option>';
+  h += '<option value="Signal Issue">Signal Issue</option><option value="General Service">General Service</option>';
+  h += '</select>';
+  h += '<textarea id="custServiceIssue" placeholder="Describe the issue..." style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:10px;outline:none;resize:vertical;height:60px;box-sizing:border-box;"></textarea>';
+  h += '</div>';
+
+  // Job notes
+  h += '<textarea id="custJobNotes" placeholder="Job notes (gate code, parking, special instructions...)" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:10px;outline:none;resize:vertical;height:50px;box-sizing:border-box;margin-bottom:12px;"></textarea>';
+
+  // Equipment section
+  h += '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">EQUIPMENT NEEDED</div>';
+  h += '<div id="custJobEquipRows">';
+  // Pre-populate from planned equipment
+  const pe = c.plannedEquipment || [];
+  pe.forEach((item, idx) => {
+    h += '<div class="cust-equip-row" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;">';
+    h += '<span style="font-size:12px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(item.name) + '</span>';
+    h += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);flex-shrink:0;">×' + (item.qty||1) + '</span>';
+    h += '<button onclick="removeCustPlannedEquip('+c.id+','+idx+')" style="background:none;border:none;color:rgba(255,68,68,0.5);font-size:14px;cursor:pointer;padding:0 2px;flex-shrink:0;">×</button>';
+    h += '</div>';
+  });
+  h += '</div>';
+
+  // Add equipment
+  h += '<div style="display:flex;gap:6px;margin-bottom:12px;">';
+  h += '<select id="custEquipSelect" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:8px;outline:none;">';
+  h += '<option value="">+ Add equipment...</option>';
+  h += equipmentList.map(e => '<option value="' + esc(e) + '">' + esc(e) + '</option>').join('');
+  h += '</select>';
+  h += '<button onclick="addCustPlannedEquip('+c.id+')" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;">ADD</button>';
+  h += '</div>';
+
+  // Action buttons
+  h += '<div style="display:flex;gap:8px;">';
+  h += '<button onclick="closeCustomerProfile();createJobFromCustomerCard('+c.id+')" style="flex:1;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:11px;font-weight:bold;cursor:pointer;letter-spacing:1px;">+ CREATE JOB</button>';
+  h += '<button onclick="closeCustomerProfile();scheduleInstallForCustomer('+c.id+')" style="flex:1;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:12px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;">📅 SCHEDULE</button>';
+  h += '</div>';
   h += '</div>';
 
   // Contact & Account Info
   h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
   h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">CONTACT & ACCOUNT</div>';
+
+  // Account type selector
+  const acctType = c.accountType || '';
+  const acctDealer = c.accountDealer || '';
+  const acctTypes = [
+    {val:'inhouse', label:'In-House', color:'var(--green)', bg:'rgba(52,211,153,0.15)'},
+    {val:'dealer', label:'Dealer', color:'var(--accent)', bg:'var(--accent-dim)'},
+    {val:'sold', label:'Sold to Company', color:'var(--orange)', bg:'rgba(251,146,60,0.15)'},
+  ];
+  h += '<div style="margin-bottom:10px;">';
+  h += '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">ACCOUNT TYPE</div>';
+  h += '<div style="display:flex;gap:6px;margin-bottom:6px;">';
+  acctTypes.forEach(at => {
+    const active = acctType === at.val;
+    h += '<button onclick="setCustAccountType('+c.id+',\''+at.val+'\')" style="flex:1;background:'+(active?at.bg:'none')+';border:'+(active?'2px':'1px')+' solid '+(active?at.color:'var(--border)')+';color:'+(active?at.color:'var(--muted)')+';border-radius:6px;padding:8px 4px;font-family:Share Tech Mono,monospace;font-size:9px;cursor:pointer;letter-spacing:1px;'+(active?'font-weight:bold;':'')+'">'+at.label+'</button>';
+  });
+  h += '</div>';
+  // Show dealer/company name field when dealer or sold
+  if (acctType === 'dealer' || acctType === 'sold') {
+    h += '<div style="display:flex;gap:6px;">';
+    h += '<input type="text" id="custDealerName" value="' + esc(acctDealer) + '" placeholder="' + (acctType === 'dealer' ? 'Dealer name...' : 'Company name...') + '" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px;outline:none;">';
+    h += '<button onclick="saveCustDealer('+c.id+')" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;">SAVE</button>';
+    h += '</div>';
+  }
+  h += '</div>';
+
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
   const contactFields = [
     {label:'Address', val:c.address, icon:'📍'},
@@ -4403,19 +4516,53 @@ function openCustomerDetail(id) {
   });
   h += '</div></div>';
 
-  // Equipment at this home
+  // Equipment at this home — EDITABLE
+  h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">🔧 EQUIPMENT AT HOME</div>';
+  
+  // Existing equipment from completed jobs (read-only display)
   const equipEntries = Object.entries(allEquip);
   if (equipEntries.length > 0) {
-    h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
-    h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">🔧 INSTALLED EQUIPMENT</div>';
+    h += '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">INSTALLED (from completed jobs)</div>';
     equipEntries.forEach(([name, qty]) => {
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
-      h += '<span style="font-size:13px;color:var(--text);flex:1;">' + esc(name) + '</span>';
-      h += '<span style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);">×' + qty + '</span>';
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
+      h += '<span style="color:var(--green);font-size:11px;">✓</span>';
+      h += '<span style="font-size:12px;color:var(--text);flex:1;">' + esc(name) + '</span>';
+      h += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);">×' + qty + '</span>';
+      h += '</div>';
+    });
+  }
+
+  // Planned equipment stored on customer record (editable)
+  const planned = c.plannedEquipment || [];
+  if (planned.length > 0 || equipEntries.length === 0) {
+    h += '<div style="font-size:9px;color:var(--orange);letter-spacing:1px;margin:10px 0 6px;">PLANNED / NEEDED</div>';
+    h += '<div id="custPlannedEquip">';
+    planned.forEach((item, idx) => {
+      h += '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
+      h += '<span style="color:var(--orange);font-size:11px;">◎</span>';
+      h += '<span style="font-size:12px;color:var(--text);flex:1;">' + esc(item.name) + '</span>';
+      h += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--muted);">×' + (item.qty||1) + '</span>';
+      h += '<button onclick="removeCustPlannedEquip('+c.id+','+idx+')" style="background:none;border:none;color:rgba(255,68,68,0.5);font-size:14px;cursor:pointer;padding:0 4px;">×</button>';
       h += '</div>';
     });
     h += '</div>';
   }
+
+  // Add equipment button
+  h += '<div style="display:flex;gap:6px;margin-top:8px;">';
+  h += '<select id="custEquipSelect" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:8px;outline:none;">';
+  h += '<option value="">+ Add equipment...</option>';
+  h += equipmentList.map(e => '<option value="' + esc(e) + '">' + esc(e) + '</option>').join('');
+  h += '</select>';
+  h += '<button onclick="addCustPlannedEquip('+c.id+')" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;">ADD</button>';
+  h += '</div>';
+
+  // Schedule install with this equipment
+  h += '<div style="display:flex;gap:6px;margin-top:10px;">';
+  h += '<button onclick="closeCustomerProfile();scheduleInstallForCustomer('+c.id+')" style="flex:1;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:10px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📅 SCHEDULE INSTALL WITH EQUIPMENT</button>';
+  h += '</div>';
+  h += '</div>';
 
   // IMEI History
   if (c.imeiHistory && c.imeiHistory.length > 0) {
@@ -4499,6 +4646,118 @@ function closeCustomerProfile() {
   document.documentElement.style.overflow = '';
   const panel = document.getElementById('customerDetailPanel');
   if (panel) panel.remove();
+}
+
+function addCustPlannedEquip(custId) {
+  const sel = document.getElementById('custEquipSelect');
+  if (!sel || !sel.value) return;
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  if (!c.plannedEquipment) c.plannedEquipment = [];
+  const existing = c.plannedEquipment.find(e => e.name === sel.value);
+  if (existing) { existing.qty = (parseInt(existing.qty)||1) + 1; }
+  else { c.plannedEquipment.push({ name: sel.value, qty: 1 }); }
+  saveCustomers();
+  sel.value = '';
+  closeCustomerProfile();
+  openCustomerDetail(custId);
+  showToast('✓ Equipment added', 'success');
+}
+
+function setCustAccountType(custId, type) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  c.accountType = type;
+  if (type === 'inhouse') c.accountDealer = '';
+  saveCustomers();
+  closeCustomerProfile();
+  openCustomerDetail(custId);
+}
+
+function saveCustDealer(custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  const el = document.getElementById('custDealerName');
+  if (el) c.accountDealer = el.value.trim();
+  saveCustomers();
+  showToast('✓ Saved', 'success');
+}
+
+function setCustJobType(type) {
+  const installBtn = document.getElementById('custJobTypeInstall');
+  const serviceBtn = document.getElementById('custJobTypeService');
+  const serviceFields = document.getElementById('custServiceFields');
+  if (type === 'service') {
+    installBtn.style.background = 'none'; installBtn.style.border = '1px solid var(--border)'; installBtn.style.color = 'var(--muted)'; installBtn.style.fontWeight = 'normal';
+    serviceBtn.style.background = 'rgba(251,146,60,0.15)'; serviceBtn.style.border = '2px solid var(--orange)'; serviceBtn.style.color = 'var(--orange)'; serviceBtn.style.fontWeight = 'bold';
+    if (serviceFields) serviceFields.style.display = 'block';
+  } else {
+    installBtn.style.background = 'var(--accent-dim)'; installBtn.style.border = '2px solid var(--accent)'; installBtn.style.color = 'var(--accent)'; installBtn.style.fontWeight = 'bold';
+    serviceBtn.style.background = 'none'; serviceBtn.style.border = '1px solid var(--border)'; serviceBtn.style.color = 'var(--muted)'; serviceBtn.style.fontWeight = 'normal';
+    if (serviceFields) serviceFields.style.display = 'none';
+  }
+  window._custJobType = type;
+}
+
+function createJobFromCustomerCard(custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  const jobType = window._custJobType || 'install';
+  const notes = document.getElementById('custJobNotes')?.value || '';
+  const serviceType = document.getElementById('custServiceType')?.value || '';
+  const serviceIssue = document.getElementById('custServiceIssue')?.value || '';
+
+  const j = blankJob();
+  j.data.jobType = jobType;
+  linkJobToCustomer(j, custId);
+  if (notes) j.data.notes = notes;
+  if (jobType === 'service') {
+    j.data.serviceType = serviceType;
+    j.data.serviceIssue = serviceIssue;
+  }
+  // Equipment from planned list
+  if (c.plannedEquipment && c.plannedEquipment.length > 0) {
+    j.data.installing = c.plannedEquipment.map(e => ({name: e.name, qty: String(e.qty || 1)}));
+  }
+  j.lastModified = Date.now();
+  jobs.push(j);
+  activeJobId = j.id;
+  saveToStorage();
+  renderTabs();
+  loadJob(j.id);
+  showScreen('job');
+  showToast('✓ ' + (jobType === 'service' ? 'Service call' : 'Install job') + ' created for ' + c.name, 'success');
+}
+
+function removeCustPlannedEquip(custId, idx) {
+  const c = customers.find(x => x.id === custId);
+  if (!c || !c.plannedEquipment) return;
+  c.plannedEquipment.splice(idx, 1);
+  saveCustomers();
+  closeCustomerProfile();
+  openCustomerDetail(custId);
+}
+
+function scheduleInstallForCustomer(custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  // Open schedule modal with customer pre-selected
+  openScheduleModal();
+  setTimeout(() => {
+    selectSchedCustomer(c.id);
+    populateScheduleCustomers();
+    renderSchedCustomerList();
+    // Pre-populate equipment from customer's planned equipment
+    if (c.plannedEquipment && c.plannedEquipment.length > 0) {
+      const rows = document.getElementById('schedInstallRows');
+      if (rows) {
+        rows.innerHTML = '';
+        c.plannedEquipment.forEach(item => {
+          addSchedEquipRow('install', item.name, item.qty || 1);
+        });
+      }
+    }
+  }, 150);
 }
 
 function openProfileFromJob() {
@@ -5762,11 +6021,12 @@ function scheduleFollowUp(days) {
 function confirmCustomFollowUp() {
   const val = document.getElementById('followUpDate').value;
   if (!val) { showToast('Pick a date', 'error'); return; }
-  createFollowUpJob(new Date(val + 'T12:00:00'));
+  const timeVal = document.getElementById('followUpTime')?.value || '';
+  createFollowUpJob(new Date(val + 'T12:00:00'), timeVal);
   document.getElementById('followUpCustom').style.display = 'none';
 }
 
-function createFollowUpJob(date) {
+function createFollowUpJob(date, customTime) {
   const j = jobs.find(x => x.id === activeJobId);
   if (!j) return;
   // Check if follow-up already exists
@@ -5787,18 +6047,31 @@ function createFollowUpJob(date) {
     fu.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => fu.data[f]);
   }
   fu.data.notes = 'Follow-up from ' + new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}) + '. Original: ' + (j.data.notes || '').slice(0,80);
+  // Copy equipment from parent job
+  if (j.data.installing && j.data.installing.length) {
+    fu.data.installing = JSON.parse(JSON.stringify(j.data.installing));
+  }
+  if (j.data.existing && j.data.existing.length) {
+    fu.data.existing = JSON.parse(JSON.stringify(j.data.existing));
+  }
+  // Parse time
+  let time = customTime || j.scheduledTime || '9:00 AM';
+  if (customTime) {
+    time = parseFlexTime(customTime) || customTime || '9:00 AM';
+  }
   fu.scheduledDate = date.toISOString();
-  fu.scheduledTime = j.scheduledTime || '9:00 AM';
-  fu.scheduledDuration = 60;
-  fu.scheduledEndTime = addMinutesToTime(fu.scheduledTime, 60);
+  fu.scheduledTime = time;
+  fu.scheduledDuration = j.scheduledDuration || 120;
+  fu.scheduledEndTime = addMinutesToTime(fu.scheduledTime, fu.scheduledDuration);
   fu.data.parentJobId = j.id;
   fu.lastModified = Date.now();
   jobs.push(fu);
   j.data.followUpJobId = fu.id;
   j.lastModified = Date.now();
   saveToStorage();
+  renderCal();
   updateFollowUpStatus();
-  showToast('🔄 Follow-up scheduled for ' + date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), 'success');
+  showToast('🔄 Follow-up scheduled for ' + date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) + ' at ' + time, 'success');
 }
 
 function updateFollowUpStatus() {
@@ -7637,9 +7910,13 @@ function confirmScheduleJob() {
       existingJob.data.date = existingJob.scheduledDate;
       if (notes) existingJob.data.notes = notes;
       // Merge customer info if the existing job had none
-      if (!existingJob.data.customerName && customerId) {
+      if (!existingJob.customerId && customerId) {
+        const custId = parseInt(customerId);
+        linkJobToCustomer(existingJob, custId);
+      } else if (!existingJob.data.customerName && customerId) {
         const c = customers.find(x => x.id === parseInt(customerId));
         if (c) {
+          existingJob.customerId = c.id;
           existingJob.data.customerName = c.name;
           existingJob.data.address = c.address;
           existingJob.data.phone = c.phone;
@@ -7651,6 +7928,7 @@ function confirmScheduleJob() {
       const existItems = getSchedEquipItems('exist');
       if (installItems.length) existingJob.data.installing = installItems;
       if (existItems.length) existingJob.data.existing = existItems.map(i => ({name:i.name||i, qty:i.qty||'1', cell:i.cell||false}));
+      existingJob.lastModified = Date.now();
       activeJobId = existingJob.id;
       saveToStorage();
       renderTabs();
