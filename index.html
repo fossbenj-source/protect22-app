@@ -2674,6 +2674,45 @@ function fullSyncJobsToFirebase() {
   window.fbSet('jobs', jobsObj).catch(()=>{});
 }
 
+function fullCloudSync() {
+  if (!window.fbSet) { showToast('⚠️ Firebase not connected', 'error'); return; }
+  showToast('☁️ Syncing all data to cloud...', 'info');
+  try {
+    // Jobs — push all as keyed object
+    const jobsObj = {};
+    jobs.forEach(j => { jobsObj[j.id] = j; });
+    window.fbSet('jobs', jobsObj);
+    
+    // Customers — push all as keyed object
+    const custObj = {};
+    customers.forEach(c => { custObj[c.id] = c; });
+    window.fbSet('customers', custObj);
+    
+    // Truck
+    window.fbSet('truck', truck);
+    
+    // Warehouse
+    window.fbSet('warehouse', warehouse);
+    
+    // Equipment costs
+    window.fbSet('equipCosts', equipCosts);
+    
+    // IMEI tracker
+    window.fbSet('imeiTracker', imeiTracker);
+    
+    // Settings
+    window.fbSet('settings', appSettings);
+    
+    // Meta
+    window.fbSet('meta', { activeJobId, jobCounter, lastModified: Date.now() });
+    
+    showToast('✓ All data synced to cloud: ' + jobs.length + ' jobs, ' + customers.length + ' customers, ' + truck.length + ' truck items', 'success');
+  } catch(e) {
+    console.error('Full sync error:', e);
+    showToast('⚠️ Sync failed: ' + e.message, 'error');
+  }
+}
+
 function loadFromStorage() {
   try {
     const saved = localStorage.getItem('p22_jobs');
@@ -9927,7 +9966,18 @@ let pendingUser = null;
 
 function onLoginSuccess(user) {
   currentUser = user;
-  const u = USERS[user.email] || { role: 'tech', name: user.email, uid: user.uid };
+  const u = USERS[user.email];
+  if (!u) {
+    // Reject unknown users
+    console.warn('[P22] Unauthorized user:', user.email);
+    if (typeof firebase !== 'undefined' && firebase.auth) firebase.auth().signOut().catch(()=>{});
+    const err = document.getElementById('loginError');
+    if (err) { err.textContent = 'Account not authorized. Contact admin.'; err.style.display = 'block'; }
+    const lb = document.getElementById('loginBtn');
+    if (lb) { lb.textContent = 'SIGN IN'; lb.disabled = false; }
+    currentUser = null; currentRole = null;
+    return;
+  }
   currentRole = u.role;
   const ls = document.getElementById('loginScreen');
   const lb = document.getElementById('loginBtn');
@@ -9935,9 +9985,9 @@ function onLoginSuccess(user) {
   if (ls) ls.style.display = 'none';
   // Remove forceHidden so app views can show
   const fh = document.getElementById('forceHidden'); if (fh) fh.remove();
+  // Always route — don't gate on appReady after first boot
   if (!appReady) {
-    pendingUser = user;
-    return;
+    appReady = true; // Force ready on re-login
   }
   routeUser();
 }
@@ -9946,6 +9996,7 @@ function routeUser() {
   if (!currentUser) return;
   const role = (USERS[currentUser.email] || {}).role || 'tech';
   currentRole = role;
+  console.log('[P22] routeUser:', currentUser.email, role);
   try {
     if (role === 'closer') {
       initCloserView();
@@ -9955,7 +10006,8 @@ function routeUser() {
       initTechApp();
     }
   } catch(e) {
-    console.error('routeUser error:', e);
+    console.error('[P22] routeUser error:', e);
+    showToast('⚠️ App load error: ' + e.message, 'error');
     // Fallback: just show the tech app directly
     const fh = document.getElementById('forceHidden'); if(fh) fh.remove();
     const ls = document.getElementById('loginScreen'); if(ls) ls.style.display = 'none';
@@ -9966,7 +10018,7 @@ function routeUser() {
 
 function doLogout() {
   currentUser = null; currentRole = null;
-  appReady = false; // Reset so re-login works cleanly
+  // Don't reset appReady — it causes re-login to get stuck
   if (typeof firebase !== 'undefined' && firebase.auth) {
     firebase.auth().signOut().then(() => {
       // After signout confirmed, show login
@@ -10304,16 +10356,8 @@ function initAppData() {
 function renderCloserCalendar() {
   const today = new Date();
   document.getElementById('closerDateLabel').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  // Load appointments from Firebase
-  if (window.fbListen) {
-    window.fbListen('appointments', data => {
-      closerAppts = data ? Object.entries(data).map(([k,v]) => ({...v, fbKey:k})) : [];
-      renderCloserMonthCal();
-      updateCloserStats();
-    });
-  } else {
-    renderCloserMonthCal();
-  }
+  // Appointments already synced from boot listener — just render
+  renderCloserMonthCal();
 }
 
 function updateCloserStats() {
@@ -10596,15 +10640,8 @@ function renderCallCenterView() {
   const today = new Date();
   document.getElementById('ccDateLabel').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
   document.getElementById('ccApptDate').value = today.toISOString().split('T')[0];
-  // Load appointments real-time
-  if (window.fbListen) {
-    window.fbListen('appointments', data => {
-      closerAppts = data ? Object.entries(data).map(([k,v]) => ({...v, fbKey:k})) : [];
-      renderCCWeekView();
-    });
-  } else {
-    renderCCWeekView();
-  }
+  // Appointments already synced from boot listener — just render
+  renderCCWeekView();
 }
 
 function renderCCWeekView() {
@@ -11954,6 +11991,7 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
       <div class="card-head"><span>💾</span><h2>Data</h2></div>
       <div class="card-body">
         <div style="font-size:12px;color:var(--muted);margin-bottom:12px;" id="settingsDataInfo"></div>
+        <button onclick="fullCloudSync()" style="width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:13px;font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-bottom:8px;">☁️ SYNC ALL DATA TO CLOUD</button>
         <button onclick="exportData()" style="width:100%;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-bottom:8px;">📤 EXPORT ALL DATA</button>
         <label style="width:100%;display:block;background:none;border:1px solid var(--green);color:var(--green);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;margin-bottom:8px;text-align:center;">
           📥 IMPORT BACKUP (.json)
