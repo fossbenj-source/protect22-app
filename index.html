@@ -4354,6 +4354,7 @@ function renderCustomers() {
 }
 
 function openCustomerDetail(id) {
+  try {
   const c = customers.find(x => x.id === id);
   if (!c) return;
   const existing = document.getElementById('customerDetailPanel');
@@ -4366,7 +4367,7 @@ function openCustomerDetail(id) {
 
   const custJobs = jobs.filter(j => {
     if (j.customerId === c.id) return true;
-    return j.data && j.data.customerName && j.data.customerName.toLowerCase() === c.name.toLowerCase();
+    return c.name && j.data && j.data.customerName && j.data.customerName.toLowerCase() === c.name.toLowerCase();
   }).sort((a,b) => new Date(b.scheduledDate||b.data.date||0) - new Date(a.scheduledDate||a.data.date||0));
   const completedJobs = custJobs.filter(j => j.status === 'complete');
   const initials = c.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -4395,7 +4396,7 @@ function openCustomerDetail(id) {
   // Quick actions bar
   h += '<div style="display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);overflow-x:auto;">';
   if (c.phone) h += '<a href="tel:' + c.phone.replace(/\D/g,'') + '" style="display:flex;align-items:center;gap:4px;background:rgba(52,211,153,0.15);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;text-decoration:none;white-space:nowrap;flex-shrink:0;">📞 Call</a>';
-  if (c.address) h += '<button onclick="navToAddress(\'' + esc(c.address.replace(/'/g,"\\'")) + '\')" style="display:flex;align-items:center;gap:4px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">📍 Navigate</button>';
+  if (c.address) h += '<button onclick="navToAddress(this.dataset.addr)" data-addr="' + esc(c.address) + '" style="display:flex;align-items:center;gap:4px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">📍 Navigate</button>';
   if (c.email) h += '<a href="mailto:' + esc(c.email) + '" style="display:flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;text-decoration:none;white-space:nowrap;flex-shrink:0;">✉ Email</a>';
   h += '</div>';
 
@@ -4649,6 +4650,11 @@ function openCustomerDetail(id) {
 
   panel.innerHTML = h;
   document.body.appendChild(panel);
+  } catch(err) {
+    console.error('openCustomerDetail error:', err);
+    document.body.style.overflow = '';
+    showToast('Error opening profile: ' + err.message, 'error');
+  }
 }
 
 function closeCustomerProfile() {
