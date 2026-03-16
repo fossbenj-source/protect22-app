@@ -1192,25 +1192,25 @@
     </div>
   </div>
 
-  <!-- ★ QUICK LINKS — grouped together, collapsible -->
+  <!-- ★ QUICK LINKS — open in-app browser -->
   <div class="card">
     <div class="card-head" onclick="const b=document.getElementById('quickLinksBody');b.style.display=b.style.display==='none'?'flex':'none'" style="cursor:pointer;">
       <span>🔗</span><h2>Quick Links & Portals</h2>
       <span style="margin-left:auto;color:var(--muted);font-size:12px;">▾</span>
     </div>
     <div id="quickLinksBody" style="display:none;padding:10px 14px;flex-direction:column;gap:8px;">
-      <a href="https://protect22.fillquick.com/Account/Login?ReturnUrl=%2F" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a2a1a,#0d1a0d);border:1px solid rgba(0,230,118,0.3);">
+      <button onclick="openInAppBrowser('Protect22 FillQuick','https://protect22.fillquick.com/Account/Login?ReturnUrl=%2F')" class="quick-link-btn" style="background:linear-gradient(135deg,#1a2a1a,#0d1a0d);border:1px solid rgba(0,230,118,0.3);width:100;text-align:left;">
         <span>📋</span><span>Protect22 FillQuick</span><span class="ql-arrow">→</span>
-      </a>
-      <a href="https://3ps.dealer.adt.com/LoginPage.htm?originalUrl=https%3A%2F%2F3ps.dealer.adt.com%2F#!/search/customer" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a1a0a,#120f00);border:1px solid rgba(255,165,0,0.3);">
+      </button>
+      <button onclick="openInAppBrowser('3PS — ADT Search','https://3ps.dealer.adt.com/LoginPage.htm?originalUrl=https%3A%2F%2F3ps.dealer.adt.com%2F#!/search/customer')" class="quick-link-btn" style="background:linear-gradient(135deg,#1a1a0a,#120f00);border:1px solid rgba(255,165,0,0.3);width:100%;text-align:left;">
         <span>🔍</span><span>3PS — ADT Customer Search</span><span class="ql-arrow">→</span>
-      </a>
-      <a href="https://adtdcc-live-gme5sigejq-ue.a.run.app/" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#0a0d1a,#0d1020);border:1px solid rgba(0,212,255,0.3);">
+      </button>
+      <button onclick="openInAppBrowser('ADT DCC Portal','https://adtdcc-live-gme5sigejq-ue.a.run.app/')" class="quick-link-btn" style="background:linear-gradient(135deg,#0a0d1a,#0d1020);border:1px solid rgba(0,212,255,0.3);width:100%;text-align:left;">
         <span>🖥️</span><span>ADT DCC Portal</span><span class="ql-arrow">→</span>
-      </a>
-      <a href="https://api.leadconnectorhq.com/widget/form/F5f31hA1mM1CFsmkuiSQ" target="_blank" class="quick-link-btn" style="background:linear-gradient(135deg,#1a0a1a,#150d20);border:1px solid rgba(180,0,255,0.3);">
+      </button>
+      <button onclick="openInAppBrowser('LeadConnector','https://api.leadconnectorhq.com/widget/form/F5f31hA1mM1CFsmkuiSQ')" class="quick-link-btn" style="background:linear-gradient(135deg,#1a0a1a,#150d20);border:1px solid rgba(180,0,255,0.3);width:100%;text-align:left;">
         <span>📝</span><span>LeadConnector Form</span><span class="ql-arrow">→</span>
-      </a>
+      </button>
     </div>
   </div>
 
@@ -5152,6 +5152,147 @@ function updateJobTypeUI(type) {
   serviceBtn.style.borderColor = type === 'service' ? 'var(--orange)' : 'var(--border)';
   serviceBtn.style.color = type === 'service' ? 'var(--orange)' : '';
   if (serviceCard) serviceCard.style.display = type === 'service' ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════════════════════
+// In-App Tabbed Browser
+// ══════════════════════════════════════════════════════════
+let _browserTabs = [];
+let _activeBrowserTab = 0;
+
+function openInAppBrowser(title, url) {
+  let overlay = document.getElementById('inAppBrowser');
+  
+  if (!overlay) {
+    // Create the browser overlay
+    overlay = document.createElement('div');
+    overlay.id = 'inAppBrowser';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:90000;background:var(--bg);display:flex;flex-direction:column;';
+    
+    // Tab bar
+    const tabBar = document.createElement('div');
+    tabBar.id = 'browserTabBar';
+    tabBar.style.cssText = 'display:flex;align-items:center;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;padding:0 4px;min-height:40px;padding-top:env(safe-area-inset-top);';
+    overlay.appendChild(tabBar);
+    
+    // Content area
+    const content = document.createElement('div');
+    content.id = 'browserContent';
+    content.style.cssText = 'flex:1;position:relative;overflow:hidden;';
+    overlay.appendChild(content);
+    
+    // Bottom bar with back button and actions
+    const bottomBar = document.createElement('div');
+    bottomBar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-top:1px solid var(--border);flex-shrink:0;padding-bottom:calc(8px + env(safe-area-inset-bottom));';
+    
+    const backBtn = document.createElement('button');
+    backBtn.style.cssText = 'background:var(--accent);color:#000;border:none;border-radius:6px;padding:8px 14px;font-family:Share Tech Mono,monospace;font-size:11px;font-weight:bold;cursor:pointer;';
+    backBtn.textContent = '← BACK TO JOB';
+    backBtn.onclick = () => closeInAppBrowser();
+    
+    const refreshBtn = document.createElement('button');
+    refreshBtn.style.cssText = 'background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;';
+    refreshBtn.textContent = '↻';
+    refreshBtn.onclick = () => {
+      const frame = document.querySelector('#browserContent iframe.active-frame');
+      if (frame) frame.src = frame.src;
+    };
+    
+    const externalBtn = document.createElement('button');
+    externalBtn.style.cssText = 'background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;margin-left:auto;';
+    externalBtn.textContent = '↗ Open in Safari';
+    externalBtn.onclick = () => {
+      const tab = _browserTabs[_activeBrowserTab];
+      if (tab) window.open(tab.url, '_blank');
+    };
+    
+    bottomBar.appendChild(backBtn);
+    bottomBar.appendChild(refreshBtn);
+    bottomBar.appendChild(externalBtn);
+    overlay.appendChild(bottomBar);
+    
+    document.body.appendChild(overlay);
+    _browserTabs = [];
+  }
+  
+  // Check if this URL is already open in a tab
+  const existingIdx = _browserTabs.findIndex(t => t.url === url);
+  if (existingIdx >= 0) {
+    switchBrowserTab(existingIdx);
+    return;
+  }
+  
+  // Add new tab
+  const tabIdx = _browserTabs.length;
+  _browserTabs.push({ title, url });
+  
+  // Create iframe
+  const content = document.getElementById('browserContent');
+  const iframe = document.createElement('iframe');
+  iframe.src = url;
+  iframe.className = 'browser-frame';
+  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;display:none;';
+  iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation');
+  content.appendChild(iframe);
+  
+  renderBrowserTabs();
+  switchBrowserTab(tabIdx);
+}
+
+function renderBrowserTabs() {
+  const tabBar = document.getElementById('browserTabBar');
+  if (!tabBar) return;
+  tabBar.innerHTML = '';
+  
+  _browserTabs.forEach((tab, idx) => {
+    const btn = document.createElement('button');
+    const isActive = idx === _activeBrowserTab;
+    btn.style.cssText = 'background:' + (isActive ? 'var(--panel2)' : 'none') + ';border:none;border-bottom:2px solid ' + (isActive ? 'var(--accent)' : 'transparent') + ';color:' + (isActive ? 'var(--accent)' : 'var(--muted)') + ';padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;flex-shrink:0;';
+    btn.innerHTML = '<span>' + esc(tab.title.length > 15 ? tab.title.slice(0,15) + '…' : tab.title) + '</span>';
+    btn.onclick = () => switchBrowserTab(idx);
+    
+    // Close button for each tab
+    const closeTab = document.createElement('span');
+    closeTab.style.cssText = 'font-size:12px;color:var(--muted);cursor:pointer;padding:0 2px;';
+    closeTab.textContent = '×';
+    closeTab.onclick = (e) => { e.stopPropagation(); closeBrowserTab(idx); };
+    btn.appendChild(closeTab);
+    
+    tabBar.appendChild(btn);
+  });
+}
+
+function switchBrowserTab(idx) {
+  _activeBrowserTab = idx;
+  const frames = document.querySelectorAll('#browserContent .browser-frame');
+  frames.forEach((f, i) => {
+    f.style.display = i === idx ? 'block' : 'none';
+    if (i === idx) f.classList.add('active-frame');
+    else f.classList.remove('active-frame');
+  });
+  renderBrowserTabs();
+}
+
+function closeBrowserTab(idx) {
+  const frames = document.querySelectorAll('#browserContent .browser-frame');
+  if (frames[idx]) frames[idx].remove();
+  _browserTabs.splice(idx, 1);
+  
+  if (_browserTabs.length === 0) {
+    closeInAppBrowser();
+    return;
+  }
+  
+  if (_activeBrowserTab >= _browserTabs.length) _activeBrowserTab = _browserTabs.length - 1;
+  renderBrowserTabs();
+  switchBrowserTab(_activeBrowserTab);
+}
+
+function closeInAppBrowser() {
+  const overlay = document.getElementById('inAppBrowser');
+  if (overlay) overlay.remove();
+  _browserTabs = [];
+  _activeBrowserTab = 0;
 }
 
 // ══════════════════════════════════════════════════════════
