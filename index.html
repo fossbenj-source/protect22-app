@@ -1177,10 +1177,10 @@
     <div class="card-body">
       <div id="followUpStatus" style="font-size:12px;color:var(--muted);margin-bottom:10px;">No follow-up scheduled</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        <button onclick="scheduleFollowUp(1)" class="btn-add" style="flex:1;min-width:80px;">Tomorrow</button>
-        <button onclick="scheduleFollowUp(3)" class="btn-add" style="flex:1;min-width:80px;">3 Days</button>
-        <button onclick="scheduleFollowUp(7)" class="btn-add" style="flex:1;min-width:80px;">1 Week</button>
-        <button onclick="scheduleFollowUp(0)" class="btn-add" style="flex:1;min-width:80px;border-color:var(--accent);color:var(--accent);">Custom...</button>
+        <button onclick="scheduleFollowUp(1)" class="btn-add" style="flex:1 1 calc(25% - 6px);min-width:70px;font-size:10px;padding:10px 4px;">TOMORROW</button>
+        <button onclick="scheduleFollowUp(3)" class="btn-add" style="flex:1 1 calc(25% - 6px);min-width:70px;font-size:10px;padding:10px 4px;">3 DAYS</button>
+        <button onclick="scheduleFollowUp(7)" class="btn-add" style="flex:1 1 calc(25% - 6px);min-width:70px;font-size:10px;padding:10px 4px;">1 WEEK</button>
+        <button onclick="scheduleFollowUp(0)" class="btn-add" style="flex:1 1 calc(25% - 6px);min-width:70px;font-size:10px;padding:10px 4px;border-color:var(--accent);color:var(--accent);">CUSTOM...</button>
       </div>
       <div id="followUpCustom" style="display:none;margin-top:10px;">
         <input type="date" id="followUpDate" style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;padding:8px 12px;outline:none;">
@@ -3681,12 +3681,9 @@ function addInstallingRow(val, qty) {
   combo.style.width='100%';
   combo.querySelector('input').style.fontSize='14px';
   combo.querySelector('input').addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addInstallingRow();setTimeout(()=>{const ins=c.querySelectorAll('.combo-wrap input');ins[ins.length-1].focus();},50);} });
-  // Line 2: qty + remove — compact, right-aligned
+  // Line 2: qty + remove — right-aligned, under the name
   const controlRow=document.createElement('div');
-  controlRow.style.cssText='display:flex;align-items:center;gap:6px;margin-top:6px;';
-  // Spacer to push qty right
-  const spacer=document.createElement('div');
-  spacer.style.cssText='flex:1;';
+  controlRow.style.cssText='display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:flex-end;';
   const qtyWrap=document.createElement('div'); qtyWrap.className='qty-wrap';
   const qtyMinus=document.createElement('button'); qtyMinus.className='qty-btn'; qtyMinus.textContent='−'; qtyMinus.type='button';
   const qtyInput=document.createElement('input'); qtyInput.type='text'; qtyInput.className='qty-input'; qtyInput.value=qty||'1'; qtyInput.maxLength=3;
@@ -3697,7 +3694,7 @@ function addInstallingRow(val, qty) {
   qtyWrap.appendChild(qtyMinus); qtyWrap.appendChild(qtyInput); qtyWrap.appendChild(qtyPlus);
   const rm=document.createElement('button'); rm.className='btn-remove'; rm.innerHTML='&times;';
   rm.onclick=()=>{row.remove();autoSave();};
-  controlRow.appendChild(spacer); controlRow.appendChild(qtyWrap); controlRow.appendChild(rm);
+  controlRow.appendChild(qtyWrap); controlRow.appendChild(rm);
   row.appendChild(combo); row.appendChild(controlRow);
   c.appendChild(row);
 }
