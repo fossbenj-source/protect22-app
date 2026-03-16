@@ -7130,6 +7130,7 @@ function showScreen(name) {
   if (name === 'customers') renderCustomers();
   if (name === 'settings') loadSettingsScreen();
   if (name === 'truck') { renderTruck(); }
+  if (name === 'admin') { renderAdminDashboard(); }
   // Update active job banner on all screen changes
   updateActiveJobBanner();
 }
@@ -7813,6 +7814,9 @@ function initTechApp() {
     } else {
       setTimeout(initTechApp, 150);
     }
+    // Show admin nav button only for admin role
+    const adminNav = document.getElementById('navAdmin');
+    if (adminNav) adminNav.style.display = (currentRole === 'admin') ? '' : 'none';
   } catch(e) {
     console.error('initTechApp error:', e);
     document.getElementById('loginScreen').style.display = 'flex';
@@ -8616,6 +8620,223 @@ function enhanceFormFields() {
     if (el) addFieldHint(el, 'Examples: 9, 930, 9:30, 2pm');
   });
 }
+// ══════════════════════════════════════════════════════════
+// ADMIN DASHBOARD & IMEI TRACKER
+// ══════════════════════════════════════════════════════════
+let imeiTracker = JSON.parse(localStorage.getItem('p22_imeiTracker') || '[]');
+
+function saveImeiTracker() {
+  localStorage.setItem('p22_imeiTracker', JSON.stringify(imeiTracker));
+}
+
+function addImeiToTracker(imeiVal) {
+  const input = document.getElementById('adminImeiInput');
+  const val = (imeiVal || (input ? input.value : '')).trim().replace(/[^0-9\-]/g, '');
+  if (!val || val.length < 5) { showToast('Enter a valid IMEI number', 'error'); return; }
+  // Check for duplicate
+  if (imeiTracker.find(x => x.imei === val)) {
+    showToast('IMEI already tracked: ' + val, 'info');
+    if (input) input.value = '';
+    return;
+  }
+  // Try to find which job/customer this came from
+  let source = null;
+  for (const j of jobs) {
+    if (j.data.imei && j.data.imei.replace(/[^0-9\-]/g, '') === val) {
+      source = { jobId: j.id, customer: j.data.customerName, address: j.data.address, date: j.scheduledDate };
+      break;
+    }
+  }
+  imeiTracker.push({
+    imei: val,
+    addedDate: new Date().toISOString(),
+    addedBy: currentUser?.email || 'admin',
+    status: 'unchecked', // unchecked, active, inactive
+    source: source,
+    notes: ''
+  });
+  saveImeiTracker();
+  if (input) input.value = '';
+  renderImeiList();
+  showToast('📡 IMEI tracked: ' + val, 'success');
+}
+
+function renderImeiList() {
+  const list = document.getElementById('imeiList');
+  if (!list) return;
+  const search = (document.getElementById('imeiSearch')?.value || '').toLowerCase();
+  const filter = document.getElementById('imeiFilter')?.value || 'all';
+  const today = new Date().toDateString();
+
+  let filtered = [...imeiTracker];
+  if (search) filtered = filtered.filter(x => x.imei.includes(search) || (x.source?.customer||'').toLowerCase().includes(search));
+  if (filter === 'unchecked') filtered = filtered.filter(x => x.status === 'unchecked');
+  if (filter === 'active') filtered = filtered.filter(x => x.status === 'active');
+  if (filter === 'inactive') filtered = filtered.filter(x => x.status === 'inactive');
+  if (filter === 'today') filtered = filtered.filter(x => new Date(x.addedDate).toDateString() === today);
+
+  // Sort newest first
+  filtered.sort((a,b) => new Date(b.addedDate) - new Date(a.addedDate));
+
+  // Update stats
+  const totalEl = document.getElementById('imeiTotal');
+  const todayEl = document.getElementById('imeiToday');
+  const uncheckedEl = document.getElementById('imeiUnchecked');
+  if (totalEl) totalEl.textContent = imeiTracker.length;
+  if (todayEl) todayEl.textContent = imeiTracker.filter(x => new Date(x.addedDate).toDateString() === today).length;
+  if (uncheckedEl) uncheckedEl.textContent = imeiTracker.filter(x => x.status === 'unchecked').length;
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">No IMEIs found</div>';
+    return;
+  }
+
+  let h = '';
+  filtered.forEach((entry, idx) => {
+    const realIdx = imeiTracker.indexOf(entry);
+    const sc = entry.status === 'active' ? 'var(--green)' : entry.status === 'inactive' ? 'var(--red)' : 'var(--yellow)';
+    const date = new Date(entry.addedDate).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const time = new Date(entry.addedDate).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    h += '<div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid ' + sc + ';border-radius:6px;padding:10px;margin-bottom:6px;">';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
+    h += '<span style="font-family:Share Tech Mono,monospace;font-size:14px;color:var(--text);font-weight:bold;flex:1;letter-spacing:1px;">' + esc(entry.imei) + '</span>';
+    h += '<select onchange="updateImeiStatus(' + realIdx + ',this.value)" style="background:var(--input-bg);border:1px solid ' + sc + ';border-radius:4px;color:' + sc + ';font-family:Share Tech Mono,monospace;font-size:10px;padding:3px 6px;outline:none;">';
+    h += '<option value="unchecked"' + (entry.status==='unchecked'?' selected':'') + '>⏳ Unchecked</option>';
+    h += '<option value="active"' + (entry.status==='active'?' selected':'') + '>✅ Active</option>';
+    h += '<option value="inactive"' + (entry.status==='inactive'?' selected':'') + '>❌ Inactive</option>';
+    h += '</select>';
+    h += '<button onclick="deleteImei(' + realIdx + ')" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:2px 4px;">×</button>';
+    h += '</div>';
+    h += '<div style="font-size:10px;color:var(--muted);">' + date + ' ' + time;
+    if (entry.source?.customer) h += ' · ' + esc(entry.source.customer);
+    if (entry.source?.address) h += ' · ' + esc(entry.source.address.split(',')[0]);
+    h += '</div>';
+    if (entry.notes) h += '<div style="font-size:10px;color:var(--muted);font-style:italic;margin-top:2px;">📝 ' + esc(entry.notes) + '</div>';
+    h += '</div>';
+  });
+  list.innerHTML = h;
+}
+
+function updateImeiStatus(idx, status) {
+  if (imeiTracker[idx]) {
+    imeiTracker[idx].status = status;
+    saveImeiTracker();
+    renderImeiList();
+  }
+}
+
+function deleteImei(idx) {
+  if (imeiTracker[idx]) {
+    const imei = imeiTracker[idx].imei;
+    imeiTracker.splice(idx, 1);
+    saveImeiTracker();
+    renderImeiList();
+    showToast('Removed ' + imei, 'info');
+  }
+}
+
+function autoCollectImeis() {
+  let added = 0;
+  jobs.forEach(j => {
+    if (j.data.imei && j.data.imei.trim().length >= 5) {
+      const val = j.data.imei.trim().replace(/[^0-9\-]/g, '');
+      if (!imeiTracker.find(x => x.imei === val)) {
+        imeiTracker.push({
+          imei: val,
+          addedDate: j.scheduledDate || new Date().toISOString(),
+          addedBy: 'auto-collect',
+          status: 'unchecked',
+          source: { jobId: j.id, customer: j.data.customerName, address: j.data.address, date: j.scheduledDate },
+          notes: 'Auto-collected from job'
+        });
+        added++;
+      }
+    }
+  });
+  if (added > 0) {
+    saveImeiTracker();
+    renderImeiList();
+    showToast('📡 Collected ' + added + ' new IMEI(s) from jobs', 'success');
+  } else {
+    showToast('No new IMEIs found in jobs', 'info');
+  }
+}
+
+function exportImeiCSV() {
+  if (imeiTracker.length === 0) { showToast('No IMEIs to export', 'info'); return; }
+  let csv = 'IMEI,Status,Date Added,Customer,Address,Notes\n';
+  imeiTracker.forEach(e => {
+    csv += '"' + e.imei + '","' + (e.status||'unchecked') + '","' + new Date(e.addedDate).toLocaleDateString() + '","' + (e.source?.customer||'') + '","' + (e.source?.address||'') + '","' + (e.notes||'') + '"\n';
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'imei_tracker_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📥 IMEI CSV exported', 'success');
+}
+
+function renderAdminDashboard() {
+  renderImeiList();
+  renderAdminRevenue();
+  renderAdminOps();
+}
+
+function renderAdminRevenue() {
+  const el = document.getElementById('adminRevenueStats');
+  if (!el) return;
+  const now = new Date();
+  const completed = jobs.filter(j => j.status === 'complete');
+  const thisMonth = completed.filter(j => j.scheduledDate && new Date(j.scheduledDate).getMonth() === now.getMonth() && new Date(j.scheduledDate).getFullYear() === now.getFullYear());
+  const lastMonth = completed.filter(j => {
+    if (!j.scheduledDate) return false;
+    const d = new Date(j.scheduledDate);
+    const lm = new Date(now); lm.setMonth(lm.getMonth()-1);
+    return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+  });
+  const thisMonthRev = thisMonth.reduce((s,j) => s + getJobFee(j), 0);
+  const lastMonthRev = lastMonth.reduce((s,j) => s + getJobFee(j), 0);
+  const allTimeRev = completed.reduce((s,j) => s + getJobFee(j), 0);
+  const change = lastMonthRev > 0 ? Math.round(((thisMonthRev - lastMonthRev) / lastMonthRev) * 100) : 0;
+  const changeColor = change >= 0 ? 'var(--green)' : 'var(--red)';
+
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+    '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--green);font-weight:bold;">$' + thisMonthRev + '</div><div style="font-size:9px;color:var(--muted);margin-top:2px;">This Month (' + thisMonth.length + ' jobs)</div></div>' +
+    '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--muted);font-weight:bold;">$' + lastMonthRev + '</div><div style="font-size:9px;color:var(--muted);margin-top:2px;">Last Month (' + lastMonth.length + ' jobs)</div></div>' +
+    '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:var(--accent);font-weight:bold;">$' + allTimeRev + '</div><div style="font-size:9px;color:var(--muted);margin-top:2px;">All Time (' + completed.length + ' jobs)</div></div>' +
+    '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;"><div style="font-family:Share Tech Mono,monospace;font-size:22px;color:' + changeColor + ';font-weight:bold;">' + (change >= 0 ? '+' : '') + change + '%</div><div style="font-size:9px;color:var(--muted);margin-top:2px;">Month-over-Month</div></div>' +
+    '</div>';
+}
+
+function renderAdminOps() {
+  const el = document.getElementById('adminOpsStats');
+  if (!el) return;
+  const completed = jobs.filter(j => j.status === 'complete');
+  const installs = completed.filter(j => (j.data.jobType||'install') !== 'service');
+  const services = completed.filter(j => j.data.jobType === 'service');
+  const pending = jobs.filter(j => j.status === 'pending' || !j.status);
+  const inProgress = jobs.filter(j => j.status === 'inprogress');
+  // Avg time
+  let totalMins = 0, timedJobs = 0;
+  completed.forEach(j => {
+    const a = timeToMinutes(j.data.arriveTime);
+    const f = timeToMinutes(j.data.finishTime);
+    if (a !== null && f !== null && f > a) { totalMins += (f-a); timedJobs++; }
+  });
+  const avg = timedJobs > 0 ? Math.round(totalMins/timedJobs) : 0;
+
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+    '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;"><span style="font-size:16px;font-weight:bold;color:var(--accent);">' + installs.length + '</span><span style="font-size:11px;color:var(--muted);margin-left:6px;">Installs</span></div>' +
+    '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;"><span style="font-size:16px;font-weight:bold;color:var(--orange);">' + services.length + '</span><span style="font-size:11px;color:var(--muted);margin-left:6px;">Service Calls</span></div>' +
+    '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;"><span style="font-size:16px;font-weight:bold;color:var(--yellow);">' + pending.length + '</span><span style="font-size:11px;color:var(--muted);margin-left:6px;">Pending</span></div>' +
+    '<div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;"><span style="font-size:16px;font-weight:bold;color:var(--text);">' + (avg > 0 ? Math.floor(avg/60)+'h '+avg%60+'m' : '—') + '</span><span style="font-size:11px;color:var(--muted);margin-left:6px;">Avg On-Site</span></div>' +
+    '</div>';
+}
+
 function enhanceAriaLabels() {
   document.querySelectorAll('.btn-copy').forEach(btn => btn.setAttribute('aria-label', btn.getAttribute('aria-label') || 'Copy field value'));
   document.querySelectorAll('.btn-paste').forEach(btn => btn.setAttribute('aria-label', btn.getAttribute('aria-label') || 'Paste into field'));
@@ -8940,6 +9161,78 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
   </div>
 </div>
 
+<!-- ADMIN DASHBOARD (admin only) -->
+<div class="screen" id="screenAdmin">
+  <div style="max-width:780px;margin:0 auto;padding:16px 16px 100px;">
+    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:16px;">🔐 ADMIN DASHBOARD</div>
+
+    <!-- IMEI Tracker -->
+    <div class="card">
+      <div class="card-head"><span>📡</span><h2>IMEI / Cell Unit Tracker</h2></div>
+      <div class="card-body">
+        <div id="imeiStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+            <div id="imeiTotal" style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--accent);font-weight:bold;">0</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px;">Total Tracked</div>
+          </div>
+          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+            <div id="imeiToday" style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--green);font-weight:bold;">0</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px;">Today</div>
+          </div>
+          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+            <div id="imeiUnchecked" style="font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--yellow);font-weight:bold;">0</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px;">Unchecked</div>
+          </div>
+        </div>
+
+        <!-- Add IMEI -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <input type="text" id="adminImeiInput" inputmode="numeric" placeholder="Enter IMEI number..." style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:16px;letter-spacing:1px;padding:10px;outline:none;">
+          <button onclick="openLiveScanner('adminImeiInput')" style="background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:44px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">📷</button>
+          <button onclick="addImeiToTracker()" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 16px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;">+ ADD</button>
+        </div>
+
+        <!-- Filter/search -->
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <input type="text" id="imeiSearch" placeholder="Search IMEIs..." oninput="renderImeiList()" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;padding:8px 10px;outline:none;">
+          <select id="imeiFilter" onchange="renderImeiList()" style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:11px;padding:8px;outline:none;">
+            <option value="all">All</option>
+            <option value="unchecked">Unchecked</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="today">Today</option>
+          </select>
+        </div>
+
+        <!-- IMEI list -->
+        <div id="imeiList" style="max-height:400px;overflow-y:auto;"></div>
+
+        <!-- Export -->
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button onclick="exportImeiCSV()" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">📥 EXPORT CSV</button>
+          <button onclick="autoCollectImeis()" style="flex:1;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;">🔄 PULL FROM JOBS</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revenue Overview -->
+    <div class="card">
+      <div class="card-head"><span>💰</span><h2>Revenue Overview</h2></div>
+      <div class="card-body">
+        <div id="adminRevenueStats"></div>
+      </div>
+    </div>
+
+    <!-- Tech Performance -->
+    <div class="card">
+      <div class="card-head"><span>📊</span><h2>Operations Summary</h2></div>
+      <div class="card-body">
+        <div id="adminOpsStats"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- NAV BAR -->
 <button id="globalSearchTrigger" onclick="openGlobalSearch()" style="position:fixed;top:12px;right:16px;z-index:8998;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Search">🔍</button>
 <nav class="crm-nav">
@@ -8948,6 +9241,7 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
   <button class="nav-btn" id="navCustomers" onclick="showScreen('customers')"><span class="nav-icon">👤</span>Customers</button>
   <button class="nav-btn" id="navHistory" onclick="showScreen('history')"><span class="nav-icon">📋</span>History</button>
   <button class="nav-btn" id="navTruck" onclick="showScreen('truck')"><span class="nav-icon">🚛</span>Truck</button>
+  <button class="nav-btn" id="navAdmin" onclick="showScreen('admin')" style="display:none;"><span class="nav-icon">🔐</span>Admin</button>
   <button class="nav-btn" id="navSettings" onclick="showScreen('settings')"><span class="nav-icon">⚙️</span>Settings</button>
 </nav>
 
