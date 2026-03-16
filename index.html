@@ -3715,18 +3715,17 @@ document.addEventListener('click', e => { if(openDropdown&&!e.target.closest('.c
 // ── Row Builders ───────────────────────────────────────────
 function addInstallingRow(val, qty) {
   const c=document.getElementById('installingRows');
-  const row=document.createElement('div'); row.className='list-row';
+  const row=document.createElement('div'); row.className='equip-item'; // Use equip-item class like existing, not list-row
   row.style.cssText='background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;';
-  // Line 1: full-width equipment name
+  // Line 1: full-width equipment name — matches existing equipment width
   const combo=createCombo(val);
   combo.style.cssText='width:100%;display:block;';
   const comboInput = combo.querySelector('input');
   if (comboInput) comboInput.style.fontSize='14px';
   if (comboInput) comboInput.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addInstallingRow();setTimeout(()=>{const ins=c.querySelectorAll('.combo-wrap input');ins[ins.length-1].focus();},50);} });
-  // Line 2: qty + remove — same layout as existing equipment
+  // Line 2: qty + remove — right-aligned below name, same as existing
   const controlRow=document.createElement('div');
   controlRow.style.cssText='display:flex;align-items:center;gap:6px;margin-top:6px;';
-  // Spacer pushes qty to right
   const spacer=document.createElement('div');
   spacer.style.flex='1';
   const qtyWrap=document.createElement('div'); qtyWrap.className='qty-wrap';
@@ -4539,7 +4538,6 @@ function openCustomerDetail(id) {
     {label:'Phone', val:c.phone, icon:'📞'},
     {label:'Email', val:c.email, icon:'✉'},
     {label:'CS #', val:c.cs, icon:'#'},
-    {label:'Current IMEI', val:c.imeiNew, icon:'📡'},
   ];
   contactFields.forEach(f => {
     if (!f.val) return;
@@ -4548,7 +4546,28 @@ function openCustomerDetail(id) {
     h += '<div style="font-size:13px;color:var(--text);margin-top:2px;word-break:break-word;">' + esc(f.val) + '</div>';
     h += '</div>';
   });
-  h += '</div></div>';
+  h += '</div>';
+
+  // System Numbers (IMEI, ADT Status, Confirmation)
+  const sysFields = [
+    {label:'Current IMEI', val:c.imeiNew, icon:'📡', color:'var(--green)'},
+    {label:'ADT Bot Status', val:c.adtStatus, icon:'🤖', color:'var(--accent)'},
+    {label:'Confirmation #', val:c.confirmation, icon:'✓', color:'var(--accent)'},
+  ];
+  const hasSysFields = sysFields.some(f => f.val);
+  if (hasSysFields) {
+    h += '<div style="margin-top:10px;"><div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">SYSTEM & TRACKING</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+    sysFields.forEach(f => {
+      if (!f.val) return;
+      h += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">';
+      h += '<div style="font-size:9px;color:' + f.color + ';letter-spacing:1px;">' + f.icon + ' ' + f.label.toUpperCase() + '</div>';
+      h += '<div style="font-family:Share Tech Mono,monospace;font-size:13px;color:var(--text);margin-top:2px;word-break:break-all;letter-spacing:1px;">' + esc(f.val) + '</div>';
+      h += '</div>';
+    });
+    h += '</div></div>';
+  }
+  h += '</div>';
 
   // Equipment at this home — EDITABLE
   h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
@@ -4610,21 +4629,27 @@ function openCustomerDetail(id) {
   h += '</div>';
   h += '</div>';
 
-  // IMEI History
-  if (c.imeiHistory && c.imeiHistory.length > 0) {
-    h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
-    h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">📡 IMEI HISTORY</div>';
-    c.imeiHistory.forEach(entry => {
+  // IMEI History — always show section
+  h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">📡 IMEI HISTORY</div>';
+  const imeiHist = c.imeiHistory || [];
+  if (imeiHist.length > 0) {
+    imeiHist.forEach(entry => {
       const date = entry.installedDate ? new Date(entry.installedDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
       const isCurrent = c.imeiNew === entry.imei;
+      const isRemoved = entry.type === 'removed';
       h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
-      h += '<span style="font-family:Share Tech Mono,monospace;font-size:13px;color:var(--text);flex:1;letter-spacing:1px;">' + esc(entry.imei) + '</span>';
-      if (isCurrent) h += '<span style="font-size:9px;background:rgba(52,211,153,0.2);color:var(--green);padding:2px 6px;border-radius:3px;">CURRENT</span>';
-      h += '<span style="font-size:10px;color:var(--muted);">' + date + '</span>';
+      h += '<span style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--text);flex:1;letter-spacing:1px;">' + esc(entry.imei) + '</span>';
+      if (isCurrent) h += '<span style="font-size:8px;background:rgba(52,211,153,0.2);color:var(--green);padding:2px 5px;border-radius:3px;">CURRENT</span>';
+      else if (isRemoved) h += '<span style="font-size:8px;background:rgba(255,68,68,0.15);color:var(--red);padding:2px 5px;border-radius:3px;">REMOVED</span>';
+      else h += '<span style="font-size:8px;background:var(--accent-dim);color:var(--accent);padding:2px 5px;border-radius:3px;">INSTALLED</span>';
+      h += '<span style="font-size:9px;color:var(--muted);">' + date + '</span>';
       h += '</div>';
     });
-    h += '</div>';
+  } else {
+    h += '<div style="font-size:11px;color:var(--muted);padding:4px 0;">No IMEI records</div>';
   }
+  h += '</div>';
 
   // Communication / Notes log
   h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
@@ -6725,30 +6750,38 @@ function findTruckMatch(equipName) {
   // 1. Exact match
   const exact = truck.find(t => t.name.toLowerCase().trim() === key);
   if (exact) return exact;
-  // 2. Normalized match
+  // 2. Normalized match (strip parentheticals and special chars)
   const normEquip = normalizeName(equipName);
   const normMatch = truck.find(t => normalizeName(t.name) === normEquip);
   if (normMatch) return normMatch;
-  // 3. Substring: one contains the other
+  // 3. Substring: one fully contains the other
   const sub = truck.find(t => {
     const tn = t.name.toLowerCase().trim();
     return key.includes(tn) || tn.includes(key);
   });
   if (sub) return sub;
-  // 4. Word overlap — extract meaningful words and compare
-  const equipWords = normEquip.split(/\s+/).filter(w => w.length > 2 && !['the','and','for','with'].includes(w));
-  if (equipWords.length >= 2) {
+  // 4. Word overlap — strict: require 60%+ match and 3+ overlapping words
+  // Exclude generic words that cause false matches
+  const genericWords = new Set(['2gig','gig','eseries','wireless','sensor','detector','button','with','pet','the','and','for']);
+  const equipWords = normEquip.split(/\s+/).filter(w => w.length > 2);
+  const equipSignificant = equipWords.filter(w => !genericWords.has(w));
+  if (equipSignificant.length >= 1) {
     let bestMatch = null, bestScore = 0;
     truck.forEach(t => {
-      const tWords = normalizeName(t.name).split(/\s+/).filter(w => w.length > 2 && !['the','and','for','with'].includes(w));
-      const overlap = equipWords.filter(w => tWords.some(tw => tw === w || tw.includes(w) || w.includes(tw)));
-      const score = overlap.length / Math.max(equipWords.length, tWords.length);
-      if (overlap.length >= 2 && score > bestScore) {
+      const tWords = normalizeName(t.name).split(/\s+/).filter(w => w.length > 2);
+      const tSignificant = tWords.filter(w => !genericWords.has(w));
+      // Must match ALL significant words
+      const sigOverlap = equipSignificant.filter(w => tSignificant.some(tw => tw === w || tw.includes(w) || w.includes(tw)));
+      // Also check total word overlap
+      const totalOverlap = equipWords.filter(w => tWords.some(tw => tw === w || tw.includes(w) || w.includes(tw)));
+      const score = totalOverlap.length / Math.max(equipWords.length, tWords.length);
+      // Require all significant words to match AND 60%+ total overlap
+      if (sigOverlap.length >= equipSignificant.length && score > bestScore && score >= 0.6) {
         bestScore = score;
         bestMatch = t;
       }
     });
-    if (bestMatch && bestScore >= 0.4) return bestMatch;
+    if (bestMatch) return bestMatch;
   }
   return null;
 }
@@ -6761,46 +6794,6 @@ function getTruckQty(equipName) {
 function getTruckKey(equipName) {
   const match = findTruckMatch(equipName);
   return match ? match.name.toLowerCase().trim() : equipName.toLowerCase().trim();
-}
-
-// ══════════════════════════════════════════════════════════
-// Fuzzy Stock Matching — truck names vs equipment names
-// ══════════════════════════════════════════════════════════
-function findTruckMatch(equipName) {
-  if (!equipName) return null;
-  const key = equipName.toLowerCase().trim();
-  // 1. Exact match
-  const exact = truck.find(t => t.name.toLowerCase().trim() === key);
-  if (exact) return exact;
-  // 2. Substring: one contains the other
-  const sub = truck.find(t => {
-    const tk = t.name.toLowerCase().trim();
-    return key.includes(tk) || tk.includes(key);
-  });
-  if (sub) return sub;
-  // 3. Core word overlap (strip model numbers in parentheses, match key words)
-  const coreWords = key.replace(/\(.*?\)/g, '').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 1);
-  if (coreWords.length >= 2) {
-    let bestMatch = null, bestScore = 0;
-    truck.forEach(t => {
-      const tWords = t.name.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 1);
-      const overlap = coreWords.filter(w => tWords.includes(w)).length;
-      const score = overlap / Math.max(coreWords.length, tWords.length);
-      if (overlap >= 2 && score > bestScore) { bestScore = score; bestMatch = t; }
-    });
-    if (bestMatch && bestScore >= 0.4) return bestMatch;
-  }
-  return null;
-}
-
-function getTruckQty(equipName) {
-  const m = findTruckMatch(equipName);
-  return m ? m.qty : 0;
-}
-
-function getTruckKey(equipName) {
-  const m = findTruckMatch(equipName);
-  return m ? m.name.toLowerCase().trim() : equipName.toLowerCase().trim();
 }
 
 function getDayStockShortfall(dayJobs) {
@@ -9836,6 +9829,26 @@ function syncEquipToCustomer(j) {
     });
   }
 
+  // Sync IMEI numbers
+  if (j.data.imeiNew) {
+    c.imeiNew = j.data.imeiNew;
+    if (!c.imeiHistory) c.imeiHistory = [];
+    if (!c.imeiHistory.find(h => h.imei === j.data.imeiNew)) {
+      c.imeiHistory.push({ imei: j.data.imeiNew, type: 'new', installedDate: new Date().toISOString(), jobId: j.id });
+    }
+  }
+  if (j.data.imeiOld) {
+    if (!c.imeiHistory) c.imeiHistory = [];
+    if (!c.imeiHistory.find(h => h.imei === j.data.imeiOld)) {
+      c.imeiHistory.push({ imei: j.data.imeiOld, type: 'removed', installedDate: new Date().toISOString(), jobId: j.id });
+    }
+  }
+
+  // Sync ADT Bot Status, Confirmation#, CS#
+  if (j.data.adtStatus) c.adtStatus = j.data.adtStatus;
+  if (j.data.confirmation) c.confirmation = j.data.confirmation;
+  if (j.data.cs) c.cs = j.data.cs;
+
   // Track revenue on customer
   const fee = getJobFee(j);
   if (fee > 0) {
@@ -9849,6 +9862,19 @@ function syncEquipToCustomer(j) {
       jobType: j.data.jobType || 'install'
     });
   }
+
+  // Add job completion to service log
+  if (!c.serviceLog) c.serviceLog = [];
+  c.serviceLog.push({
+    date: new Date().toISOString(),
+    jobId: j.id,
+    type: j.data.jobType || 'install',
+    status: j.status,
+    equipment: installing.map(i => typeof i === 'object' ? i.name : i),
+    fee: fee,
+    timeOnSite: (j.data.arriveTime && j.data.finishTime) ? calcTimeOnSite(j.data.arriveTime, j.data.finishTime) : '',
+    notes: j.data.notes || ''
+  });
 
   saveCustomers();
 }
