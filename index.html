@@ -1009,43 +1009,45 @@
       </div>
       <div class="field">
         <label>CS #</label>
-        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imeiNew').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
+        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="debouncedAutoSave()" onpaste="setTimeout(()=>{lockIfFilled('cs');debouncedAutoSave();},100)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imeiNew').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this);setTimeout(()=>lockIfFilled('cs'),100)" title="Paste CS #">⏎</button></div>
       </div>
       <div class="field">
         <label style="color:var(--green);">📡 NEW IMEI (Installing)</label>
         <div class="copy-row">
-          <input type="text" id="imeiNew" onblur="lockIfFilled('imeiNew')" placeholder="New unit IMEI being installed" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imeiOld').focus();}">
-          <button onclick="openLiveScanner('imeiNew')" style="display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Live scan">📷</button>
+          <input type="text" id="imeiNew" onblur="lockIfFilled('imeiNew')" placeholder="New unit IMEI" oninput="debouncedAutoSave()" onpaste="setTimeout(()=>{lockIfFilled('imeiNew');debouncedAutoSave();},100)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imeiOld').focus();}">
           <label style="display:flex;align-items:center;justify-content:center;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.4);color:rgb(139,92,246);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:14px;" title="AI photo read">
-            🤖<input type="file" accept="image/*" capture="environment" onchange="aiExtractImei(event,'imeiNew')" style="display:none;">
+            🤖<input type="file" accept="image/*" capture="environment" onchange="aiExtractImeiAndLock(event,'imeiNew')" style="display:none;">
           </label>
           <button class="btn-copy" onclick="copyField('imeiNew',this)" title="Copy">⎘</button>
-          <button class="btn-paste" onclick="pasteField('imeiNew',this)" title="Paste">⏎</button>
+          <button class="btn-paste" onclick="pasteField('imeiNew',this);setTimeout(()=>lockIfFilled('imeiNew'),100)" title="Paste">⏎</button>
         </div>
       </div>
       <div class="field">
         <label style="color:var(--orange);">📡 OLD IMEI (Removing)</label>
         <div class="copy-row">
-          <input type="text" id="imeiOld" onblur="lockIfFilled('imeiOld')" placeholder="Old unit IMEI being pulled" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}">
-          <button onclick="openLiveScanner('imeiOld')" style="display:flex;align-items:center;justify-content:center;background:rgba(251,146,60,0.15);border:1px solid var(--orange);color:var(--orange);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Live scan">📷</button>
+          <input type="text" id="imeiOld" onblur="lockIfFilled('imeiOld')" placeholder="Old unit IMEI" oninput="debouncedAutoSave()" onpaste="setTimeout(()=>{lockIfFilled('imeiOld');debouncedAutoSave();},100)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}">
           <label style="display:flex;align-items:center;justify-content:center;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.4);color:rgb(139,92,246);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:14px;" title="AI photo read">
-            🤖<input type="file" accept="image/*" capture="environment" onchange="aiExtractImei(event,'imeiOld')" style="display:none;">
+            🤖<input type="file" accept="image/*" capture="environment" onchange="aiExtractImeiAndLock(event,'imeiOld')" style="display:none;">
           </label>
           <button class="btn-copy" onclick="copyField('imeiOld',this)" title="Copy">⎘</button>
-          <button class="btn-paste" onclick="pasteField('imeiOld',this)" title="Paste">⏎</button>
+          <button class="btn-paste" onclick="pasteField('imeiOld',this);setTimeout(()=>lockIfFilled('imeiOld'),100)" title="Paste">⏎</button>
         </div>
       </div>
       <div class="field">
         <label>ADT Bot Status #</label>
         <div class="copy-row">
-          <input type="text" id="adtStatus" onblur="lockIfFilled('adtStatus')" placeholder="ADT bot status number" oninput="debouncedAutoSave()">
+          <input type="text" id="adtStatus" onblur="lockIfFilled('adtStatus')" placeholder="ADT bot status number" oninput="debouncedAutoSave()" onpaste="setTimeout(()=>{lockIfFilled('adtStatus');debouncedAutoSave();},100)">
           <button class="btn-copy" onclick="copyField('adtStatus',this)" title="Copy ADT status">⎘</button>
-          <button class="btn-paste" onclick="pasteField('adtStatus',this)" title="Paste ADT status">⏎</button>
+          <button class="btn-paste" onclick="pasteField('adtStatus',this);setTimeout(()=>lockIfFilled('adtStatus'),100)" title="Paste ADT status">⏎</button>
         </div>
       </div>
       <div class="field">
         <label>Confirmation #</label>
-        <div class="copy-row"><input type="text" id="confirmation" onblur="lockIfFilled('confirmation')" placeholder="Confirmation number" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('notes').focus();}"><button class="btn-copy" onclick="copyField('confirmation',this)" title="Copy confirmation #">⎘</button><button class="btn-paste" onclick="pasteField('confirmation',this)" title="Paste confirmation #">⏎</button></div>
+        <div class="copy-row">
+          <input type="text" id="confirmation" onblur="lockIfFilled('confirmation')" placeholder="Confirmation number" oninput="debouncedAutoSave()" onpaste="setTimeout(()=>{lockIfFilled('confirmation');debouncedAutoSave();},100)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('notes').focus();}">
+          <button class="btn-copy" onclick="copyField('confirmation',this)" title="Copy confirmation #">⎘</button>
+          <button class="btn-paste" onclick="pasteField('confirmation',this);setTimeout(()=>lockIfFilled('confirmation'),100)" title="Paste confirmation #">⏎</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1088,11 +1090,11 @@
     <div class="card-head"><span>🔑</span><h2>Codes</h2></div>
     <div class="card-body">
       <div class="field">
-        <label>Master Code</label>
+        <label>Installer Code</label>
         <div class="copy-row">
-          <input type="text" id="masterCode" placeholder="Enter master code" oninput="debouncedAutoSave()" onblur="lockIfFilled('masterCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
-          <button class="btn-copy" onclick="copyField('masterCode',this)" title="Copy master code">⎘</button>
-          <button class="btn-paste" onclick="pasteField('masterCode',this)" title="Paste master code">⏎</button>
+          <input type="text" id="masterCode" placeholder="Enter installer code" oninput="debouncedAutoSave()" onblur="lockIfFilled('masterCode')" style="font-family:'Share Tech Mono',monospace;font-size:18px;letter-spacing:4px;">
+          <button class="btn-copy" onclick="copyField('masterCode',this)" title="Copy installer code">⎘</button>
+          <button class="btn-paste" onclick="pasteField('masterCode',this)" title="Paste installer code">⏎</button>
         </div>
       </div>
       <div class="field">
@@ -1102,11 +1104,6 @@
           <button class="btn-copy" onclick="copyField('verbalCode',this)" title="Copy verbal code">⎘</button>
           <button class="btn-paste" onclick="pasteField('verbalCode',this)" title="Paste verbal code">⏎</button>
         </div>
-      </div>
-      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-        <label>User Codes</label>
-        <div id="userCodeRows"></div>
-        <button class="btn-add" onclick="addUserCodeRow()" style="margin-top:8px;">+ Add User Code</button>
       </div>
     </div>
   </div>
@@ -1805,6 +1802,7 @@ function loadJob(id) {
   else { sb.classList.remove('show'); btn.innerHTML = '✉ Send Install Record'; }
   // Update address bar and customer collapse state
   updateAddressBar();
+  _customerCollapsed = false; // Reset so it re-evaluates for the new job
   updateCustomerCollapseState();
   updatePasteVisibility();
 }
@@ -1858,6 +1856,17 @@ function applyCustomerCollapse() {
 }
 
 function updateCustomerCollapseState() {
+  // Always refresh collapsed summary text with current field values
+  const name = document.getElementById('customerName')?.value?.trim() || '';
+  const phone = document.getElementById('phone')?.value?.trim() || '';
+  const cs = document.getElementById('cs')?.value?.trim() || '';
+  const nameEl = document.getElementById('collapsedName');
+  const phoneEl = document.getElementById('collapsedPhone');
+  const csEl = document.getElementById('collapsedCS');
+  if (nameEl) nameEl.textContent = name || 'No customer';
+  if (phoneEl) phoneEl.textContent = phone ? '📞 ' + phone : '';
+  if (csEl) csEl.textContent = cs ? 'CS: ' + cs : '';
+
   // Auto-collapse if all key fields are locked
   const keyFields = ['customerName', 'address', 'phone'];
   const allLocked = keyFields.every(fid => {
@@ -9237,6 +9246,12 @@ function captureImeiOnComplete(j) {
 // ══════════════════════════════════════════════════════════
 // AI-powered IMEI extraction from photos
 // ══════════════════════════════════════════════════════════
+async function aiExtractImeiAndLock(event, targetFieldId) {
+  await aiExtractImei(event, targetFieldId);
+  // Lock after AI fills it
+  if (targetFieldId) setTimeout(() => lockIfFilled(targetFieldId), 500);
+}
+
 async function aiExtractImei(event, targetFieldId) {
   const file = event.target.files[0];
   if (!file) return;
