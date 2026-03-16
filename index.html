@@ -1004,15 +1004,24 @@
       </div>
       <div class="field">
         <label>CS #</label>
-        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imei').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
+        <div class="copy-row"><input type="text" id="cs" onblur="lockIfFilled('cs')" placeholder="CS number / reference" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imeiNew').focus();}"><button class="btn-copy" onclick="copyField('cs',this)" title="Copy CS #">⎘</button><button class="btn-paste" onclick="pasteField('cs',this)" title="Paste CS #">⏎</button></div>
       </div>
       <div class="field">
-        <label>IMEI / Serial #</label>
+        <label style="color:var(--green);">📡 NEW IMEI (Installing)</label>
         <div class="copy-row">
-          <input type="text" id="imei" onblur="lockIfFilled('imei')" placeholder="Scan or enter IMEI / serial" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}">
-          <button onclick="openLiveScanner('imei')" style="display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Scan barcode">📷</button>
-          <button class="btn-copy" onclick="copyField('imei',this)" title="Copy IMEI">⎘</button>
-          <button class="btn-paste" onclick="pasteField('imei',this)" title="Paste IMEI">⏎</button>
+          <input type="text" id="imeiNew" onblur="lockIfFilled('imeiNew')" placeholder="New unit IMEI being installed" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('imeiOld').focus();}">
+          <button onclick="openLiveScanner('imeiNew')" style="display:flex;align-items:center;justify-content:center;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Scan barcode">📷</button>
+          <button class="btn-copy" onclick="copyField('imeiNew',this)" title="Copy">⎘</button>
+          <button class="btn-paste" onclick="pasteField('imeiNew',this)" title="Paste">⏎</button>
+        </div>
+      </div>
+      <div class="field">
+        <label style="color:var(--orange);">📡 OLD IMEI (Removing)</label>
+        <div class="copy-row">
+          <input type="text" id="imeiOld" onblur="lockIfFilled('imeiOld')" placeholder="Old unit IMEI being pulled" oninput="debouncedAutoSave()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmation').focus();}">
+          <button onclick="openLiveScanner('imeiOld')" style="display:flex;align-items:center;justify-content:center;background:rgba(251,146,60,0.15);border:1px solid var(--orange);color:var(--orange);border-radius:6px;width:38px;height:38px;cursor:pointer;flex-shrink:0;font-size:16px;" title="Scan barcode">📷</button>
+          <button class="btn-copy" onclick="copyField('imeiOld',this)" title="Copy">⎘</button>
+          <button class="btn-paste" onclick="pasteField('imeiOld',this)" title="Paste">⏎</button>
         </div>
       </div>
       <div class="field">
@@ -1376,7 +1385,7 @@ function blankJob() {
     sent: false,
     status: 'pending',
     data: {
-      customerName:'', address:'', cs:'', email:'', phone:'', masterCode:'', verbalCode:'', adtStatus:'', imei:'',
+      customerName:'', address:'', cs:'', email:'', phone:'', masterCode:'', verbalCode:'', adtStatus:'', imeiNew:'', imeiOld:'',
       confirmation:'', notes:'', installing:[], existing:[], zones:[], userCodes:[],
       arriveTime:'', finishTime:'', jobType:'install', photos:[],
       serviceType:'', serviceIssue:'', serviceResolution:''
@@ -1541,7 +1550,7 @@ function closeJobsDropdown() {
 function renderEmptyJobState() {
   // Clear all form fields when no job is selected
   ['customerName','address','cs','email','phone','confirmation','notes',
-   'masterCode','verbalCode','adtStatus','imei'].forEach(id => {
+   'masterCode','verbalCode','adtStatus','imeiNew','imeiOld'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1571,7 +1580,10 @@ function saveCurrentJob() {
   d.masterCode = document.getElementById('masterCode') ? document.getElementById('masterCode').value : '';
   d.verbalCode = document.getElementById('verbalCode') ? document.getElementById('verbalCode').value : '';
   d.adtStatus = document.getElementById('adtStatus') ? document.getElementById('adtStatus').value : '';
-  d.imei = document.getElementById('imei') ? document.getElementById('imei').value : '';
+  d.imeiNew = document.getElementById('imeiNew') ? document.getElementById('imeiNew').value : '';
+  d.imeiOld = document.getElementById('imeiOld') ? document.getElementById('imeiOld').value : '';
+  // Backward compat: keep old 'imei' field populated with new IMEI
+  d.imei = d.imeiNew || d.imeiOld || '';
   d.address = document.getElementById('address').value;
   d.cs = document.getElementById('cs').value;
   d.email = document.getElementById('email').value;
@@ -1595,7 +1607,7 @@ function saveCurrentJob() {
   if (document.getElementById('serviceIssue')) d.serviceIssue = document.getElementById('serviceIssue').value;
   if (document.getElementById('serviceResolution')) d.serviceResolution = document.getElementById('serviceResolution').value;
   // Persist locked state so it survives navigation
-  const lockableFields = ['customerName','address','email','phone','cs','adtStatus','imei','confirmation','masterCode','verbalCode'];
+  const lockableFields = ['customerName','address','email','phone','cs','adtStatus','imeiNew','imeiOld','confirmation','masterCode','verbalCode'];
   d.lockedFields = lockableFields.filter(fid => {
     const el = document.getElementById(fid);
     return el && el.readOnly;
@@ -1607,7 +1619,7 @@ function loadJob(id) {
   if (!j) return;
   const d = j.data;
   // Restore lock state — unlock all first, then re-lock whichever were saved as locked
-  const _lockable = ['customerName','address','email','phone','cs','adtStatus','imei','confirmation','masterCode','verbalCode'];
+  const _lockable = ['customerName','address','email','phone','cs','adtStatus','imeiNew','imeiOld','confirmation','masterCode','verbalCode'];
   _lockable.forEach(fid => {
     const el = document.getElementById(fid);
     if (el) { el.readOnly = false; el.classList.remove('locked'); }
@@ -1621,7 +1633,8 @@ function loadJob(id) {
   if (document.getElementById('masterCode')) document.getElementById('masterCode').value = d.masterCode || '';
   if (document.getElementById('verbalCode')) document.getElementById('verbalCode').value = d.verbalCode || '';
   if(document.getElementById('adtStatus')) document.getElementById('adtStatus').value = d.adtStatus || '';
-  if(document.getElementById('imei')) document.getElementById('imei').value = d.imei || '';
+  if(document.getElementById('imeiNew')) document.getElementById('imeiNew').value = d.imeiNew || d.imei || '';
+  if(document.getElementById('imeiOld')) document.getElementById('imeiOld').value = d.imeiOld || '';
   document.getElementById('address').value = d.address || ''; updateCrossStreet();
   document.getElementById('cs').value = d.cs || '';
   document.getElementById('email').value = d.email || '';
@@ -1944,7 +1957,7 @@ function updateCrossStreet() {
 
 // ── Smart button visibility: hide copy+paste when empty, show copy when has value ──
 function updatePasteVisibility() {
-  const fields = ['customerName','address','email','phone','cs','adtStatus','imei','confirmation','masterCode','verbalCode'];
+  const fields = ['customerName','address','email','phone','cs','adtStatus','imeiNew','imeiOld','confirmation','masterCode','verbalCode'];
   fields.forEach(fid => {
     const el = document.getElementById(fid);
     if (!el) return;
@@ -2941,6 +2954,8 @@ function finishComplete(j, finishTime) {
   renderTabs();
   saveToStorage();
   renderMonthCal();
+  // Auto-capture IMEIs on completion
+  captureImeiOnComplete(j);
   // Always clear active in-progress tracking when ANY job completes
   clearActiveInProgress();
   // Auto-send install record on completion
@@ -3769,11 +3784,11 @@ function clearJobData() {
   j.data.customerName=''; j.data.address=''; j.data.cs='';
   j.data.email=''; j.data.phone=''; j.data.confirmation='';
   j.data.notes=''; j.data.zones=[]; j.data.arriveTime=''; j.data.finishTime='';
-  j.data.masterCode=''; j.data.verbalCode=''; j.data.adtStatus=''; j.data.imei='';
+  j.data.masterCode=''; j.data.verbalCode=''; j.data.adtStatus=''; j.data.imeiNew=''; j.data.imeiOld=''; j.data.imei='';
   j.data.lockedFields = [];
   j.status='pending'; j.sent=false;
   // Unlock and clear all fields
-  const clearFields = ['customerName','address','cs','email','phone','confirmation','notes','masterCode','verbalCode','adtStatus','imei'];
+  const clearFields = ['customerName','address','cs','email','phone','confirmation','notes','masterCode','verbalCode','adtStatus','imeiNew','imeiOld'];
   clearFields.forEach(fid => {
     const el = document.getElementById(fid);
     if (el) { el.value = ''; el.readOnly = false; el.classList.remove('locked'); }
@@ -4103,6 +4118,7 @@ function openCustomerDetail(id) {
     {label:'Phone', val:c.phone, icon:'📞'},
     {label:'Email', val:c.email, icon:'✉'},
     {label:'CS #', val:c.cs, icon:'#'},
+    {label:'Current IMEI', val:c.imeiNew, icon:'📡'},
   ];
   contactFields.forEach(f => {
     if (!f.val) return;
@@ -4122,6 +4138,22 @@ function openCustomerDetail(id) {
       h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
       h += '<span style="font-size:13px;color:var(--text);flex:1;">' + esc(name) + '</span>';
       h += '<span style="font-family:Share Tech Mono,monospace;font-size:12px;color:var(--accent);">×' + qty + '</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  // IMEI History
+  if (c.imeiHistory && c.imeiHistory.length > 0) {
+    h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
+    h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">📡 IMEI HISTORY</div>';
+    c.imeiHistory.forEach(entry => {
+      const date = entry.installedDate ? new Date(entry.installedDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+      const isCurrent = c.imeiNew === entry.imei;
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
+      h += '<span style="font-family:Share Tech Mono,monospace;font-size:13px;color:var(--text);flex:1;letter-spacing:1px;">' + esc(entry.imei) + '</span>';
+      if (isCurrent) h += '<span style="font-size:9px;background:rgba(52,211,153,0.2);color:var(--green);padding:2px 6px;border-radius:3px;">CURRENT</span>';
+      h += '<span style="font-size:10px;color:var(--muted);">' + date + '</span>';
       h += '</div>';
     });
     h += '</div>';
@@ -8741,28 +8773,80 @@ function deleteImei(idx) {
   }
 }
 
+// Auto-capture IMEIs when a job completes
+function captureImeiOnComplete(j) {
+  const d = j.data;
+  // OLD IMEI → goes to tracker (pulled units for checking/reuse)
+  if (d.imeiOld && d.imeiOld.trim().length >= 5) {
+    const val = d.imeiOld.trim().replace(/[^0-9\-]/g, '');
+    if (!imeiTracker.find(x => x.imei === val)) {
+      imeiTracker.push({
+        imei: val,
+        type: 'old',
+        addedDate: new Date().toISOString(),
+        addedBy: 'auto-complete',
+        status: 'unchecked',
+        source: { jobId: j.id, customer: d.customerName, address: d.address, date: j.scheduledDate },
+        notes: 'Old unit removed from ' + (d.customerName || 'job')
+      });
+      saveImeiTracker();
+    }
+  }
+  // NEW IMEI → link to customer profile
+  if (d.imeiNew && d.imeiNew.trim().length >= 5 && d.customerName) {
+    const cust = customers.find(c => c.name && c.name.toLowerCase() === d.customerName.toLowerCase());
+    if (cust) {
+      cust.imeiNew = d.imeiNew.trim();
+      if (!cust.imeiHistory) cust.imeiHistory = [];
+      // Add to history if not already there
+      if (!cust.imeiHistory.find(h => h.imei === d.imeiNew.trim())) {
+        cust.imeiHistory.push({
+          imei: d.imeiNew.trim(),
+          installedDate: new Date().toISOString(),
+          jobId: j.id
+        });
+      }
+      saveCustomers();
+    }
+  }
+}
+
 function autoCollectImeis() {
   let added = 0;
   jobs.forEach(j => {
-    if (j.data.imei && j.data.imei.trim().length >= 5) {
-      const val = j.data.imei.trim().replace(/[^0-9\-]/g, '');
-      if (!imeiTracker.find(x => x.imei === val)) {
+    // Collect OLD IMEIs (removed units → tracker)
+    const oldImei = (j.data.imeiOld || j.data.imei || '').trim();
+    if (oldImei.length >= 5) {
+      const val = oldImei.replace(/[^0-9\-]/g, '');
+      if (val && !imeiTracker.find(x => x.imei === val)) {
         imeiTracker.push({
-          imei: val,
+          imei: val, type: 'old',
           addedDate: j.scheduledDate || new Date().toISOString(),
-          addedBy: 'auto-collect',
-          status: 'unchecked',
+          addedBy: 'auto-collect', status: 'unchecked',
           source: { jobId: j.id, customer: j.data.customerName, address: j.data.address, date: j.scheduledDate },
-          notes: 'Auto-collected from job'
+          notes: 'Old unit from ' + (j.data.customerName || 'job')
         });
         added++;
+      }
+    }
+    // Link NEW IMEIs to customer profiles
+    const newImei = (j.data.imeiNew || '').trim();
+    if (newImei.length >= 5 && j.data.customerName) {
+      const cust = customers.find(c => c.name && c.name.toLowerCase() === j.data.customerName.toLowerCase());
+      if (cust) {
+        cust.imeiNew = newImei;
+        if (!cust.imeiHistory) cust.imeiHistory = [];
+        if (!cust.imeiHistory.find(h => h.imei === newImei)) {
+          cust.imeiHistory.push({ imei: newImei, installedDate: j.scheduledDate || new Date().toISOString(), jobId: j.id });
+        }
       }
     }
   });
   if (added > 0) {
     saveImeiTracker();
+    saveCustomers();
     renderImeiList();
-    showToast('📡 Collected ' + added + ' new IMEI(s) from jobs', 'success');
+    showToast('📡 Collected ' + added + ' old IMEI(s) + linked new IMEIs to customers', 'success');
   } else {
     showToast('No new IMEIs found in jobs', 'info');
   }
@@ -8856,7 +8940,7 @@ function enhanceAriaLabels() {
 
 const _originalSaveCurrentJob = saveCurrentJob;
 saveCurrentJob = function() {
-  ['customerName','address','cs','email','phone','confirmation','masterCode','verbalCode','adtStatus','imei'].forEach(id => {
+  ['customerName','address','cs','email','phone','confirmation','masterCode','verbalCode','adtStatus','imeiNew','imeiOld'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       applyStandardFieldFormatting(el);
