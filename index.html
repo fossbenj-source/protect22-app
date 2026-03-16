@@ -1401,8 +1401,10 @@ function haptic() {}
 function blankJob() {
   return {
     id: ++jobCounter,
+    customerId: null, // Links to customer record
     sent: false,
     status: 'pending',
+    lastModified: Date.now(),
     data: {
       customerName:'', address:'', cs:'', email:'', phone:'', masterCode:'', verbalCode:'', adtStatus:'', imeiNew:'', imeiOld:'',
       confirmation:'', notes:'', installing:[], existing:[], zones:[], userCodes:[],
@@ -1410,6 +1412,56 @@ function blankJob() {
       serviceType:'', serviceIssue:'', serviceResolution:''
     }
   };
+}
+
+// ── Job/Customer Linking Helpers ──────────────────────────
+function linkJobToCustomer(job, custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  job.customerId = c.id;
+  job.data.customerName = c.name || '';
+  job.data.address = c.address || '';
+  job.data.phone = c.phone || '';
+  job.data.email = c.email || '';
+  job.data.cs = c.cs || '';
+  job.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => job.data[f]);
+}
+
+function findOpenJobForCustomer(custId, date) {
+  // Find an existing non-complete job for this customer on this date
+  return jobs.find(j => {
+    if (j.customerId !== custId) return false;
+    if (j.status === 'complete' || j.status === 'cantfinish') return false;
+    if (date && j.scheduledDate) {
+      return new Date(j.scheduledDate).toDateString() === new Date(date).toDateString();
+    }
+    return true; // Any open job for this customer
+  });
+}
+
+function findOrCreateJob(custId, date) {
+  // Try to find an existing open job first
+  const existing = custId ? findOpenJobForCustomer(custId, date) : null;
+  if (existing) return { job: existing, isNew: false };
+  // Create new
+  const j = blankJob();
+  if (custId) linkJobToCustomer(j, custId);
+  return { job: j, isNew: true };
+}
+
+// Central job update helper — always stamps lastModified on the exact job
+function updateJob(jobId, patch) {
+  const j = jobs.find(x => x.id === jobId);
+  if (!j) return null;
+  if (patch.data) Object.assign(j.data, patch.data);
+  if (patch.status !== undefined) j.status = patch.status;
+  if (patch.scheduledDate !== undefined) j.scheduledDate = patch.scheduledDate;
+  if (patch.scheduledTime !== undefined) j.scheduledTime = patch.scheduledTime;
+  if (patch.scheduledDuration !== undefined) j.scheduledDuration = patch.scheduledDuration;
+  if (patch.scheduledEndTime !== undefined) j.scheduledEndTime = patch.scheduledEndTime;
+  if (patch.sent !== undefined) j.sent = patch.sent;
+  j.lastModified = Date.now();
+  return j;
 }
 
 // ── Tabs ───────────────────────────────────────────────────
@@ -1622,6 +1674,11 @@ function saveCurrentJob() {
   if (!j) return;
   const d = j.data;
   d.customerName = document.getElementById('customerName').value;
+  // Auto-link customerId if not set and customer name matches
+  if (!j.customerId && d.customerName) {
+    const match = customers.find(c => c.name && c.name.toLowerCase() === d.customerName.toLowerCase());
+    if (match) j.customerId = match.id;
+  }
   d.masterCode = document.getElementById('masterCode') ? document.getElementById('masterCode').value : '';
   d.verbalCode = document.getElementById('verbalCode') ? document.getElementById('verbalCode').value : '';
   d.adtStatus = document.getElementById('adtStatus') ? document.getElementById('adtStatus').value : '';
@@ -2354,9 +2411,9 @@ function debouncedAutoSave() {
 }
 
 function saveToStorage() {
-  // Stamp every job with lastModified for sync conflict resolution
-  const now = Date.now();
-  jobs.forEach(j => { j.lastModified = now; });
+  // Only stamp lastModified on the active job (the one being edited)
+  const activeJob = jobs.find(j => j.id === activeJobId);
+  if (activeJob) activeJob.lastModified = Date.now();
   try {
     localStorage.setItem('p22_jobs', JSON.stringify(jobs));
     localStorage.setItem('p22_activeJobId', activeJobId);
@@ -2366,7 +2423,7 @@ function saveToStorage() {
   if (window.fbSet) {
     window.fbSet('jobs', JSON.parse(JSON.stringify(jobs)))
       .catch(e => console.warn('Firebase save failed:', e));
-    window.fbSet('meta', { activeJobId, jobCounter, lastModified: now })
+    window.fbSet('meta', { activeJobId, jobCounter, lastModified: Date.now() })
       .catch(e => {});
   }
 }
@@ -4263,7 +4320,7 @@ function renderCustomers() {
     const card = document.createElement('div');
     card.className = 'customer-card';
     const initials = c.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
-    const custJobs = jobs.filter(j => j.data && j.data.customerName === c.name);
+    const custJobs = jobs.filter(j => j.customerId === c.id || (j.data && j.data.customerName === c.name));
     const jobCount = custJobs.length;
     const lastJob = [...custJobs].sort((a,b) => new Date(b.scheduledDate||0) - new Date(a.scheduledDate||0))[0];
     const lastDate = lastJob && lastJob.scheduledDate ? new Date(lastJob.scheduledDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
@@ -4292,7 +4349,10 @@ function openCustomerDetail(id) {
   panel.id = 'customerDetailPanel';
   panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;';
 
-  const custJobs = jobs.filter(j => j.data && j.data.customerName && j.data.customerName.toLowerCase() === c.name.toLowerCase()).sort((a,b) => new Date(b.scheduledDate||b.data.date||0) - new Date(a.scheduledDate||a.data.date||0));
+  const custJobs = jobs.filter(j => {
+    if (j.customerId === c.id) return true;
+    return j.data && j.data.customerName && j.data.customerName.toLowerCase() === c.name.toLowerCase();
+  }).sort((a,b) => new Date(b.scheduledDate||b.data.date||0) - new Date(a.scheduledDate||a.data.date||0));
   const completedJobs = custJobs.filter(j => j.status === 'complete');
   const initials = c.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const totalRevenue = completedJobs.reduce((s,j) => s + getJobFee(j), 0);
@@ -4445,8 +4505,10 @@ function closeCustomerProfile() {
 
 function openProfileFromJob() {
   const j = jobs.find(x => x.id === activeJobId);
-  if (!j || !j.data.customerName) { showToast('No customer on this job', 'error'); return; }
-  const c = customers.find(x => x.name.toLowerCase() === j.data.customerName.toLowerCase());
+  if (!j) { showToast('No customer on this job', 'error'); return; }
+  // Use customerId first, fall back to name match
+  let c = j.customerId ? customers.find(x => x.id === j.customerId) : null;
+  if (!c && j.data.customerName) c = customers.find(x => x.name && x.name.toLowerCase() === j.data.customerName.toLowerCase());
   if (c) {
     openCustomerDetail(c.id);
   } else {
@@ -4488,14 +4550,10 @@ function createServiceCallFor(custId) {
   if (!c) return;
   const j = blankJob();
   j.data.jobType = 'service';
-  j.data.customerName = c.name;
-  j.data.address = c.address || '';
-  j.data.phone = c.phone || '';
-  j.data.email = c.email || '';
-  j.data.cs = c.cs || '';
-  j.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => j.data[f]);
+  linkJobToCustomer(j, custId);
   jobs.push(j);
   activeJobId = j.id;
+  j.lastModified = Date.now();
   saveToStorage();
   showScreen('job');
   renderTabs();
@@ -4517,21 +4575,25 @@ function scheduleForCustomer(id) {
 function useCustomer(id) {
   const c = customers.find(x => x.id === id);
   if (!c) return;
-  // Save whatever is currently in the form first so nothing is lost
   saveCurrentJob();
-  // Create a brand new job for this customer — never overwrite the active one
+
+  // Check if there's an existing open (non-complete) job for this customer
+  const existingJob = findOpenJobForCustomer(id, null);
+  if (existingJob) {
+    // Reuse existing job instead of creating a duplicate
+    activeJobId = existingJob.id;
+    saveToStorage();
+    renderTabs();
+    loadJob(existingJob.id);
+    showScreen('job');
+    showToast('↩ Opened existing job for ' + c.name, 'info');
+    return;
+  }
+
+  // No open job — create new
   const j = blankJob();
-  j.data.customerName = c.name || '';
-  j.data.address      = c.address || '';
-  j.data.phone        = c.phone || '';
-  j.data.email        = c.email || '';
-  j.data.cs           = c.cs || '';
-  j.data.notes        = c.notes || '';
-  // Pre-set locked fields so they lock on load
-  j.data.lockedFields = ['customerName','address','phone','email','cs'].filter(fid => {
-    const val = fid === 'customerName' ? c.name : fid === 'address' ? c.address : fid === 'phone' ? c.phone : fid === 'email' ? c.email : c.cs;
-    return val && val.trim();
-  });
+  linkJobToCustomer(j, id);
+  j.data.notes = c.notes || '';
   jobs.push(j);
   activeJobId = j.id;
   saveToStorage();
@@ -5716,20 +5778,26 @@ function createFollowUpJob(date) {
   }
   const fu = blankJob();
   fu.data.jobType = 'service';
-  fu.data.customerName = j.data.customerName;
-  fu.data.address = j.data.address;
-  fu.data.phone = j.data.phone;
-  fu.data.email = j.data.email;
-  fu.data.cs = j.data.cs;
+  // Link to same customer via ID
+  if (j.customerId) linkJobToCustomer(fu, j.customerId);
+  else {
+    fu.data.customerName = j.data.customerName;
+    fu.data.address = j.data.address;
+    fu.data.phone = j.data.phone;
+    fu.data.email = j.data.email;
+    fu.data.cs = j.data.cs;
+    fu.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => fu.data[f]);
+  }
   fu.data.notes = 'Follow-up from ' + new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}) + '. Original: ' + (j.data.notes || '').slice(0,80);
-  fu.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => fu.data[f]);
   fu.scheduledDate = date.toISOString();
   fu.scheduledTime = j.scheduledTime || '9:00 AM';
   fu.scheduledDuration = 60;
   fu.scheduledEndTime = addMinutesToTime(fu.scheduledTime, 60);
   fu.data.parentJobId = j.id;
+  fu.lastModified = Date.now();
   jobs.push(fu);
   j.data.followUpJobId = fu.id;
+  j.lastModified = Date.now();
   saveToStorage();
   updateFollowUpStatus();
   showToast('🔄 Follow-up scheduled for ' + date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), 'success');
@@ -7501,15 +7569,48 @@ function confirmScheduleJob() {
   }
 
   // Create new job only if not updating existing
+  const custIdInt = customerId ? parseInt(customerId) : null;
+  
+  // DEDUP CHECK: Is there already an open job for this customer on this date?
+  if (custIdInt) {
+    const schedDate = new Date(date + 'T12:00:00').toISOString();
+    const dupJob = jobs.find(j => 
+      j.customerId === custIdInt &&
+      j.scheduledDate && new Date(j.scheduledDate).toDateString() === new Date(schedDate).toDateString() &&
+      j.status !== 'complete' && j.status !== 'cantfinish'
+    );
+    if (dupJob) {
+      // Update existing job instead of creating duplicate
+      dupJob.scheduledTime = time;
+      dupJob.scheduledDuration = schedDuration;
+      dupJob.scheduledEndTime = addMinutesToTime(time, schedDuration);
+      if (notes) dupJob.data.notes = notes;
+      const installItems = getSchedEquipItems('install');
+      const existItems = getSchedEquipItems('exist');
+      if (installItems.length) dupJob.data.installing = installItems;
+      if (existItems.length) dupJob.data.existing = existItems.map(i => ({name:i.name||i, qty:i.qty||'1', cell:i.cell||false}));
+      dupJob.lastModified = Date.now();
+      saveToStorage();
+      closeScheduleModal();
+      calSelectedDate = new Date(dupJob.scheduledDate);
+      renderCal();
+      showToast('↩ Updated existing job for ' + (dupJob.data.customerName || 'customer') + ' at ' + time, 'info');
+      return;
+    }
+  }
+
   const j = blankJob();
   j.scheduledDate = new Date(date + 'T12:00:00').toISOString();
   j.scheduledTime = time;
   j.data.date = j.scheduledDate;
   j.data.notes = notes;
 
-  if (customerId) {
+  if (custIdInt) {
+    linkJobToCustomer(j, custIdInt);
+  } else if (customerId) {
     const c = customers.find(x => x.id === parseInt(customerId));
     if (c) {
+      j.customerId = c.id;
       j.data.customerName = c.name;
       j.data.address = c.address;
       j.data.phone = c.phone;
@@ -8792,10 +8893,10 @@ function createInstallFromAppt(fbKey) {
     showToast('Install job already exists for this appointment', 'info');
     return;
   }
-  // Auto-create customer if they don't exist
-  const existingCust = customers.find(c => c.name.toLowerCase() === (a.customerName||'').toLowerCase());
-  if (!existingCust && a.customerName) {
-    const newCust = {
+  // Auto-create customer if they don't exist, or find existing
+  let cust = customers.find(c => c.name && c.name.toLowerCase() === (a.customerName||'').toLowerCase());
+  if (!cust && a.customerName) {
+    cust = {
       id: Date.now(),
       name: a.customerName,
       address: a.address || '',
@@ -8804,41 +8905,25 @@ function createInstallFromAppt(fbKey) {
       cs: '',
       notes: 'Added from closed appointment ' + (a.date || ''),
     };
-    customers.push(newCust);
+    customers.push(cust);
     saveCustomers();
   }
-  // Create a new job in the tech system
-  const newJob = {
-    id: Date.now() + 1,
-    status: 'pending',
-    sent: false,
-    scheduledDate: a.date ? new Date(a.date).toISOString() : null,
-    scheduledTime: a.time || '',
-    scheduledDuration: 120,
-    lastModified: Date.now(),
-    data: {
-      customerName: a.customerName || '',
-      address: a.address || '',
-      phone: a.phone || '',
-      email: '',
-      cs: '',
-      notes: (a.notes ? a.notes + ' | ' : '') + 'From closer — closed ' + new Date().toLocaleDateString(),
-      installing: [],
-      existing: [],
-      zones: [],
-      arriveTime: '', finishTime: '', masterCode: '', verbalCode: '', adtStatus: '',
-      lockedFields: ['customerName','address','phone'].filter(f => {
-        if (f === 'customerName') return !!a.customerName;
-        if (f === 'address') return !!a.address;
-        if (f === 'phone') return !!a.phone;
-        return false;
-      })
-    },
-    fromAppt: fbKey
-  };
+  // Create job using proper model
+  const newJob = blankJob();
+  if (cust) linkJobToCustomer(newJob, cust.id);
+  else {
+    newJob.data.customerName = a.customerName || '';
+    newJob.data.address = a.address || '';
+    newJob.data.phone = a.phone || '';
+  }
+  newJob.scheduledDate = a.date ? new Date(a.date).toISOString() : null;
+  newJob.scheduledTime = a.time || '';
+  newJob.scheduledDuration = 120;
+  newJob.scheduledEndTime = a.time ? addMinutesToTime(a.time, 120) : '';
+  newJob.data.notes = (a.notes ? a.notes + ' | ' : '') + 'From closer — closed ' + new Date().toLocaleDateString();
+  newJob.lastModified = Date.now();
+  newJob.fromAppt = fbKey;
   jobs.push(newJob);
-  jobCounter = Math.max(jobCounter, newJob.id);
-  if (window.fbSet) window.fbSet('jobs', JSON.parse(JSON.stringify(jobs)));
   saveToStorage();
   showToast('✓ Closed! Install job + customer created for tech', 'success');
 }
