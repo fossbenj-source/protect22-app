@@ -7882,9 +7882,19 @@ function adjustTruck(i, delta) {
 }
 
 function removeTruckItem(i) {
-  truck.splice(i, 1);
-  saveTruck();
-  renderTruck();
+  const item = truck[i];
+  if (!item) return;
+  showConfirmSheet(
+    'Remove ' + item.name + ' from truck?',
+    'This removes the item from your truck inventory. Qty: ' + item.qty,
+    'Remove',
+    () => {
+      truck.splice(i, 1);
+      saveTruck();
+      renderTruck();
+      showToast(item.name + ' removed from truck', 'info');
+    }
+  );
 }
 
 // Run after init
