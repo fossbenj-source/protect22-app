@@ -1428,9 +1428,13 @@ function linkJobToCustomer(job, custId) {
   job.data.email = c.email || '';
   job.data.cs = c.cs || '';
   job.data.lockedFields = ['customerName','address','phone','email','cs'].filter(f => job.data[f]);
-  // Carry over planned equipment if job has none yet
+  // Carry over planned equipment → installing (what tech brings from truck)
   if (c.plannedEquipment && c.plannedEquipment.length > 0 && (!job.data.installing || job.data.installing.length === 0)) {
     job.data.installing = c.plannedEquipment.map(e => ({name: e.name, qty: String(e.qty || 1)}));
+  }
+  // Carry over installed equipment → existing (what's already at the house)
+  if (c.installedEquipment && c.installedEquipment.length > 0 && (!job.data.existing || job.data.existing.length === 0)) {
+    job.data.existing = c.installedEquipment.map(e => ({name: e.name, qty: String(e.qty || 1), cell: false}));
   }
 }
 
@@ -4550,13 +4554,13 @@ function openCustomerDetail(id) {
   h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
   h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">🔧 EQUIPMENT AT HOME</div>';
   
-  // Installed equipment — from customer record (source of truth), with job fallback for legacy data
+  // Installed equipment — already at the house, doesn't need to come from truck
   const custInstalled = c.installedEquipment || [];
   const displayInstalled = custInstalled.length > 0 ? custInstalled : Object.entries(allEquip).map(([name, qty]) => ({name, qty}));
   
+  h += '<div style="font-size:9px;color:var(--green);letter-spacing:1px;margin-bottom:6px;">ALREADY INSTALLED (at the house)</div>';
   if (displayInstalled.length > 0) {
-    h += '<div style="font-size:9px;color:var(--green);letter-spacing:1px;margin-bottom:6px;">INSTALLED</div>';
-    displayInstalled.forEach(item => {
+    displayInstalled.forEach((item, idx) => {
       const name = item.name;
       const qty = item.qty || 1;
       const lastDate = item.lastInstalled ? new Date(item.lastInstalled).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
@@ -4565,14 +4569,22 @@ function openCustomerDetail(id) {
       h += '<span style="font-size:12px;color:var(--text);flex:1;">' + esc(name) + '</span>';
       if (lastDate) h += '<span style="font-size:9px;color:var(--muted);">' + lastDate + '</span>';
       h += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);">×' + qty + '</span>';
+      h += '<button onclick="removeCustInstalledEquip('+c.id+','+idx+')" style="background:none;border:none;color:rgba(255,68,68,0.3);font-size:12px;cursor:pointer;padding:0 4px;">×</button>';
       h += '</div>';
     });
+  } else {
+    h += '<div style="font-size:11px;color:var(--muted);padding:4px 0;">No equipment recorded</div>';
   }
+  // Add to installed (already at house)
+  h += '<div style="display:flex;gap:6px;margin-top:6px;align-items:flex-start;">';
+  h += '<div id="custEquipComboInstalled" style="flex:1;"></div>';
+  h += '<button onclick="addCustInstalledEquipFromCombo('+c.id+')" style="background:rgba(52,211,153,0.15);border:1px solid var(--green);color:var(--green);border:none;border-radius:6px;padding:10px 8px;font-family:Share Tech Mono,monospace;font-size:9px;font-weight:bold;cursor:pointer;flex-shrink:0;height:40px;white-space:nowrap;">+ AT HOME</button>';
+  h += '</div>';
 
-  // Planned equipment stored on customer record (editable)
+  // Planned equipment — what tech needs to BRING from the truck
   const planned = c.plannedEquipment || [];
-  if (planned.length > 0 || displayInstalled.length === 0) {
-    h += '<div style="font-size:9px;color:var(--orange);letter-spacing:1px;margin:10px 0 6px;">PLANNED / NEEDED</div>';
+  h += '<div style="font-size:9px;color:var(--orange);letter-spacing:1px;margin:14px 0 6px;">PLANNED TO INSTALL (tech brings from truck)</div>';
+  if (planned.length > 0) {
     h += '<div id="custPlannedEquip">';
     planned.forEach((item, idx) => {
       h += '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
@@ -4583,12 +4595,13 @@ function openCustomerDetail(id) {
       h += '</div>';
     });
     h += '</div>';
+  } else {
+    h += '<div style="font-size:11px;color:var(--muted);padding:4px 0;">None planned</div>';
   }
-
-  // Add equipment button - searchable
-  h += '<div style="display:flex;gap:6px;margin-top:8px;align-items:flex-start;">';
+  // Add to planned (needs to come from truck)
+  h += '<div style="display:flex;gap:6px;margin-top:6px;align-items:flex-start;">';
   h += '<div id="custEquipCombo2" style="flex:1;"></div>';
-  h += '<button onclick="addCustPlannedEquipFromCombo('+c.id+',2)" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 12px;font-family:Share Tech Mono,monospace;font-size:10px;font-weight:bold;cursor:pointer;flex-shrink:0;height:40px;">ADD</button>';
+  h += '<button onclick="addCustPlannedEquipFromCombo('+c.id+',2)" style="background:rgba(251,146,60,0.15);border:1px solid var(--orange);color:var(--orange);border-radius:6px;padding:10px 8px;font-family:Share Tech Mono,monospace;font-size:9px;font-weight:bold;cursor:pointer;flex-shrink:0;height:40px;white-space:nowrap;">+ BRING</button>';
   h += '</div>';
 
   // Schedule install with this equipment
@@ -4682,11 +4695,19 @@ function openCustomerDetail(id) {
     combo1.id = 'custEquipComboEl1';
     combo1Container.appendChild(combo1);
   }
+  const comboInstalledContainer = document.getElementById('custEquipComboInstalled');
+  if (comboInstalledContainer) {
+    const comboI = createCombo('');
+    comboI.style.width = '100%';
+    comboI.querySelector('input').placeholder = 'Search equipment already at home...';
+    comboI.id = 'custEquipComboElInstalled';
+    comboInstalledContainer.appendChild(comboI);
+  }
   const combo2Container = document.getElementById('custEquipCombo2');
   if (combo2Container) {
     const combo2 = createCombo('');
     combo2.style.width = '100%';
-    combo2.querySelector('input').placeholder = 'Search equipment...';
+    combo2.querySelector('input').placeholder = 'Search equipment to bring...';
     combo2.id = 'custEquipComboEl2';
     combo2Container.appendChild(combo2);
   }
@@ -4702,6 +4723,33 @@ function closeCustomerProfile() {
   document.documentElement.style.overflow = '';
   const panel = document.getElementById('customerDetailPanel');
   if (panel) panel.remove();
+}
+
+function addCustInstalledEquipFromCombo(custId) {
+  const comboEl = document.getElementById('custEquipComboElInstalled');
+  if (!comboEl) return;
+  const input = comboEl.querySelector('input');
+  const val = comboEl.getValue ? comboEl.getValue() : (input ? input.value.trim() : '');
+  if (!val) { showToast('Select equipment first', 'error'); return; }
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+  if (!c.installedEquipment) c.installedEquipment = [];
+  const existing = c.installedEquipment.find(e => e.name === val);
+  if (existing) { existing.qty = (parseInt(existing.qty)||1) + 1; }
+  else { c.installedEquipment.push({ name: val, qty: 1, firstInstalled: new Date().toISOString(), lastInstalled: new Date().toISOString() }); }
+  saveCustomers();
+  closeCustomerProfile();
+  openCustomerDetail(custId);
+  showToast('✓ Added to installed equipment', 'success');
+}
+
+function removeCustInstalledEquip(custId, idx) {
+  const c = customers.find(x => x.id === custId);
+  if (!c || !c.installedEquipment) return;
+  c.installedEquipment.splice(idx, 1);
+  saveCustomers();
+  closeCustomerProfile();
+  openCustomerDetail(custId);
 }
 
 function addCustPlannedEquipFromCombo(custId, comboNum) {
