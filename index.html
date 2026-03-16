@@ -1530,7 +1530,13 @@ if (localStorage.getItem('p22_equipSheetUrl')) {
 
 function saveEquipCosts() {
   localStorage.setItem('p22_equipCosts', JSON.stringify(equipCosts));
-  if (window.fbSet) window.fbSet('equipCosts', equipCosts).catch(()=>{});
+  if (window.fbSet) {
+    var safeCosts = {};
+    Object.entries(equipCosts).forEach(function(entry) {
+      safeCosts[entry[0].replace(/[.#$/\[\]]/g, '_')] = entry[1];
+    });
+    window.fbSet('equipCosts', safeCosts).catch(function(){});
+  }
 }
 
 function getEquipCost(name) {
@@ -2694,8 +2700,14 @@ function fullCloudSync() {
     // Warehouse
     window.fbSet('warehouse', warehouse);
     
-    // Equipment costs
-    window.fbSet('equipCosts', equipCosts);
+    // Equipment costs — sanitize keys (Firebase doesn't allow . # $ / [ ])
+    const safeCosts = {};
+    Object.entries(equipCosts).forEach(function(entry) {
+      var k = entry[0], v = entry[1];
+      var safeKey = k.replace(/[.#$/\[\]]/g, '_');
+      safeCosts[safeKey] = v;
+    });
+    window.fbSet('equipCosts', safeCosts);
     
     // IMEI tracker
     window.fbSet('imeiTracker', imeiTracker);
@@ -9885,264 +9897,14 @@ function updatePinDots() {
   }
 }
 
-// ── Auth State ───────────────────────────────────────────
-let currentUser = null;
-let currentRole = null;
-const USERS = {
-  'benfoss12@gmail.com':     { role: 'admin',       name: 'Ben Foss',    uid: 'admin' },
-  'bfoss@chooseadair.com':   { role: 'closer',      name: 'Closer',      uid: 'closer' },
-  'bfossmarketing@gmail.com':{ role: 'callcenter',  name: 'Call Center', uid: 'callcenter' },
-};
+// ── Auth, Config, Router loaded from external files ─────
+</script>
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/router.js"></script>
+<script>
 
-function doLogin() {
-  const email = document.getElementById('loginEmail').value.trim();
-  const pass  = document.getElementById('loginPassword').value;
-  const btn   = document.getElementById('loginBtn');
-  const err   = document.getElementById('loginError');
-  err.style.display = 'none';
-  if (!email || !pass) { showLoginError('Enter your email and password'); return; }
-  btn.textContent = 'SIGNING IN...';
-  btn.disabled = true;
-
-  // The Firebase compat SDK is loaded synchronously in <head> so firebase.auth
-  // is always available by the time the user can interact with the page.
-  if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
-    // Firebase SDK couldn't load (offline, local file, blocked CDN)
-    // Offer offline mode so the app is still usable
-    showLoginError('Firebase not loaded — no internet or loaded from a local file.');
-    btn.textContent = 'SIGN IN'; btn.disabled = false;
-    // Show an offline mode button so the app is still usable
-    if (!document.getElementById('offlineModeBtn')) {
-      const wrap = btn.parentElement;
-      const offBtn = document.createElement('button');
-      offBtn.id = 'offlineModeBtn';
-      offBtn.type = 'button';
-      offBtn.textContent = '⚡ CONTINUE OFFLINE';
-      offBtn.style.cssText = 'width:100%;background:none;border:1px solid var(--yellow);color:var(--yellow);border-radius:8px;padding:13px;font-family:Share Tech Mono,monospace;font-size:13px;font-weight:bold;letter-spacing:2px;cursor:pointer;margin-top:10px;';
-      offBtn.onclick = () => {
-        document.getElementById('loginScreen').style.display = 'none';
-        try { document.getElementById('failsafeCss').remove(); } catch(e) {}
-        try { document.getElementById('forceHidden').remove(); } catch(e) {}
-        currentRole = 'tech';
-        initAppData();
-      };
-      wrap.appendChild(offBtn);
-    }
-    return;
-  }
-
-  firebase.auth().signInWithEmailAndPassword(email, pass)
-    .then(() => {
-      // onAuthStateChanged fires automatically and calls onLoginSuccess → routeUser
-      // Safety timeout: if auth state doesn't fire within 8s, reset the button
-      setTimeout(() => {
-        if (btn.disabled) {
-          btn.textContent = 'SIGN IN'; btn.disabled = false;
-          if (!currentUser) showLoginError('Sign in timed out — try again');
-        }
-      }, 8000);
-    })
-    .catch(e => {
-      console.error('Login error:', e);
-      const msg = (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials' || e.code === 'auth/invalid-credential')
-        ? 'Invalid email or password'
-        : e.code === 'auth/too-many-requests'
-        ? 'Too many attempts — wait a minute and try again'
-        : e.code === 'auth/network-request-failed'
-        ? 'Network error — check your connection'
-        : 'Sign in failed (' + (e.code||'unknown') + ')';
-      showLoginError(msg);
-      btn.textContent = 'SIGN IN'; btn.disabled = false;
-    });
-}
-
-function showLoginError(msg) {
-  const err = document.getElementById('loginError');
-  err.textContent = msg; err.style.display = 'block';
-}
-
-let appReady = false;
-let pendingUser = null;
-
-function onLoginSuccess(user) {
-  currentUser = user;
-  const u = USERS[user.email];
-  if (!u) {
-    // Reject unknown users
-    console.warn('[P22] Unauthorized user:', user.email);
-    if (typeof firebase !== 'undefined' && firebase.auth) firebase.auth().signOut().catch(()=>{});
-    const err = document.getElementById('loginError');
-    if (err) { err.textContent = 'Account not authorized. Contact admin.'; err.style.display = 'block'; }
-    const lb = document.getElementById('loginBtn');
-    if (lb) { lb.textContent = 'SIGN IN'; lb.disabled = false; }
-    currentUser = null; currentRole = null;
-    return;
-  }
-  currentRole = u.role;
-  const ls = document.getElementById('loginScreen');
-  const lb = document.getElementById('loginBtn');
-  if (lb) { lb.textContent = 'SIGN IN'; lb.disabled = false; }
-  if (ls) ls.style.display = 'none';
-  // Remove forceHidden so app views can show
-  const fh = document.getElementById('forceHidden'); if (fh) fh.remove();
-  // Always route — don't gate on appReady after first boot
-  if (!appReady) {
-    appReady = true; // Force ready on re-login
-  }
-  routeUser();
-}
-
-function routeUser() {
-  if (!currentUser) return;
-  const role = (USERS[currentUser.email] || {}).role || 'tech';
-  currentRole = role;
-  console.log('[P22] routeUser:', currentUser.email, role);
-  try {
-    if (role === 'closer') {
-      initCloserView();
-    } else if (role === 'callcenter') {
-      initCallCenterView();
-    } else {
-      initTechApp();
-    }
-  } catch(e) {
-    console.error('[P22] routeUser error:', e);
-    showToast('⚠️ App load error: ' + e.message, 'error');
-    // Fallback: just show the tech app directly
-    const fh = document.getElementById('forceHidden'); if(fh) fh.remove();
-    const ls = document.getElementById('loginScreen'); if(ls) ls.style.display = 'none';
-    const ta = document.getElementById('techApp'); if(ta) ta.style.display = 'block';
-    if (typeof initAppData === 'function') initAppData();
-  }
-}
-
-function doLogout() {
-  currentUser = null; currentRole = null;
-  // Don't reset appReady — it causes re-login to get stuck
-  if (typeof firebase !== 'undefined' && firebase.auth) {
-    firebase.auth().signOut().then(() => {
-      // After signout confirmed, show login
-      const ls = document.getElementById('loginScreen');
-      if (ls) ls.style.display = 'flex';
-      const em = document.getElementById('loginEmail');
-      const pw = document.getElementById('loginPassword');
-      const err = document.getElementById('loginError');
-      if (em) em.value = '';
-      if (pw) pw.value = '';
-      if (err) { err.style.display = 'none'; err.textContent = ''; }
-      // Hide all app views
-      ['techApp','closerApp','callCenterApp'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-      });
-    }).catch(()=>{});
-  } else {
-    const ls = document.getElementById('loginScreen');
-    if (ls) ls.style.display = 'flex';
-  }
-}
-
-function initTechApp() {
-  try {
-    const ta = document.getElementById('techApp');
-    const ca = document.getElementById('closerApp');
-    const cc = document.getElementById('callCenterApp');
-    if (!ta) { setTimeout(initTechApp, 100); return; }
-    // Remove force-hidden style and show tech app
-    const _fs = document.getElementById('forceHidden'); if(_fs) _fs.remove();
-    const ls = document.getElementById('loginScreen');
-    if (ls) ls.style.display = 'none';
-    ta.style.display = 'block';
-    if (ca) ca.style.display = 'none';
-    if (cc) cc.style.display = 'none';
-    const u = USERS[currentUser?.email] || {};
-    const lbl = document.getElementById('todayDateLabel');
-    if (lbl) lbl.textContent = (u.name||'Tech').toUpperCase() + ' · ' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-    if (typeof initAppData === 'function') {
-      initAppData();
-    } else {
-      setTimeout(initTechApp, 150);
-    }
-    // Show admin nav button only for admin role
-    const adminNav = document.getElementById('navAdmin');
-    if (adminNav) adminNav.style.display = (currentRole === 'admin') ? '' : 'none';
-  } catch(e) {
-    console.error('initTechApp error:', e);
-    document.getElementById('loginScreen').style.display = 'flex';
-  }
-}
-
-function initCloserView() {
-  const ta=document.getElementById('techApp');
-  const ca=document.getElementById('closerApp');
-  const cc=document.getElementById('callCenterApp');
-  if (!ca) { setTimeout(initCloserView, 100); return; }
-  if (ta) ta.style.display = 'none';
-  const _fs = document.getElementById('forceHidden'); if(_fs) _fs.remove();
-  const _ls2 = document.getElementById('loginScreen');
-  if (_ls2) _ls2.style.display = 'none';
-  ca.style.display = 'block';
-  if (cc) cc.style.display = 'none';
-  document.getElementById('closerDateLabel').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
-  renderCloserCalendar();
-}
-
-function initCallCenterView() {
-  const ta=document.getElementById('techApp');
-  const ca=document.getElementById('closerApp');
-  const cc=document.getElementById('callCenterApp');
-  if (!cc) { setTimeout(initCallCenterView, 100); return; }
-  if (ta) ta.style.display = 'none';
-  if (ca) ca.style.display = 'none';
-  const _fs = document.getElementById('forceHidden'); if(_fs) _fs.remove();
-  const _ls3 = document.getElementById('loginScreen');
-  if (_ls3) _ls3.style.display = 'none';
-  cc.style.display = 'block';
-  renderCallCenterView();
-}
-
-// Keyboard login support
-document.addEventListener('keydown', e => {
-  const ls = document.getElementById('loginScreen');
-  if (!ls || ls.style.display === 'none') return;
-  if (e.key === 'Enter') doLogin();
-});
-
-// ── Init ─────────────────────────────────────────────────
-// ── Firebase Auth Init ───────────────────────────────────
-function initFirebaseAuth() {
-  if (typeof firebase === 'undefined' || !firebase.auth) {
-    console.log('Firebase not available - using offline mode');
-    const ls = document.getElementById('loginScreen');
-    if (ls) ls.style.display = 'flex';
-    return;
-  }
-  try {
-    const auth = firebase.auth();
-    // Persist session — if already logged in, go straight to app
-    auth.onAuthStateChanged(user => {
-      const ls = document.getElementById('loginScreen');
-      if (user) {
-        try {
-          // onLoginSuccess has a double-fire guard — safe to always call
-          onLoginSuccess(user);
-        } catch(e) {
-          console.warn('Auth routing error:', e);
-          if (ls) ls.style.display = 'flex';
-        }
-      } else {
-        if (ls) ls.style.display = 'flex';
-        const ta = document.getElementById('techApp');
-        const ca = document.getElementById('closerApp');
-        const cc = document.getElementById('callCenterApp');
-        if (ta) ta.style.display = 'none';
-        if (ca) ca.style.display = 'none';
-        if (cc) cc.style.display = 'none';
-      }
-    });
-  } catch(e) { console.warn('Auth init failed', e); }
-}
-// end initFirebaseAuth
+// Auth functions loaded from js/config.js, js/auth.js, js/router.js
 
 document.addEventListener('DOMContentLoaded', function() {
 
