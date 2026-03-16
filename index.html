@@ -1223,7 +1223,14 @@
   <div class="sent-banner" id="sentBanner">✓ Install record already sent for this job</div>
 
   <button class="btn-summary" onclick="sendDailySummary()">📊 Send Daily Summary</button>
-  <button class="btn-clear" onclick="clearJobData()">↺ Clear This Job's Customer Data</button>
+  
+  <!-- Danger zone — collapsible to prevent fat-finger -->
+  <div style="margin-top:16px;border-top:1px solid rgba(255,68,68,0.15);padding-top:8px;">
+    <button onclick="const z=document.getElementById('dangerZone');z.style.display=z.style.display==='none'?'block':'none'" style="background:none;border:none;color:rgba(255,68,68,0.4);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;cursor:pointer;width:100%;text-align:center;padding:4px;">⚠ DANGER ZONE ▾</button>
+    <div id="dangerZone" style="display:none;padding-top:8px;">
+      <button onclick="confirmClearJobData()" style="width:100%;background:none;border:1px solid rgba(255,68,68,0.2);color:rgba(255,68,68,0.5);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;">↺ Clear This Job's Customer Data</button>
+    </div>
+  </div>
 
   <!-- spacer for floating button -->
   <div style="height:70px;"></div>
@@ -1391,6 +1398,17 @@ function esc(str) {
   return div.innerHTML;
 }
 
+// Haptic feedback — works on supported devices
+function haptic(style) {
+  try {
+    if (navigator.vibrate) {
+      if (style === 'heavy') navigator.vibrate(30);
+      else if (style === 'medium') navigator.vibrate(15);
+      else navigator.vibrate(8);
+    }
+  } catch(e) {}
+}
+
 function blankJob() {
   return {
     id: ++jobCounter,
@@ -1407,14 +1425,22 @@ function blankJob() {
 
 // ── Tabs ───────────────────────────────────────────────────
 function addJob() {
-  saveCurrentJob();
-  const j = blankJob();
-  jobs.push(j);
-  activeJobId = j.id;
-  renderTabs();
-  loadJob(j.id);
-  saveToStorage();
-  closeJobsDropdown();
+  showConfirmSheet(
+    'Create new blank job?',
+    'This adds an empty job to your list. You can also schedule a job from the calendar instead.',
+    'Create Job',
+    () => {
+      saveCurrentJob();
+      const j = blankJob();
+      jobs.push(j);
+      activeJobId = j.id;
+      renderTabs();
+      loadJob(j.id);
+      saveToStorage();
+      closeJobsDropdown();
+      showToast('New job created', 'info');
+    }
+  );
 }
 
 function switchJob(id) {
@@ -1430,6 +1456,24 @@ function switchJob(id) {
 
 function deleteJob(id, e) {
   if (e) e.stopPropagation();
+  const j = jobs.find(x => x.id === id);
+  if (!j) return;
+  const name = j.data.customerName || 'Unnamed job';
+  // Skip confirmation for blank unnamed jobs with no data
+  const isBlank = !j.data.customerName && !j.data.address && !j.data.phone && !j.data.arriveTime;
+  if (isBlank) {
+    doDeleteJob(id);
+    return;
+  }
+  showConfirmSheet(
+    'Delete ' + name + '?',
+    'This removes the job and all its data. You can undo for a few seconds after.',
+    'Delete',
+    () => doDeleteJob(id)
+  );
+}
+
+function doDeleteJob(id) {
   const deleted = jobs.find(j => j.id === id);
   if (!deleted) return;
   const deletedIndex = jobs.indexOf(deleted);
@@ -3942,8 +3986,19 @@ async function sendDailySummary() {
 }
 
 // ── Clear Job ──────────────────────────────────────────────
+function confirmClearJobData() {
+  const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
+  const name = j.data.customerName || 'this job';
+  showConfirmSheet(
+    'Clear all customer data for ' + name + '?',
+    'This removes customer info, times, codes, and notes. Equipment stays loaded. This cannot be undone.',
+    'Clear Data',
+    () => clearJobData()
+  );
+}
+
 function clearJobData() {
-  if (!confirm('Clear customer info for this job? Equipment stays loaded.')) return;
   const j=jobs.find(x=>x.id===activeJobId);
   if(!j) return;
   j.data.customerName=''; j.data.address=''; j.data.cs='';
@@ -4981,11 +5036,17 @@ function showJobsPanel(title, filteredJobs) {
 
   // Block background scrolling
   document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
 
   const panel = document.createElement('div');
   panel.id = 'statsPanel';
   panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;overscroll-behavior:contain;';
-  panel.onclick = (e) => { if(e.target===panel) { document.body.style.overflow=''; panel.remove(); } };
+  panel.onclick = (e) => { if(e.target===panel) { document.body.style.overflow=''; document.documentElement.style.overflow=''; panel.remove(); } };
+  // Block background scroll on iOS
+  panel.addEventListener('touchmove', (e) => {
+    // Only allow scrolling inside the sheet, not the overlay background
+    if (!e.target.closest('#statsPanel > div')) e.preventDefault();
+  }, {passive: false});
 
   const sorted = [...filteredJobs].sort((a,b) => {
     const da = new Date(a.scheduledDate||a.data.date||0);
@@ -5004,8 +5065,17 @@ function showJobsPanel(title, filteredJobs) {
   const closeBtn = document.createElement('button');
   closeBtn.style.cssText = 'background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;';
   closeBtn.textContent = '×';
-  closeBtn.onclick = () => { document.body.style.overflow=''; panel.remove(); };
+  closeBtn.onclick = () => { document.body.style.overflow=''; document.documentElement.style.overflow=''; panel.remove(); };
   hdr.appendChild(titleEl);
+  // Add cleanup button if there are blank jobs
+  const blanks = jobs.filter(j => !j.data.customerName && !j.data.address && !j.data.phone && !j.data.arriveTime && j.status !== 'inprogress');
+  if (blanks.length > 0) {
+    const cleanBtn = document.createElement('button');
+    cleanBtn.style.cssText = 'background:none;border:1px solid var(--orange);color:var(--orange);border-radius:4px;padding:4px 8px;font-family:Share Tech Mono,monospace;font-size:9px;cursor:pointer;margin-right:8px;';
+    cleanBtn.textContent = '🧹 ' + blanks.length + ' blank';
+    cleanBtn.onclick = () => { document.body.style.overflow=''; panel.remove(); cleanupBlankJobs(); };
+    hdr.appendChild(cleanBtn);
+  }
   hdr.appendChild(closeBtn);
 
   const body2 = document.createElement('div');
@@ -5023,7 +5093,7 @@ function showJobsPanel(title, filteredJobs) {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;';
       row.innerHTML = '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;color:var(--text);">'+esc(j.data.customerName||'Unnamed')+'</div><div style="font-size:11px;color:var(--muted);">'+esc(date)+(j.data.address?' · '+esc(j.data.address.split(',')[0]):'')+'</div></div><span style="font-size:11px;color:'+sc+';white-space:nowrap;">'+(j.status||'pending')+'</span>';
-      row.onclick = () => { document.body.style.overflow=''; switchJob(j.id); showScreen('job'); panel.remove(); };
+      row.onclick = () => { document.body.style.overflow=''; document.documentElement.style.overflow=''; switchJob(j.id); showScreen('job'); panel.remove(); };
       row.onmouseover = () => { row.style.background = 'var(--accent-dim)'; };
       row.onmouseout = () => { row.style.background = ''; };
       body2.appendChild(row);
@@ -5038,6 +5108,30 @@ function showJobsPanel(title, filteredJobs) {
 
 function showAllJobsList() {
   showJobsPanel('ALL JOBS — ' + jobs.length, jobs);
+}
+
+function cleanupBlankJobs() {
+  const blanks = jobs.filter(j => !j.data.customerName && !j.data.address && !j.data.phone && !j.data.arriveTime && j.status !== 'inprogress');
+  if (blanks.length === 0) { showToast('No blank jobs to clean up', 'info'); return; }
+  showConfirmSheet(
+    'Remove ' + blanks.length + ' blank job' + (blanks.length > 1 ? 's' : '') + '?',
+    'These are unnamed jobs with no customer data, address, or time stamps.',
+    'Remove ' + blanks.length + ' Blank Jobs',
+    () => {
+      blanks.forEach(b => { jobs = jobs.filter(j => j.id !== b.id); });
+      if (activeJobId && !jobs.find(j => j.id === activeJobId)) {
+        activeJobId = jobs.length > 0 ? jobs[jobs.length - 1].id : null;
+      }
+      saveToStorage();
+      renderTabs();
+      renderMonthCal();
+      if (activeJobId) loadJob(activeJobId);
+      showToast('✓ Removed ' + blanks.length + ' blank jobs', 'success');
+      // Refresh the panel if open
+      const panel = document.getElementById('statsPanel');
+      if (panel) { panel.remove(); showAllJobsList(); }
+    }
+  );
 }
 
 function showCompletedJobsList() {
@@ -6570,7 +6664,7 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
   function onStart(clientX, clientY) {
     startY = clientY;
     startX = clientX;
-    startTop = parseInt(el.style.top) || 0; // Original position in the events column (px)
+    startTop = parseInt(el.style.top) || 0;
     const rect = el.getBoundingClientRect();
     grabOffsetY = clientY - rect.top;
     grabOffsetX = clientX - rect.left;
@@ -6583,6 +6677,7 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     const dx = clientX - startX;
     if (!dragging && Math.hypot(dx, dy) > dragThreshold) {
       dragging = true;
+      haptic('medium');
       el.classList.add('dragging');
       document.body.style.userSelect = 'none';
       document.body.style.webkitUserSelect = 'none';
@@ -6662,6 +6757,7 @@ function addDragMoveToEvent(el, jobId, HOUR_HEIGHT, HOUR_START, containerEl) {
     }
 
     if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+    haptic('light');
     showMoveConfirm(j, newTime, newDateISO, newDateLabel, colInfo);
   }
 
@@ -7104,7 +7200,7 @@ function addResizeToEvent(el, jobId, HOUR_HEIGHT, HOUR_START) {
     startY = clientY;
     startH = el.offsetHeight;
     dragging = true;
-    // Prevent text selection during drag
+    haptic('light');
     document.body.style.userSelect = 'none';
     document.body.style.webkitUserSelect = 'none';
     el.style.opacity = '0.85';
@@ -7116,7 +7212,6 @@ function addResizeToEvent(el, jobId, HOUR_HEIGHT, HOUR_START) {
     const dy = clientY - startY;
     const newH = Math.max(30, startH + dy);
     el.style.height = newH + 'px';
-    // Show live duration
     const mins = Math.round((newH / HOUR_HEIGHT) * 60 / 15) * 15;
     const endT = addMinutesToTime(jobs.find(x=>x.id===jobId)?.scheduledTime, mins);
     const nameEl = el.querySelector('.timeline-event-name');
@@ -7126,6 +7221,7 @@ function addResizeToEvent(el, jobId, HOUR_HEIGHT, HOUR_START) {
   function onDragEnd() {
     if (!dragging) return;
     dragging = false;
+    haptic('light');
     document.body.style.userSelect = '';
     document.body.style.webkitUserSelect = '';
     el.style.opacity = '';
@@ -8394,6 +8490,8 @@ function initAppData() {
   const lbl = document.getElementById('todayDateLabel');
   if (lbl) lbl.textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
   scheduleDailySummary();
+  // Load IMEI tracker from cloud
+  loadImeiFromCloud();
   // Restore active in-progress job tracking — only if they actually arrived on site
   const inProgressJob = jobs.find(j => j.status === 'inprogress' && j.data.arriveTime && !j.data.finishTime);
   if (inProgressJob) {
@@ -9000,6 +9098,7 @@ let imeiTracker = JSON.parse(localStorage.getItem('p22_imeiTracker') || '[]');
 
 function saveImeiTracker() {
   localStorage.setItem('p22_imeiTracker', JSON.stringify(imeiTracker));
+  saveImeiToCloud();
 }
 
 function addImeiToTracker(imeiVal) {
@@ -9299,17 +9398,72 @@ async function syncImeiToSheets() {
         notes: e.notes || ''
       }))
     };
-    await fetch(IMEI_SHEETS_URL, {
+    // Use text/plain to avoid CORS preflight, Google Apps Script handles it
+    const resp = await fetch(IMEI_SHEETS_URL, {
       method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(payload)
-    });
+    }).catch(() => null);
+    // Also try no-cors as fallback (won't get response but data still arrives)
+    if (!resp || !resp.ok) {
+      await fetch(IMEI_SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+    }
     showToast('✓ ' + imeiTracker.length + ' IMEIs synced to Sheets', 'success');
   } catch(err) {
     console.error('Sheets sync error:', err);
     showToast('⚠️ Sync failed — check connection', 'error');
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// Firebase Cloud Sync for IMEI Tracker
+// ══════════════════════════════════════════════════════════
+function saveImeiToCloud() {
+  try {
+    if (typeof firebase !== 'undefined' && firebase.database) {
+      firebase.database().ref('imeiTracker').set(imeiTracker);
+    }
+  } catch(e) { console.warn('IMEI cloud save failed:', e); }
+}
+
+function loadImeiFromCloud() {
+  try {
+    if (typeof firebase !== 'undefined' && firebase.database) {
+      firebase.database().ref('imeiTracker').on('value', snap => {
+        const remote = snap.val();
+        if (!remote || !Array.isArray(remote)) return;
+        // Merge: keep all unique IMEIs from both local and remote
+        const localMap = new Map(imeiTracker.map(e => [e.imei, e]));
+        const remoteMap = new Map(remote.map(e => [e.imei, e]));
+        const allImeis = new Set([...localMap.keys(), ...remoteMap.keys()]);
+        const merged = [];
+        allImeis.forEach(imei => {
+          const local = localMap.get(imei);
+          const rem = remoteMap.get(imei);
+          if (local && !rem) merged.push(local);
+          else if (rem && !local) merged.push(rem);
+          else {
+            // Both exist — keep the one with more recent status change or addedDate
+            const lt = new Date(local.addedDate || 0).getTime();
+            const rt = new Date(rem.addedDate || 0).getTime();
+            // If status differs, prefer non-unchecked (someone checked it)
+            if (local.status !== 'unchecked' && rem.status === 'unchecked') merged.push(local);
+            else if (rem.status !== 'unchecked' && local.status === 'unchecked') merged.push(rem);
+            else merged.push(rt > lt ? rem : local);
+          }
+        });
+        if (JSON.stringify(merged) !== JSON.stringify(imeiTracker)) {
+          imeiTracker = merged;
+          saveImeiTracker(); // Save merged to localStorage
+          if (document.getElementById('imeiList')) renderImeiList(); // Refresh if on admin screen
+        }
+      });
+    }
+  } catch(e) { console.warn('IMEI cloud load failed:', e); }
 }
 
 function autoCollectImeis() {
