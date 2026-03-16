@@ -3226,6 +3226,8 @@ function finishComplete(j, finishTime) {
   renderMonthCal();
   // Auto-capture IMEIs on completion
   captureImeiOnComplete(j);
+  // Sync installed equipment back to customer record
+  syncEquipToCustomer(j);
   // Always clear active in-progress tracking when ANY job completes
   clearActiveInProgress();
   // Auto-send install record on completion
@@ -4366,7 +4368,7 @@ function openCustomerDetail(id) {
   }).sort((a,b) => new Date(b.scheduledDate||b.data.date||0) - new Date(a.scheduledDate||a.data.date||0));
   const completedJobs = custJobs.filter(j => j.status === 'complete');
   const initials = c.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
-  const totalRevenue = completedJobs.reduce((s,j) => s + getJobFee(j), 0);
+  const totalRevenue = c.totalRevenue || completedJobs.reduce((s,j) => s + getJobFee(j), 0);
 
   // Aggregate installed equipment across all completed jobs
   const allEquip = {};
@@ -4520,14 +4522,20 @@ function openCustomerDetail(id) {
   h += '<div style="padding:16px;border-bottom:1px solid var(--border);">';
   h += '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;">🔧 EQUIPMENT AT HOME</div>';
   
-  // Existing equipment from completed jobs (read-only display)
-  const equipEntries = Object.entries(allEquip);
-  if (equipEntries.length > 0) {
-    h += '<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">INSTALLED (from completed jobs)</div>';
-    equipEntries.forEach(([name, qty]) => {
+  // Installed equipment — from customer record (source of truth), with job fallback for legacy data
+  const custInstalled = c.installedEquipment || [];
+  const displayInstalled = custInstalled.length > 0 ? custInstalled : Object.entries(allEquip).map(([name, qty]) => ({name, qty}));
+  
+  if (displayInstalled.length > 0) {
+    h += '<div style="font-size:9px;color:var(--green);letter-spacing:1px;margin-bottom:6px;">INSTALLED</div>';
+    displayInstalled.forEach(item => {
+      const name = item.name;
+      const qty = item.qty || 1;
+      const lastDate = item.lastInstalled ? new Date(item.lastInstalled).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
       h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">';
       h += '<span style="color:var(--green);font-size:11px;">✓</span>';
       h += '<span style="font-size:12px;color:var(--text);flex:1;">' + esc(name) + '</span>';
+      if (lastDate) h += '<span style="font-size:9px;color:var(--muted);">' + lastDate + '</span>';
       h += '<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--accent);">×' + qty + '</span>';
       h += '</div>';
     });
@@ -4535,7 +4543,7 @@ function openCustomerDetail(id) {
 
   // Planned equipment stored on customer record (editable)
   const planned = c.plannedEquipment || [];
-  if (planned.length > 0 || equipEntries.length === 0) {
+  if (planned.length > 0 || displayInstalled.length === 0) {
     h += '<div style="font-size:9px;color:var(--orange);letter-spacing:1px;margin:10px 0 6px;">PLANNED / NEEDED</div>';
     h += '<div id="custPlannedEquip">';
     planned.forEach((item, idx) => {
@@ -9677,6 +9685,60 @@ function deleteImei(idx) {
 }
 
 // Auto-capture IMEIs when a job completes
+// Sync installed equipment from completed job back to customer record
+function syncEquipToCustomer(j) {
+  if (!j.customerId) return;
+  const c = customers.find(x => x.id === j.customerId);
+  if (!c) return;
+
+  // Initialize installed equipment on customer if needed
+  if (!c.installedEquipment) c.installedEquipment = [];
+
+  // Add installing items to customer's installed equipment
+  const installing = (j.data.installing || []).filter(i => i && (typeof i === 'object' ? i.name : i));
+  installing.forEach(item => {
+    const name = typeof item === 'object' ? item.name : item;
+    const qty = parseInt(typeof item === 'object' ? item.qty : '1') || 1;
+    const existing = c.installedEquipment.find(e => e.name === name);
+    if (existing) {
+      existing.qty = (parseInt(existing.qty) || 0) + qty;
+      existing.lastInstalled = new Date().toISOString();
+    } else {
+      c.installedEquipment.push({
+        name: name,
+        qty: qty,
+        firstInstalled: new Date().toISOString(),
+        lastInstalled: new Date().toISOString()
+      });
+    }
+  });
+
+  // Remove planned equipment that was just installed
+  if (c.plannedEquipment && c.plannedEquipment.length > 0) {
+    installing.forEach(item => {
+      const name = typeof item === 'object' ? item.name : item;
+      const idx = c.plannedEquipment.findIndex(p => p.name === name);
+      if (idx >= 0) c.plannedEquipment.splice(idx, 1);
+    });
+  }
+
+  // Track revenue on customer
+  const fee = getJobFee(j);
+  if (fee > 0) {
+    if (!c.totalRevenue) c.totalRevenue = 0;
+    c.totalRevenue += fee;
+    if (!c.revenueHistory) c.revenueHistory = [];
+    c.revenueHistory.push({
+      date: new Date().toISOString(),
+      amount: fee,
+      jobId: j.id,
+      jobType: j.data.jobType || 'install'
+    });
+  }
+
+  saveCustomers();
+}
+
 function captureImeiOnComplete(j) {
   const d = j.data;
   // OLD IMEI → goes to tracker (pulled units for checking/reuse)
