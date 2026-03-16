@@ -2479,15 +2479,39 @@ function refreshData() {
 // ── Status ─────────────────────────────────────────────────
 function setStatus(s, save=true) {
   const j = jobs.find(x => x.id === activeJobId);
+  if (!j) return;
   const wasComplete = j && j.status === 'complete';
-  if (j) j.status = s;
+  // Toggle: if tapping the already-active In Progress, confirm reset
+  if (j.status === s && s === 'inprogress') {
+    showConfirmSheet(
+      'Stop In Progress?',
+      'This resets the job to Pending and clears the arrive time.',
+      'Reset to Pending',
+      () => {
+        j.status = 'pending';
+        j.data.arriveTime = '';
+        const arrInput = document.getElementById('arriveInput');
+        if (arrInput) arrInput.value = '';
+        const btnA = document.getElementById('btnArrive');
+        if (btnA) btnA.className = 'time-btn';
+        stopLiveTimer();
+        clearActiveInProgress();
+        updateActiveJobBanner();
+        const btnI = document.getElementById('btnInProgress');
+        if (btnI) btnI.className = 'status-btn';
+        renderTabs(); saveToStorage(); renderMonthCal();
+        showToast('Job reset to Pending', 'info');
+      }
+    );
+    return;
+  }
+  j.status = s;
   const btnI = document.getElementById('btnInProgress');
   const btnCo = document.getElementById('btnComplete');
   const btnC = document.getElementById('btnCantFinish');
-  if (btnI) btnI.className = 'status-btn' + (s==='inprogress' ? ' active-inprogress' : '');
-  if (btnCo) btnCo.className = 'status-btn' + (s==='complete' ? ' active-complete' : '');
-  if (btnC) btnC.className = 'status-btn' + (s==='cantfinish' ? ' active-cantfinish' : '');
-  // Deduction now handled via confirmation modal — not auto-triggered
+  if (btnI) btnI.className = 'status-btn' + (j.status==='inprogress' ? ' active-inprogress' : '');
+  if (btnCo) btnCo.className = 'status-btn' + (j.status==='complete' ? ' active-complete' : '');
+  if (btnC) btnC.className = 'status-btn' + (j.status==='cantfinish' ? ' active-cantfinish' : '');
   if (save) { renderTabs(); saveToStorage(); if(typeof renderMonthCal==='function') renderMonthCal(); }
 }
 
@@ -4367,7 +4391,7 @@ function openCustomerDetail(id) {
 
   const panel = document.createElement('div');
   panel.id = 'customerDetailPanel';
-  panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;';
+  panel.style.cssText = 'position:fixed;inset:0;z-index:40000;background:var(--bg);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;';
 
   const custJobs = jobs.filter(j => {
     if (j.customerId === c.id) return true;
