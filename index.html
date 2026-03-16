@@ -1384,6 +1384,7 @@ const EQUIPMENT = [
   "ADC-ADC-T2000 SMART THERMOSTAT",
   "ADC-INDR 1080P WI-FI CAM 117 FIELD"
 ];
+const equipmentList = EQUIPMENT; // Alias for customer card equipment dropdown
 
 // ── State ──────────────────────────────────────────────────
 let jobs = [], activeJobId = null, jobCounter = 0;
@@ -3687,12 +3688,13 @@ document.addEventListener('click', e => { if(openDropdown&&!e.target.closest('.c
 function addInstallingRow(val, qty) {
   const c=document.getElementById('installingRows');
   const row=document.createElement('div'); row.className='list-row';
-  row.style.cssText='background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;';
-  // Line 1: full-width equipment name
+  row.style.cssText='display:flex;flex-direction:column;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;';
+  // Line 1: full-width equipment name — same size as existing
   const combo=createCombo(val);
-  combo.style.width='100%';
-  combo.querySelector('input').style.fontSize='14px';
-  combo.querySelector('input').addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addInstallingRow();setTimeout(()=>{const ins=c.querySelectorAll('.combo-wrap input');ins[ins.length-1].focus();},50);} });
+  combo.style.cssText='width:100%;';
+  const comboInput = combo.querySelector('input');
+  comboInput.style.cssText += 'font-size:14px;width:100%;box-sizing:border-box;';
+  comboInput.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addInstallingRow();setTimeout(()=>{const ins=c.querySelectorAll('.combo-wrap input');ins[ins.length-1].focus();},50);} });
   // Line 2: qty + remove — right-aligned, under the name
   const controlRow=document.createElement('div');
   controlRow.style.cssText='display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:flex-end;';
