@@ -1473,7 +1473,12 @@ const DEFAULT_EQUIP_COSTS = {
 })();
 
 // Google Sheet equipment sync
-const EQUIP_SHEET_URL = localStorage.getItem('p22_equipSheetUrl') || '';
+const EQUIP_SHEET_URL = localStorage.getItem('p22_equipSheetUrl') || 'https://script.google.com/macros/s/AKfycbxcD3PGwIR3XiDfn81XGWK8mZk7_2s73lnw9Jx1t7QVo-St9CkegyXrjKMYHng7uW5aVw/exec';
+
+// Set it in localStorage if not already there
+if (!localStorage.getItem('p22_equipSheetUrl')) {
+  localStorage.setItem('p22_equipSheetUrl', 'https://script.google.com/macros/s/AKfycbxcD3PGwIR3XiDfn81XGWK8mZk7_2s73lnw9Jx1t7QVo-St9CkegyXrjKMYHng7uW5aVw/exec');
+}
 
 async function syncEquipmentFromSheet(silent) {
   const url = localStorage.getItem('p22_equipSheetUrl') || '';
