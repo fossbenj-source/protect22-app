@@ -809,9 +809,14 @@
     </div>
 
     <!-- Reports button -->
-    <button onclick="showReportsDashboard()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;">
-      📊 VIEW REPORTS & STATS
-    </button>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button onclick="showReportsDashboard()" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;display:flex;align-items:center;justify-content:center;gap:6px;">
+        📊 REPORTS
+      </button>
+      <button id="attentionBtn" onclick="showJobPool()" style="flex:1;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:8px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px;display:flex;align-items:center;justify-content:center;gap:6px;">
+        ⚠ NEEDS ATTENTION <span id="attentionCount" style="background:var(--orange);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:bold;">0</span>
+      </button>
+    </div>
 
     <!-- Schedule Job button -->
     <button class="btn-today-add" onclick="openScheduleModal()" style="margin-bottom:14px;">+ Schedule Job</button>
@@ -2898,6 +2903,30 @@ function showDeductConfirmModal(j, finishTime) {
     });
   }
 
+  // Needs attention checkboxes
+  const flagSection = document.createElement('div');
+  flagSection.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;';
+  flagSection.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--orange);letter-spacing:2px;margin-bottom:8px;">⚠ FLAG ISSUES (optional)</div>';
+  const flags = [
+    {id:'flag_missing', label:'Missing equipment — needs return', icon:'📦'},
+    {id:'flag_badservice', label:'Service issue — needs redo', icon:'🔧'},
+    {id:'flag_followup', label:'Customer needs follow-up call', icon:'📞'},
+    {id:'flag_parts', label:'Waiting on parts', icon:'⏳'},
+  ];
+  flags.forEach(f => {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--text);';
+    row.innerHTML = '<input type="checkbox" id="'+f.id+'" style="width:18px;height:18px;accent-color:var(--orange);"> <span>'+f.icon+' '+f.label+'</span>';
+    flagSection.appendChild(row);
+  });
+  // Notes for flags
+  const flagNotes = document.createElement('input');
+  flagNotes.type = 'text';
+  flagNotes.placeholder = 'Details (e.g. missing smoke detector, need stickypad)...';
+  flagNotes.style.cssText = 'width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px;outline:none;margin-top:8px;box-sizing:border-box;';
+  flagSection.appendChild(flagNotes);
+  sheet.appendChild(flagSection);
+
   // Buttons
   const btnWrap = document.createElement('div');
   btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:16px;';
@@ -2906,7 +2935,6 @@ function showDeductConfirmModal(j, finishTime) {
   confirmBtn.style.cssText = 'width:100%;background:linear-gradient(135deg,var(--green),#00a86b);color:#000;border:none;border-radius:8px;padding:13px;font-family:Share Tech Mono,monospace;font-size:12px;font-weight:bold;letter-spacing:2px;cursor:pointer;';
   confirmBtn.textContent = '✓ COMPLETE & DEDUCT FROM TRUCK';
   confirmBtn.onclick = () => {
-    // Apply deductions
     itemData.forEach(({ name, usedInput }) => {
       const used = parseInt(usedInput.value) || 0;
       if (used === 0) return;
@@ -2915,6 +2943,7 @@ function showDeductConfirmModal(j, finishTime) {
     });
     saveTruck();
     renderTruck();
+    applyJobFlags(j, flags, flagNotes.value);
     finishComplete(j, finishTime);
     overlay.remove();
     showToast('✓ Complete — truck updated!', 'success');
@@ -2924,6 +2953,7 @@ function showDeductConfirmModal(j, finishTime) {
   skipBtn.style.cssText = 'width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-family:Share Tech Mono,monospace;font-size:11px;cursor:pointer;letter-spacing:1px;';
   skipBtn.textContent = 'COMPLETE WITHOUT UPDATING TRUCK';
   skipBtn.onclick = () => {
+    applyJobFlags(j, flags, flagNotes.value);
     finishComplete(j, finishTime);
     overlay.remove();
     showToast('✓ Job complete — truck stock unchanged', 'info');
@@ -2940,6 +2970,130 @@ function showDeductConfirmModal(j, finishTime) {
   sheet.appendChild(btnWrap);
   overlay.appendChild(sheet);
   document.body.appendChild(overlay);
+}
+
+// ══════════════════════════════════════════════════════════
+// Job Flags & Needs Attention Pool
+// ══════════════════════════════════════════════════════════
+function applyJobFlags(j, flagDefs, flagNote) {
+  const activeFlags = [];
+  flagDefs.forEach(f => {
+    const cb = document.getElementById(f.id);
+    if (cb && cb.checked) activeFlags.push(f.label);
+  });
+  if (activeFlags.length > 0 || flagNote) {
+    if (!j.data.flags) j.data.flags = [];
+    j.data.flags.push({
+      date: new Date().toISOString(),
+      issues: activeFlags,
+      note: flagNote || '',
+      resolved: false
+    });
+    j.data.needsAttention = true;
+  }
+}
+
+function getJobsNeedingAttention() {
+  return jobs.filter(j => {
+    if (j.data.needsAttention && j.data.flags && j.data.flags.some(f => !f.resolved)) return true;
+    if (j.status === 'cantfinish') return true;
+    return false;
+  });
+}
+
+function resolveJobFlag(jobId, flagIdx) {
+  const j = jobs.find(x => x.id === jobId);
+  if (!j || !j.data.flags || !j.data.flags[flagIdx]) return;
+  j.data.flags[flagIdx].resolved = true;
+  // Check if all flags resolved
+  if (j.data.flags.every(f => f.resolved)) j.data.needsAttention = false;
+  saveToStorage();
+  showJobPool();
+  showToast('✓ Flag resolved', 'success');
+}
+
+function showJobPool() {
+  const existing = document.getElementById('jobPoolOverlay');
+  if (existing) existing.remove();
+  document.body.style.overflow = 'hidden';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'jobPoolOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;overscroll-behavior:contain;';
+  overlay.onclick = e => { if (e.target === overlay) { document.body.style.overflow=''; overlay.remove(); } };
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:780px;margin:0 auto;max-height:85vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));';
+
+  const attentionJobs = getJobsNeedingAttention();
+
+  let h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">';
+  h += '<div style="font-family:Share Tech Mono,monospace;font-size:14px;color:var(--orange);letter-spacing:2px;">⚠ NEEDS ATTENTION — ' + attentionJobs.length + '</div>';
+  h += '<button onclick="document.body.style.overflow=\'\';document.getElementById(\'jobPoolOverlay\').remove()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">×</button>';
+  h += '</div>';
+
+  if (attentionJobs.length === 0) {
+    h += '<div style="text-align:center;padding:30px;color:var(--green);font-size:14px;">✓ All clear — no jobs need attention</div>';
+  } else {
+    attentionJobs.forEach(j => {
+      const name = j.data.customerName || 'Unnamed';
+      const date = j.scheduledDate ? new Date(j.scheduledDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+      const sc = j.status === 'cantfinish' ? 'var(--red)' : 'var(--orange)';
+      const jobType = j.data.jobType === 'service' ? 'SVC' : 'INSTALL';
+
+      h += '<div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid ' + sc + ';border-radius:8px;padding:12px;margin-bottom:10px;">';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+      h += '<span style="font-weight:700;font-size:14px;color:var(--text);flex:1;">' + esc(name) + '</span>';
+      h += '<span style="font-size:9px;background:rgba(251,146,60,0.2);color:var(--orange);padding:2px 6px;border-radius:3px;">' + jobType + '</span>';
+      h += '<span style="font-size:10px;color:var(--muted);">' + date + '</span>';
+      h += '<span style="font-size:11px;color:' + sc + ';">' + (j.status || 'pending') + '</span>';
+      h += '</div>';
+
+      if (j.data.address) h += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">📍 ' + esc(j.data.address.split(',')[0]) + '</div>';
+
+      // Show flags
+      if (j.data.flags) {
+        j.data.flags.forEach((flag, idx) => {
+          if (flag.resolved) return;
+          flag.issues.forEach(issue => {
+            h += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;">';
+            h += '<span style="font-size:11px;color:var(--orange);">⚠ ' + esc(issue) + '</span>';
+            h += '</div>';
+          });
+          if (flag.note) {
+            h += '<div style="font-size:11px;color:var(--muted);font-style:italic;padding:2px 0;">📝 ' + esc(flag.note) + '</div>';
+          }
+          h += '<div style="display:flex;gap:6px;margin-top:6px;">';
+          h += '<button onclick="resolveJobFlag(' + j.id + ',' + idx + ')" style="background:rgba(52,211,153,0.15);border:1px solid var(--green);color:var(--green);border-radius:6px;padding:6px 12px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">✓ Resolved</button>';
+          h += '<button onclick="document.body.style.overflow=\'\';document.getElementById(\'jobPoolOverlay\').remove();createFollowUpFromFlag(' + j.id + ')" style="background:rgba(77,201,246,0.15);border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:6px 12px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">📅 Schedule Return</button>';
+          h += '<button onclick="document.body.style.overflow=\'\';document.getElementById(\'jobPoolOverlay\').remove();switchJob(' + j.id + ');showScreen(\'job\')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:6px 12px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">Open Job</button>';
+          h += '</div>';
+        });
+      }
+
+      if (j.status === 'cantfinish' && (!j.data.flags || j.data.flags.length === 0)) {
+        h += '<div style="font-size:11px;color:var(--red);margin-bottom:4px;">⚠ Couldn\'t finish — no flags set</div>';
+        h += '<div style="display:flex;gap:6px;margin-top:6px;">';
+        h += '<button onclick="document.body.style.overflow=\'\';document.getElementById(\'jobPoolOverlay\').remove();switchJob(' + j.id + ');showScreen(\'job\')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:6px 12px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">Open Job</button>';
+        h += '<button onclick="document.body.style.overflow=\'\';document.getElementById(\'jobPoolOverlay\').remove();createFollowUpFromFlag(' + j.id + ')" style="background:rgba(77,201,246,0.15);border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:6px 12px;font-family:Share Tech Mono,monospace;font-size:10px;cursor:pointer;">📅 Schedule Return</button>';
+        h += '</div>';
+      }
+
+      h += '</div>';
+    });
+  }
+
+  sheet.innerHTML = h;
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+function createFollowUpFromFlag(jobId) {
+  const j = jobs.find(x => x.id === jobId);
+  if (!j) return;
+  // Use existing follow-up system
+  activeJobId = jobId;
+  scheduleFollowUp(1); // Default to tomorrow
 }
 
 function finishComplete(j, finishTime) {
@@ -4532,7 +4686,9 @@ function renderDayTimeline(d) {
           return '<div style="color:var(--red);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">❌ '+short+'</div>';
         }).join('');
     }
-    const hasWarning = jobStockStatus.hasCumulativeShortfall;
+    const hasStockWarning = jobStockStatus.hasCumulativeShortfall;
+    const hasAttentionFlag = j.data.needsAttention && j.data.flags && j.data.flags.some(f => !f.resolved);
+    const hasWarning = hasStockWarning || hasAttentionFlag;
     // Build equipment pills showing cumulative stock status
     let equipPills = '';
     if (heightPx > 55 && installingItems.length > 0) {
@@ -4734,6 +4890,12 @@ function updateTodayStats() {
     if (window.firebaseReady) { sync.textContent = '⬤ Synced'; sync.style.color = 'var(--green)'; }
     else { sync.textContent = '⬤ Local'; sync.style.color = 'var(--muted)'; }
   }
+  // Update needs-attention count
+  const attCount = getJobsNeedingAttention().length;
+  const attEl = document.getElementById('attentionCount');
+  const attBtn = document.getElementById('attentionBtn');
+  if (attEl) attEl.textContent = attCount;
+  if (attBtn) attBtn.style.display = attCount > 0 ? 'flex' : 'none';
 }
 
 // ── Today's Job Cards (top of today screen) ─────────────
@@ -7554,6 +7716,25 @@ function loadSettingsScreen() {
   }
   // Load template editor
   loadTemplateEditor();
+  // AI settings (admin only)
+  const aiCard = document.getElementById('aiSettingsCard');
+  if (aiCard) aiCard.style.display = (currentRole === 'admin') ? 'block' : 'none';
+  const apiKeyEl = document.getElementById('settingsAnthropicKey');
+  if (apiKeyEl) {
+    const saved = localStorage.getItem('p22_anthropicKey') || '';
+    apiKeyEl.value = saved ? '••••••••' + saved.slice(-8) : '';
+  }
+}
+
+function saveAnthropicKey() {
+  const el = document.getElementById('settingsAnthropicKey');
+  if (!el) return;
+  const val = el.value.trim();
+  if (!val || val.startsWith('••')) { showToast('Enter your full API key', 'error'); return; }
+  if (!val.startsWith('sk-ant-')) { showToast('Key should start with sk-ant-', 'error'); return; }
+  localStorage.setItem('p22_anthropicKey', val);
+  el.value = '••••••••' + val.slice(-8);
+  showToast('✓ API key saved', 'success');
 }
 
 // Override PIN check to use settings PIN if set
@@ -8831,32 +9012,62 @@ async function aiExtractImei(event, targetFieldId) {
   if (!file) return;
   event.target.value = '';
 
+  // Check for API key
+  const apiKey = localStorage.getItem('p22_anthropicKey') || '';
+  if (!apiKey) {
+    showToast('⚠️ Set your Anthropic API key in Settings first', 'error');
+    return;
+  }
+
   showToast('🤖 Analyzing photo for IMEI...', 'info');
 
   try {
-    // Convert to base64
+    // Convert to base64, compress if needed
     const base64 = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result.split(',')[1]);
-      r.onerror = () => rej(new Error('Read failed'));
-      r.readAsDataURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 1024;
+        const scale = Math.min(maxW / img.width, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        res(dataUrl.split(',')[1]);
+      };
+      img.onerror = () => rej(new Error('Image load failed'));
+      img.src = URL.createObjectURL(file);
     });
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 500,
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 } },
-            { type: 'text', text: 'Extract ALL IMEI numbers, serial numbers, and ICCID numbers from this image. Return ONLY a JSON array of objects like: [{"type":"IMEI","value":"35380511-1327461"},{"type":"Serial","value":"ABC123"}]. If no numbers found, return []. No other text.' }
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+            { type: 'text', text: 'Read this label. Extract ALL IMEI numbers, serial numbers (SN), and ICCID numbers. Return ONLY a JSON array like: [{"type":"IMEI","value":"35380511-0405668"},{"type":"SN","value":"20430900..."}]. Numbers only, no spaces. If none found return []. No other text.' }
           ]
         }]
       })
     });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error('API error:', response.status, errBody);
+      if (response.status === 401) showToast('⚠️ Invalid API key — check Settings', 'error');
+      else showToast('⚠️ API error: ' + response.status, 'error');
+      return;
+    }
 
     const data = await response.json();
     const text = data.content?.map(c => c.text || '').join('') || '';
@@ -9389,6 +9600,21 @@ Jane Doe, "456 Oak Ave, Mesa, AZ", (555) 987-6543, jane@email.com, CS67890,</div
           <input type="file" accept=".csv,.txt" onchange="importCustomerCSV(event)" style="display:none;">
         </label>
         <button onclick="clearAllData()" style="width:100%;background:none;border:1px solid rgba(255,68,68,0.4);color:rgba(255,68,68,0.8);border-radius:8px;padding:11px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;">🗑 CLEAR ALL DATA</button>
+      </div>
+    </div>
+
+    <!-- AI Settings (admin only) -->
+    <div class="card" id="aiSettingsCard" style="display:none;">
+      <div class="card-head"><span>🤖</span><h2>AI Settings</h2></div>
+      <div class="card-body">
+        <div class="field">
+          <label>Anthropic API Key (for IMEI photo scanning)</label>
+          <div style="display:flex;gap:6px;">
+            <input type="password" id="settingsAnthropicKey" placeholder="sk-ant-..." style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;padding:10px;outline:none;">
+            <button onclick="saveAnthropicKey()" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 14px;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:bold;cursor:pointer;">SAVE</button>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px;">Get your key at console.anthropic.com. Used for 🤖 photo IMEI extraction. Stored locally only.</div>
+        </div>
       </div>
     </div>
 
