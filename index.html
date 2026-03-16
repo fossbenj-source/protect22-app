@@ -1398,16 +1398,8 @@ function esc(str) {
   return div.innerHTML;
 }
 
-// Haptic feedback — works on supported devices
-function haptic(style) {
-  try {
-    if (navigator.vibrate) {
-      if (style === 'heavy') navigator.vibrate(30);
-      else if (style === 'medium') navigator.vibrate(15);
-      else navigator.vibrate(8);
-    }
-  } catch(e) {}
-}
+// Haptic placeholder — no-op (iOS doesn't support web haptics)
+function haptic() {}
 
 function blankJob() {
   return {
@@ -2747,17 +2739,13 @@ let pendingRescheduleJob = null;
 
 function enterReschedulePlacementMode(sourceJob) {
   pendingRescheduleJob = sourceJob;
-  // Also store ID in case of re-render
 
   // Go to Today tab / calendar
   showScreen('today');
-  // Show week view - start from NEXT week so future slots are visible
+  // Show week view - stay on current week
   const today = new Date();
-  // Move calDate to next week's Sunday
-  const nextWeek = new Date(today);
-  nextWeek.setDate(today.getDate() + (7 - today.getDay()));
-  calDate = nextWeek;
-  calSelectedDate = nextWeek;
+  calDate = today;
+  calSelectedDate = today;
   renderMonthCal();
   // Switch to week view
   setCalView('week');
@@ -4714,8 +4702,8 @@ function renderDayTimeline(d) {
 
   dayJobs.forEach(j => {
     const time = j.scheduledTime || (j.data && j.data.arriveTime);
-    const mins = timeToMinutes(time);
-    if (mins===null) return;
+    let mins = timeToMinutes(time);
+    if (mins === null) mins = 540; // Default to 9 AM if time can't be parsed
     const topPx=((mins/60)-HOUR_START)*HOUR_HEIGHT;
     const dur=j.scheduledDuration||60;
     const heightPx=Math.max(28,(dur/60)*HOUR_HEIGHT);
@@ -7100,18 +7088,20 @@ function showJobContextMenu(jobId, el) {
   hdr.textContent = (j.data.customerName||j.scheduledTime||'Unnamed Job') + (j.data.customerName&&j.scheduledTime?' · '+j.scheduledTime:'');
   sheet.appendChild(hdr);
 
-  // Action buttons
+  // Action buttons — different options based on job status
+  const isComplete = j.status === 'complete' || j.status === 'cantfinish';
   const actions = [
     { icon:'👁', label:'Quick Peek', color:'var(--text)', fn:() => { menu.remove(); showQuickPeek(jobId); }},
-    { icon:'📋', label:'Open Job', color:'var(--accent)', fn:() => { switchJob(jobId); showScreen('job'); menu.remove(); const cn = document.getElementById('customerName'); if(cn && !cn.value) setTimeout(()=>cn.focus(),200); }},
-    { icon:'📅', label:'Reschedule', color:'var(--muted)', fn:() => {
+    { icon:'📋', label:'Open Job', color:'var(--accent)', fn:() => { switchJob(jobId); showScreen('job'); menu.remove(); }},
+  ];
+  
+  if (!isComplete) {
+    actions.push({ icon:'📅', label:'Reschedule', color:'var(--muted)', fn:() => {
       menu.remove();
-      // Enter placement mode with THIS job
       enterReschedulePlacementMode(j);
-    }},
-    { icon:'🗑️', label:'Remove from Schedule', color:'var(--red)', fn:() => {
+    }});
+    actions.push({ icon:'🗑️', label:'Remove from Schedule', color:'var(--red)', fn:() => {
       menu.remove();
-      // Use inline confirm sheet instead of window.confirm (blocked in PWA)
       showConfirmSheet(
         'Remove ' + (j.data.customerName||'this job') + ' from schedule?',
         'This keeps the job and all customer data — just removes it from the calendar.',
@@ -7121,16 +7111,15 @@ function showJobContextMenu(jobId, el) {
           j.scheduledTime = null;
           j.scheduledEndTime = null;
           j.scheduledDuration = null;
-          j.status = 'pending';
           saveToStorage();
-          renderMonthCal();
-          renderDayTimeline(calSelectedDate);
-          renderWeekTimeline();
+          renderCal();
           showToast((j.data.customerName||'Job') + ' removed from schedule', 'info');
         }
       );
-    }},
-  ];
+    }});
+  } else {
+    actions.push({ icon:'📊', label:'View in History', color:'var(--muted)', fn:() => { menu.remove(); showScreen('history'); }});
+  }
 
   actions.forEach(a => {
     const btn = document.createElement('button');
