@@ -1248,8 +1248,8 @@
 
 <script>
 emailjs.init("A1vvWPOF9gjT480_A");
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyMxJeWLlp5GWa8rpCqbUWc-fLXd4xXdfGHZQ0oUeCfFH5Fb7lQjvt1iadUZALPWlQL/exec";
-const IMEI_SHEETS_URL = "https://script.google.com/macros/s/AKfycbwsall5HhnQQz1jz_BrxYH8_wBsGlbESj3H_ZVyN4nGz_AuT0CFjqbFOq4CBZSOy-Ew/exec";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyLEqQem1zV98nmCS741KWA3reMacsIEv1NLLpDzaRYqY0QxJ6dZsyRCcWfumClJUTF/exec";
+const IMEI_SHEETS_URL = "https://script.google.com/macros/s/AKfycbwUeiCSqydVppW9pwd18cBJv4KG6qwdipZBAdVvnS-vAHEOO5LHkNsd7bgBtD0qOZ6E/exec";
 let INSTALL_FEE = (() => { try { const s = JSON.parse(localStorage.getItem('p22_settings')||'{}'); return s.installFee || 150; } catch(e) { return 150; } })();
 const DEFAULT_EMAIL_RECIPIENT = 'bfoss@bridgepointservice.com';
 function getEmailRecipient() {
@@ -3536,13 +3536,22 @@ async function autoSendRecord(j) {
     await emailjs.send('service_ody8c3i', 'template_rzxkses', {
       to_email: getEmailRecipient(),
       customer_name: data.customer, install_date: data.date,
+      job_type: data.jobType.toUpperCase(),
       installing: data.installing, existing_equipment: data.existing,
       cs_number: data.cs, customer_email: data.email,
       customer_phone: data.phone, confirmation: data.confirmation,
       zones: data.zones, address: data.address, notes: data.notes,
       status: data.status, arrive_time: data.arriveTime, finish_time: data.finishTime,
-      fees: data.fees, verbal_code: data.verbalCode || '—', master_code: data.masterCode || '—',
-      user_codes: data.userCodes || '—'
+      time_on_site: data.timeOnSite,
+      fees: data.fees, equipment_cost: data.equipmentCost ? '$'+data.equipmentCost.toFixed(2) : '—',
+      verbal_code: data.verbalCode || '—', master_code: data.masterCode || '—',
+      user_codes: data.userCodes || '—',
+      imei_new: data.imeiNew, imei_old: data.imeiOld,
+      adt_status: data.adtStatus,
+      account_type: data.accountType || '—',
+      service_type: data.serviceType || '—',
+      service_issue: data.serviceIssue || '—',
+      service_resolution: data.serviceResolution || '—'
     });
     await logToSheets(data);
     j.sent = true;
@@ -4140,7 +4149,7 @@ function loadUserCodes(codes) {
 function collectData() {
   const j = jobs.find(x => x.id === activeJobId) || {};
   const d = j.data || {};
-  const installing=[...document.getElementById('installingRows').querySelectorAll('.list-row')]
+  const installing=[...document.getElementById('installingRows').querySelectorAll('.equip-item')]
     .map(r=>{ const name=r.querySelector('.combo-wrap').getValue(); const qty=r.querySelector('.qty-input').value||'1'; return name?(qty>1?`${name} (x${qty})`:name):null; }).filter(Boolean);
   const existing=[...document.getElementById('existingRows').querySelectorAll('.equip-item')]
     .map(item=>{
@@ -4153,6 +4162,33 @@ function collectData() {
       return `${name}${qtyStr}${f?' ['+f+']':''}`;
     }).filter(Boolean);
   const zones=[...document.getElementById('zoneRows').querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean);
+
+  // Equipment cost (admin)
+  const equipCostTotal = getJobEquipmentCost(j);
+
+  // IMEI data
+  const imeiNew = document.getElementById('imeiNew') ? document.getElementById('imeiNew').value.trim() : '';
+  const imeiOld = document.getElementById('imeiOld') ? document.getElementById('imeiOld').value.trim() : '';
+
+  // Job type
+  const jobType = d.jobType || 'install';
+
+  // Service fields
+  const serviceType = d.serviceType || '';
+  const serviceIssue = d.serviceIssue || '';
+  const serviceResolution = d.serviceResolution || '';
+
+  // Time on site
+  let timeOnSite = '—';
+  if (d.arriveTime && d.finishTime) {
+    timeOnSite = calcTimeOnSite(d.arriveTime, d.finishTime) || '—';
+  }
+
+  // Customer record
+  const cust = j.customerId ? customers.find(c => c.id === j.customerId) : null;
+  const accountType = cust?.accountType || '';
+  const accountDealer = cust?.accountDealer || '';
+
   return {
     customer: document.getElementById('customerName').value.trim()||'—',
     address: document.getElementById('address').value.trim()||'—',
@@ -4167,11 +4203,23 @@ function collectData() {
     status: j.status||'pending',
     arriveTime: d.arriveTime||'—',
     finishTime: d.finishTime||'—',
+    timeOnSite: timeOnSite,
     installing: installing.length?installing.map((e,i)=>`${i+1}. ${e}`).join('\n'):'—',
     existing: existing.length?existing.map((e,i)=>`${i+1}. ${e}`).join('\n'):'—',
     zones: zones.length?zones.map((z,i)=>`${i+1}. ${z}`).join('\n'):'—',
     userCodes: (d.userCodes||[]).filter(u=>u.name||u.code).map((u,i)=>`User ${i+1}: ${u.name||'—'} = ${u.code||'—'}`).join('\n') || '—',
-    fees: '$' + getJobFee(j) + (j.data.jobType === 'service' ? ' Service Fee' : ' Install Fee'),
+    fees: '$' + getJobFee(j) + (jobType === 'service' ? ' Service Fee' : ' Install Fee'),
+    feeAmount: getJobFee(j),
+    equipmentCost: equipCostTotal,
+    imeiNew: imeiNew || '—',
+    imeiOld: imeiOld || '—',
+    jobType: jobType,
+    serviceType: serviceType,
+    serviceIssue: serviceIssue || '—',
+    serviceResolution: serviceResolution || '—',
+    accountType: accountType,
+    accountDealer: accountDealer,
+    jobId: j.id || '',
     date: new Date().toLocaleString()
   };
 }
@@ -4181,25 +4229,39 @@ async function logToSheets(data) {
   try {
     const payload = {
       date: data.date,
+      jobType: data.jobType,
       customer: data.customer,
       address: data.address,
       phone: data.phone,
       email: data.email,
       cs: data.cs,
       confirmation: data.confirmation,
+      accountType: data.accountType,
+      accountDealer: data.accountDealer,
       status: data.status,
       arriveTime: data.arriveTime,
       finishTime: data.finishTime,
-      fees: data.fees,
+      timeOnSite: data.timeOnSite,
+      feeAmount: data.feeAmount,
+      equipmentCost: data.equipmentCost,
       installing: data.installing,
       existing: data.existing,
+      imeiNew: data.imeiNew,
+      imeiOld: data.imeiOld,
+      adtStatus: data.adtStatus,
       zones: data.zones,
+      masterCode: data.masterCode,
+      verbalCode: data.verbalCode,
       userCodes: data.userCodes,
-      notes: data.notes
+      serviceType: data.serviceType,
+      serviceIssue: data.serviceIssue,
+      serviceResolution: data.serviceResolution,
+      notes: data.notes,
+      jobId: data.jobId
     };
     await fetch(SHEETS_URL, {
       method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'text/plain'},
       body: JSON.stringify(payload)
     });
   } catch(e) { console.warn('Sheets log failed:', e); }
@@ -4216,13 +4278,22 @@ async function submitForm() {
     await emailjs.send('service_ody8c3i','template_rzxkses',{
       to_email: getEmailRecipient(),
       customer_name:data.customer, install_date:data.date,
+      job_type: data.jobType.toUpperCase(),
       installing:data.installing, existing_equipment:data.existing,
       cs_number:data.cs, customer_email:data.email,
       customer_phone:data.phone, confirmation:data.confirmation,
       zones:data.zones, address:data.address, notes:data.notes,
       status:data.status, arrive_time:data.arriveTime, finish_time:data.finishTime,
-      fees:data.fees, verbal_code:data.verbalCode||'—', master_code:data.masterCode||'—',
-      user_codes:data.userCodes||'—'
+      time_on_site: data.timeOnSite,
+      fees:data.fees, equipment_cost: data.equipmentCost ? '$'+data.equipmentCost.toFixed(2) : '—',
+      verbal_code:data.verbalCode||'—', master_code:data.masterCode||'—',
+      user_codes:data.userCodes||'—',
+      imei_new: data.imeiNew, imei_old: data.imeiOld,
+      adt_status: data.adtStatus,
+      account_type: data.accountType || '—',
+      service_type: data.serviceType || '—',
+      service_issue: data.serviceIssue || '—',
+      service_resolution: data.serviceResolution || '—'
     });
     await logToSheets(data);
     showToast('✓ Sent & logged: ' + data.customer, 'success');
@@ -8927,49 +8998,6 @@ function saveReceiptOnly(btn) {
   showToast('✓ Receipt saved', 'success');
 }
 
-function saveReceiptCategory(btn) {
-  const sheet = btn.closest('div[style*="border-radius"]');
-  if (sheet && sheet._receipt) {
-    const receipt = sheet._receipt;
-    const idx = receipts.findIndex(r => r.id === receipt.id);
-    if (idx >= 0) { receipts[idx] = receipt; saveReceipts(); }
-  }
-  showToast('✓ Receipt saved', 'success');
-}
-
-function addReceiptToInventory(btn, dest) {
-  const overlay = btn.closest('div[style*="fixed"]');
-  const sheet = overlay.querySelector('div[style*="border-radius"]');
-  const receipt = sheet._receipt;
-  if (!receipt) return;
-
-  const target = dest === 'warehouse' ? warehouse : truck;
-  let added = 0;
-
-  receipt.items.forEach(item => {
-    if (!item || !item.name) return;
-    const qty = parseInt(item.qty) || 1;
-    const existing = target.find(t => t.name.toLowerCase() === item.name.toLowerCase());
-    if (existing) existing.qty += qty;
-    else target.push({ name: item.name, qty: qty });
-    // Auto-add to equipment list if not already there
-    addCustomEquipment(item.name);
-    added++;
-  });
-
-  if (dest === 'warehouse') saveWarehouse();
-  else { saveTruck(); renderTruck(); }
-
-  // Save receipt category too
-  if (receipt.id) {
-    const idx = receipts.findIndex(r => r.id === receipt.id);
-    if (idx >= 0) { receipts[idx] = receipt; saveReceipts(); }
-  }
-
-  overlay.remove();
-  showToast('✓ ' + added + ' item' + (added!==1?'s':'') + ' added to ' + dest, 'success');
-}
-
 function renderReceipts() {
   const list = document.getElementById('receiptList');
   if (!list) return;
@@ -9943,6 +9971,16 @@ try {
       if (!data) return;
       const remote = Array.isArray(data) ? data : Object.values(data);
       if (remote.length) { truck = remote; localStorage.setItem('p22_truck', JSON.stringify(truck)); if(typeof updateTruckBadge==='function') updateTruckBadge(); }
+    });
+    db.ref('warehouse').on('value', snap => {
+      const data = snap.val();
+      if (!data) return;
+      const remote = Array.isArray(data) ? data : Object.values(data);
+      if (remote.length) { warehouse = remote; localStorage.setItem('p22_warehouse', JSON.stringify(warehouse)); }
+    });
+    db.ref('equipCosts').on('value', snap => {
+      const data = snap.val();
+      if (data && typeof data === 'object') { equipCosts = data; localStorage.setItem('p22_equipCosts', JSON.stringify(equipCosts)); }
     });
     db.ref('customers').on('value', snap => {
       const data = snap.val();
